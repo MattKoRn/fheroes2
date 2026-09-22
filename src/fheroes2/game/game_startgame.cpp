@@ -1038,7 +1038,7 @@ namespace
         if ( !loadOfflineProgressData( data ) ) {
             data.lastSeenUnix = now;
             data.resources = kingdom.GetFunds();
-            data.dailyIncome = kingdom.GetIncome();
+            captureOfflineKingdomState( data, kingdom );
             saveOfflineProgressData( data );
             return {};
         }
