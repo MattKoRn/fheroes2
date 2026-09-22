@@ -735,6 +735,49 @@ namespace
         }
     }
 
+    uint64_t deployCreatureCountToArmy( Army & army, const Monster & monster, uint64_t remaining )
+    {
+        if ( remaining == 0 || !monster.isValid() ) {
+            return remaining;
+        }
+
+        // Fill existing stacks first without ever overflowing the engine's uint32 troop count.
+        for ( size_t slot = 0; slot < army.Size() && remaining > 0; ++slot ) {
+            Troop * troop = army.GetTroop( slot );
+            if ( troop == nullptr || !troop->isValid() || !troop->isMonster( monster.GetID() ) ) {
+                continue;
+            }
+
+            const uint64_t capacity = std::numeric_limits<uint32_t>::max() - static_cast<uint64_t>( troop->GetCount() );
+            const uint32_t amount = static_cast<uint32_t>( std::min<uint64_t>( remaining, capacity ) );
+            if ( amount == 0 ) {
+                continue;
+            }
+
+            troop->SetCount( troop->GetCount() + amount );
+            remaining -= amount;
+        }
+
+        // If one stack reaches uint32 max, continue into free army slots instead of wrapping
+        // the existing stack or silently banking creatures that can still be deployed.
+        for ( size_t slot = 0; slot < army.Size() && remaining > 0; ++slot ) {
+            Troop * troop = army.GetTroop( slot );
+            if ( troop == nullptr || troop->isValid() ) {
+                continue;
+            }
+
+            const uint32_t amount = static_cast<uint32_t>( std::min<uint64_t>( remaining, std::numeric_limits<uint32_t>::max() ) );
+            if ( amount == 0 ) {
+                break;
+            }
+
+            troop->Set( monster, amount );
+            remaining -= amount;
+        }
+
+        return remaining;
+    }
+
     void restorePersistentCreaturesForNewMap( Kingdom & kingdom )
     {
         OfflineProgressData data;
@@ -804,14 +847,11 @@ namespace
             const Monster monster( static_cast<int>( monsterId ) );
 
             for ( Army * army : targetArmies ) {
-                if ( army == nullptr || remaining == 0 || !army->CanJoinTroop( monster ) ) {
+                if ( army == nullptr || remaining == 0 ) {
                     continue;
                 }
 
-                const uint32_t chunk = static_cast<uint32_t>( std::min<uint64_t>( remaining, std::numeric_limits<uint32_t>::max() ) );
-                if ( army->JoinTroop( monster, chunk, false ) ) {
-                    remaining -= chunk;
-                }
+                remaining = deployCreatureCountToArmy( *army, monster, remaining );
             }
 
             reserve[monsterId] = remaining;
@@ -1512,49 +1552,6 @@ namespace
         summary.bonusRewards.*member += summary.rankUpBonus;
         summary.rewards.*member += summary.rankUpBonus;
         data.resources.*member += summary.rankUpBonus;
-    }
-
-    uint64_t deployCreatureCountToArmy( Army & army, const Monster & monster, uint64_t remaining )
-    {
-        if ( remaining == 0 || !monster.isValid() ) {
-            return remaining;
-        }
-
-        // Fill existing stacks first without ever overflowing the engine's uint32 troop count.
-        for ( size_t slot = 0; slot < army.Size() && remaining > 0; ++slot ) {
-            Troop * troop = army.GetTroop( slot );
-            if ( troop == nullptr || !troop->isValid() || !troop->isMonster( monster.GetID() ) ) {
-                continue;
-            }
-
-            const uint64_t capacity = std::numeric_limits<uint32_t>::max() - static_cast<uint64_t>( troop->GetCount() );
-            const uint32_t amount = static_cast<uint32_t>( std::min<uint64_t>( remaining, capacity ) );
-            if ( amount == 0 ) {
-                continue;
-            }
-
-            troop->SetCount( troop->GetCount() + amount );
-            remaining -= amount;
-        }
-
-        // If one stack reaches uint32 max, continue into free army slots instead of wrapping
-        // the existing stack or silently banking creatures that can still be deployed.
-        for ( size_t slot = 0; slot < army.Size() && remaining > 0; ++slot ) {
-            Troop * troop = army.GetTroop( slot );
-            if ( troop == nullptr || troop->isValid() ) {
-                continue;
-            }
-
-            const uint32_t amount = static_cast<uint32_t>( std::min<uint64_t>( remaining, std::numeric_limits<uint32_t>::max() ) );
-            if ( amount == 0 ) {
-                break;
-            }
-
-            troop->Set( monster, amount );
-            remaining -= amount;
-        }
-
-        return remaining;
     }
 
     void applyOfflineCreatureRecruitment( OfflineProgressSummary & summary, OfflineProgressData & data, Kingdom & kingdom )
