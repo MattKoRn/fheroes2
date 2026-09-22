@@ -82,6 +82,7 @@
 #include "mp2.h"
 #include "mus.h"
 #include "players.h"
+#include "rand.h"
 #include "resource.h"
 #include "screen.h"
 #include "settings.h"
@@ -629,7 +630,20 @@ namespace
         return strength;
     }
 
-    void scaleArmyStrength( Army & army, const double multiplier )
+    double getRandomizedEnemyMultiplier( const double baseMultiplier, const uint32_t seed, const uint32_t minBonusPercent,
+                                         const uint32_t maxBonusPercent, const double maxMultiplier )
+    {
+        if ( baseMultiplier <= 1.0 ) {
+            return 1.0;
+        }
+
+        const uint32_t bonusPercent = Rand::GetWithSeed( minBonusPercent, maxBonusPercent, seed );
+        const double randomizedMultiplier = 1.0 + ( baseMultiplier - 1.0 ) * static_cast<double>( bonusPercent ) / 100.0;
+
+        return std::clamp( randomizedMultiplier, 1.0, maxMultiplier );
+    }
+
+    void scaleArmyStrength( Army & army, const double multiplier, const uint32_t seed )
     {
         if ( multiplier <= 1.0 ) {
             return;
@@ -641,7 +655,12 @@ namespace
                 continue;
             }
 
-            const uint64_t scaledCount = static_cast<uint64_t>( std::ceil( static_cast<double>( troop->GetCount() ) * multiplier ) );
+            // Keep a smaller second layer of variance inside each army so different creature
+            // stacks do not all grow by exactly the same percentage.
+            const uint32_t slotSeed = seed ^ static_cast<uint32_t>( 0x9E3779B9u + slot * 0x85EBCA6Bu );
+            const double stackMultiplier = getRandomizedEnemyMultiplier( multiplier, slotSeed, 90, 110, 3.0 );
+
+            const uint64_t scaledCount = static_cast<uint64_t>( std::ceil( static_cast<double>( troop->GetCount() ) * stackMultiplier ) );
             troop->SetCount( static_cast<uint32_t>( std::min<uint64_t>( scaledCount, std::numeric_limits<uint32_t>::max() ) ) );
         }
     }
@@ -673,14 +692,23 @@ namespace
                 }
 
                 Kingdom & enemyKingdom = world.GetKingdom( player->GetColor() );
+                const uint32_t mapSeed = world.GetMapSeed();
+
                 for ( Heroes * hero : enemyKingdom.GetHeroes() ) {
                     if ( hero != nullptr ) {
-                        scaleArmyStrength( hero->GetArmy(), enemyMultiplier );
+                        const uint32_t seed = mapSeed ^ static_cast<uint32_t>( hero->GetID() * 0x45D9F3Bu )
+                                              ^ static_cast<uint32_t>( player->GetColor() ) * 0x27D4EB2Du;
+                        const double randomizedMultiplier = getRandomizedEnemyMultiplier( enemyMultiplier, seed, 70, 140, 2.85 );
+                        scaleArmyStrength( hero->GetArmy(), randomizedMultiplier, seed );
                     }
                 }
+
                 for ( Castle * castle : enemyKingdom.GetCastles() ) {
                     if ( castle != nullptr ) {
-                        scaleArmyStrength( castle->GetArmy(), enemyMultiplier );
+                        const uint32_t seed = mapSeed ^ static_cast<uint32_t>( castle->GetIndex() ) * 0x165667B1u
+                                              ^ static_cast<uint32_t>( player->GetColor() ) * 0x9E3779B9u;
+                        const double randomizedMultiplier = getRandomizedEnemyMultiplier( enemyMultiplier, seed, 70, 140, 2.85 );
+                        scaleArmyStrength( castle->GetArmy(), randomizedMultiplier, seed );
                     }
                 }
             }
@@ -698,7 +726,10 @@ namespace
                     continue;
                 }
 
-                const uint64_t scaledCount = static_cast<uint64_t>( std::ceil( static_cast<double>( count ) * neutralMultiplier ) );
+                const uint32_t seed = world.GetMapSeed() ^ static_cast<uint32_t>( tileIndex ) * 0x7FEB352Du ^ 0xA24BAED5u;
+                const double randomizedMultiplier = getRandomizedEnemyMultiplier( neutralMultiplier, seed, 60, 150, 2.35 );
+
+                const uint64_t scaledCount = static_cast<uint64_t>( std::ceil( static_cast<double>( count ) * randomizedMultiplier ) );
                 Maps::setMonsterCountOnTile( tile, static_cast<uint32_t>( std::min<uint64_t>( scaledCount, std::numeric_limits<uint32_t>::max() ) ) );
             }
         }

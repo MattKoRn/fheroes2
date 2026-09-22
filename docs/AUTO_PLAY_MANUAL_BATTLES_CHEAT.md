@@ -67,3 +67,6 @@ Large creature-count displays now use an algorithmic suffix formatter. Compact a
 ## Battle presentation
 
 The battlefield hex grid is forced off in this fork. Movement-area and cursor-shadow visuals remain separate and are not disabled. The engine's normal default battle animation speed remains 5, while visible auto-play battles run one step faster at speed 6.
+
+
+Enemy scaling is intentionally varied. Enemy heroes and castle garrisons receive deterministic per-map random variation around the strength-based base multiplier (roughly 70–140% of the scaling bonus), plus smaller per-stack variation, capped at 2.85x. Neutral wandering stacks use a wider 60–150% spread and are capped at 2.35x. Seeds are based on the map and entity/tile so reloads do not reroll the result.
