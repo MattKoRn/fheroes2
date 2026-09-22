@@ -1658,7 +1658,7 @@ namespace
             const int64_t baseResource = data.resources.*member;
             int64_t savedDailyIncome = std::max<int64_t>( 0, data.dailyIncome.*member );
             if ( offlineResourceTypes[i] == Resource::GOLD ) {
-                savedDailyIncome = savedDailyIncome * 250 / 100;
+                savedDailyIncome = savedDailyIncome * 750 / 100;
             }
             const int64_t dailyIncome = savedDailyIncome * summary.stateEfficiencyPercent / 100;
             const int64_t capacity = std::numeric_limits<int32_t>::max() - baseResource;
