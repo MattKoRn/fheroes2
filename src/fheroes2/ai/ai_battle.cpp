@@ -158,6 +158,29 @@ namespace
         return bestAttackVector;
     }
 
+    double getTacticalTargetValue( const Battle::Unit & attacker, const Battle::Unit & target )
+    {
+        double value = target.evaluateThreatForUnit( attacker );
+
+        // Active shooters project damage across the whole battlefield, so shutting them down
+        // is more valuable than their raw stack strength alone suggests.
+        if ( target.isArchers() && !target.isHandFighting() ) {
+            value *= 1.15;
+        }
+
+        const uint32_t potentialDamage = attacker.getPotentialDamage( target );
+        if ( potentialDamage >= target.GetHitPoints() ) {
+            // Removing a stack completely denies all of its future turns and retaliation opportunities.
+            value *= 1.35;
+        }
+        else if ( potentialDamage * 2 >= target.GetHitPoints() ) {
+            // Prefer attacks that put a dangerous stack close to elimination over light chip damage.
+            value *= 1.10;
+        }
+
+        return value;
+    }
+
     double optimalAttackValue( const Battle::Unit & attacker, const Battle::Unit & target, const Battle::Position & attackPos, const double allEnemiesThreat )
     {
         assert( attackPos.isValidForUnit( attacker ) );
@@ -179,10 +202,10 @@ namespace
             }
 
             return std::accumulate( unitsUnderAttack.begin(), unitsUnderAttack.end(), static_cast<double>( 0.0 ),
-                                    [&attacker]( const double total, const Battle::Unit * unit ) { return total + unit->evaluateThreatForUnit( attacker ); } );
+                                    [&attacker]( const double total, const Battle::Unit * unit ) { return total + getTacticalTargetValue( attacker, *unit ); } );
         }
 
-        double attackValue = target.evaluateThreatForUnit( attacker );
+        double attackValue = getTacticalTargetValue( attacker, target );
 
         // A double cell attack should only be considered if the attacker is actually able to attack the target from the given attack position. Otherwise, the attacker
         // can at least block the target if the target is a shooter, so this position can be valuable in any case.
@@ -1461,8 +1484,11 @@ Battle::Actions AI::BattlePlanner::archerDecision( Battle::Arena & arena, const 
             const uint32_t archerMeleeDmg = currentUnit.getPotentialDamage( *enemy );
             const uint32_t retaliatoryDmg = enemy->EstimateRetaliatoryDamage( archerMeleeDmg );
             const int32_t damageDiff = static_cast<int32_t>( archerMeleeDmg ) - static_cast<int32_t>( retaliatoryDmg );
-            if ( bestOutcome < damageDiff ) {
-                bestOutcome = damageDiff;
+            const int32_t tacticalBonus = static_cast<int32_t>( std::min<double>( getTacticalTargetValue( currentUnit, *enemy ) * 0.15,
+                                                                                 static_cast<double>( std::numeric_limits<int32_t>::max() / 4 ) ) );
+            const int32_t outcome = damageDiff + tacticalBonus;
+            if ( bestOutcome < outcome ) {
+                bestOutcome = outcome;
 
                 target.unit = enemy;
 
@@ -1534,7 +1560,12 @@ Battle::Actions AI::BattlePlanner::archerDecision( Battle::Arena & arena, const 
                             }
                         }
 
-                        result += unit->evaluateThreatForUnit( currentUnit );
+                        if ( currentUnit.GetColor() == unit->GetCurrentColor() ) {
+                            result += unit->evaluateThreatForUnit( currentUnit );
+                        }
+                        else {
+                            result += getTacticalTargetValue( currentUnit, *unit );
+                        }
                     }
 
                     if ( isExtraLogicAllowed ) {
@@ -1571,7 +1602,7 @@ Battle::Actions AI::BattlePlanner::archerDecision( Battle::Arena & arena, const 
                 continue;
             }
 
-            updateBestTarget( enemy->evaluateThreatForUnit( currentUnit ), -1 );
+            updateBestTarget( getTacticalTargetValue( currentUnit, *enemy ), -1 );
         }
 
         if ( target.unit ) {

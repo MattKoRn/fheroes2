@@ -1008,6 +1008,45 @@ namespace
         return value - ( correctedDistance * std::log10( correctedDistance ) );
     }
 
+    double getReachabilityPriorityModifier( const MP2::MapObjectType objectType, const uint32_t distance, const uint32_t movePoints )
+    {
+        if ( movePoints == 0 || distance == 0 ) {
+            return 1.0;
+        }
+
+        const bool reachableThisTurn = distance <= movePoints;
+        const bool requiresMultipleTurns = distance > movePoints * 2;
+
+        switch ( objectType ) {
+        case MP2::OBJ_CASTLE:
+        case MP2::OBJ_HERO:
+            // Finishing a decisive attack or defense this turn is significantly better than
+            // starting another trip that leaves the target time to move or reinforce.
+            return reachableThisTurn ? 1.25 : 1.0;
+
+        case MP2::OBJ_ALCHEMIST_LAB:
+        case MP2::OBJ_ARTIFACT:
+        case MP2::OBJ_MINE:
+        case MP2::OBJ_SAWMILL:
+            // Permanent economy and hero-power gains are good same-turn objectives.
+            return reachableThisTurn ? 1.15 : 1.0;
+
+        case MP2::OBJ_BARREL:
+        case MP2::OBJ_CAMPFIRE:
+        case MP2::OBJ_FLOTSAM:
+        case MP2::OBJ_RESOURCE:
+        case MP2::OBJ_SEA_CHEST:
+        case MP2::OBJ_TREASURE_CHEST:
+            // Do not send heroes on long multi-turn detours for consumable pickups.
+            return requiresMultipleTurns ? 0.65 : ( reachableThisTurn ? 1.05 : 1.0 );
+
+        default:
+            break;
+        }
+
+        return 1.0;
+    }
+
     double getFogDiscoveryValue( const Heroes & hero )
     {
         switch ( hero.getAIRole() ) {
@@ -2567,6 +2606,10 @@ int AI::Planner::getPriorityTarget( Heroes & hero, double & maxPriority )
         }
 
         value = scaleWithDistanceAndTime( value, distance, type );
+
+        if ( value > 0 ) {
+            value *= getReachabilityPriorityModifier( type, distance, heroMovePoints );
+        }
     };
 
     // Set baseline target if it's a special role
