@@ -11,6 +11,15 @@ set "TRIPLET=x64-windows"
 set "VCPKG_DEFAULT_BINARY_CACHE=%LOCALAPPDATA%\fheroes2-vcpkg-cache"
 set "PATH=%PATH%;%LOCALAPPDATA%\Microsoft\WindowsApps"
 
+if not exist "%VCPKG_DEFAULT_BINARY_CACHE%" (
+    mkdir "%VCPKG_DEFAULT_BINARY_CACHE%"
+    if errorlevel 1 (
+        echo ERROR: Could not create the vcpkg binary cache directory:
+        echo   %VCPKG_DEFAULT_BINARY_CACHE%
+        goto :fail
+    )
+)
+
 echo.
 echo ============================================================
 echo  fheroes2 one-click Release build and install
