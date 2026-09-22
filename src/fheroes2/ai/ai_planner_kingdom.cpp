@@ -766,13 +766,18 @@ fheroes2::GameMode AI::Planner::KingdomTurn( Kingdom & kingdom )
             const Heroes * hero = tile.getHero();
             assert( hero != nullptr );
 
-            if ( hero->GetColor() == myColor && !hero->Modes( Heroes::PATROL ) ) {
-                ++stats.friendlyHeroes;
+            if ( hero->GetColor() == myColor ) {
+                // Patrol heroes are intentionally excluded from the mobile-hero count, but their
+                // armies still defend the region and must contribute to the strength ratio.
                 stats.friendlyArmyStrength += hero->GetArmy().GetStrength();
 
-                const int wisdomLevel = hero->GetLevelSkill( Skill::Secondary::WISDOM );
-                if ( wisdomLevel + 2 > stats.spellLevel ) {
-                    stats.spellLevel = wisdomLevel + 2;
+                if ( !hero->Modes( Heroes::PATROL ) ) {
+                    ++stats.friendlyHeroes;
+
+                    const int wisdomLevel = hero->GetLevelSkill( Skill::Secondary::WISDOM );
+                    if ( wisdomLevel + 2 > stats.spellLevel ) {
+                        stats.spellLevel = wisdomLevel + 2;
+                    }
                 }
             }
 
