@@ -1008,7 +1008,8 @@ namespace
         return value - ( correctedDistance * std::log10( correctedDistance ) );
     }
 
-    double getReachabilityPriorityModifier( const MP2::MapObjectType objectType, const uint32_t distance, const uint32_t movePoints )
+    double getReachabilityPriorityModifier( const MP2::MapObjectType objectType, const uint32_t distance, const uint32_t movePoints,
+                                            const Heroes::Role role )
     {
         if ( movePoints == 0 || distance == 0 ) {
             return 1.0;
@@ -1017,20 +1018,30 @@ namespace
         const bool reachableThisTurn = distance <= movePoints;
         const bool requiresMultipleTurns = static_cast<uint64_t>( distance ) > static_cast<uint64_t>( movePoints ) * 2;
 
+        double modifier = 1.0;
+
         switch ( objectType ) {
         case MP2::OBJ_CASTLE:
         case MP2::OBJ_HERO:
-            // Finishing a decisive attack or defense this turn is significantly better than
-            // starting another trip that leaves the target time to move or reinforce.
-            return reachableThisTurn ? 1.25 : 1.0;
+            modifier = reachableThisTurn ? 1.25 : 1.0;
+            if ( role == Heroes::Role::FIGHTER || role == Heroes::Role::CHAMPION ) {
+                modifier *= 1.20;
+            }
+            else if ( role == Heroes::Role::SCOUT ) {
+                modifier *= 0.85;
+            }
+            break;
 
         case MP2::OBJ_ABANDONED_MINE:
         case MP2::OBJ_ALCHEMIST_LAB:
         case MP2::OBJ_ARTIFACT:
         case MP2::OBJ_MINE:
         case MP2::OBJ_SAWMILL:
-            // Permanent economy and hero-power gains are good same-turn objectives.
-            return reachableThisTurn ? 1.15 : 1.0;
+            modifier = reachableThisTurn ? 1.15 : 1.0;
+            if ( role == Heroes::Role::FIGHTER || role == Heroes::Role::CHAMPION ) {
+                modifier *= 1.08;
+            }
+            break;
 
         case MP2::OBJ_BARREL:
         case MP2::OBJ_CAMPFIRE:
@@ -1038,14 +1049,26 @@ namespace
         case MP2::OBJ_RESOURCE:
         case MP2::OBJ_SEA_CHEST:
         case MP2::OBJ_TREASURE_CHEST:
-            // Do not send heroes on long multi-turn detours for consumable pickups.
-            return requiresMultipleTurns ? 0.65 : ( reachableThisTurn ? 1.05 : 1.0 );
+            modifier = requiresMultipleTurns ? 0.65 : ( reachableThisTurn ? 1.05 : 1.0 );
+
+            if ( role == Heroes::Role::FIGHTER || role == Heroes::Role::CHAMPION ) {
+                // Front-line heroes should not abandon strategic pressure for low-value loot.
+                modifier *= requiresMultipleTurns ? 0.45 : 0.80;
+            }
+            else if ( role == Heroes::Role::SCOUT ) {
+                // Scouts are the right heroes to sweep nearby pickups.
+                modifier *= requiresMultipleTurns ? 0.90 : 1.15;
+            }
+            else if ( role == Heroes::Role::COURIER ) {
+                modifier *= 0.45;
+            }
+            break;
 
         default:
             break;
         }
 
-        return 1.0;
+        return modifier;
     }
 
     double getFogDiscoveryValue( const Heroes & hero )
@@ -2611,7 +2634,7 @@ int AI::Planner::getPriorityTarget( Heroes & hero, double & maxPriority )
         value = scaleWithDistanceAndTime( value, distance, type );
 
         if ( value > 0 ) {
-            value *= getReachabilityPriorityModifier( type, actualDistance, heroMovePoints );
+            value *= getReachabilityPriorityModifier( type, actualDistance, heroMovePoints, hero.getAIRole() );
         }
     };
 

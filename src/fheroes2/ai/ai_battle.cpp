@@ -165,7 +165,20 @@ namespace
         // Active shooters project damage across the whole battlefield, so shutting them down
         // is more valuable than their raw stack strength alone suggests.
         if ( target.isArchers() && !target.isHandFighting() ) {
-            value *= 1.15;
+            value *= 1.20;
+        }
+
+        // Focus already-damaged stacks. Removing a weakened stack denies an entire future turn
+        // and is usually stronger than spreading the same damage across several enemies.
+        const uint32_t initialCount = target.GetInitialCount();
+        if ( initialCount > 0 ) {
+            const uint64_t currentCount = target.GetCount();
+            if ( currentCount * 4 <= initialCount ) {
+                value *= 1.25;
+            }
+            else if ( currentCount * 2 <= initialCount ) {
+                value *= 1.15;
+            }
         }
 
         const uint32_t potentialDamage = attacker.getPotentialDamage( target );
@@ -216,6 +229,20 @@ namespace
             attackValue
                 += doubleCellAttackValue( attacker, target, Battle::Board::GetIndexDirection( attackTargetIdx, Battle::Board::GetReflectDirection( attackDirection ) ),
                                           attackTargetIdx );
+        }
+
+        const uint32_t potentialDamage = attacker.getPotentialDamage( target );
+        if ( potentialDamage < target.GetHitPoints() && attacker.GetHitPoints() > 0 ) {
+            const uint32_t retaliatoryDamage = target.EstimateRetaliatoryDamage( potentialDamage );
+            if ( retaliatoryDamage > 0 ) {
+                const double retaliationRatio
+                    = std::min( 1.0, static_cast<double>( retaliatoryDamage ) / static_cast<double>( attacker.GetHitPoints() ) );
+
+                // Avoid expensive melee trades unless the target is important enough to justify them.
+                // Shooters receive a softer penalty because engaging them also disables ranged fire.
+                const double penaltyStrength = target.isArchers() && !target.isHandFighting() ? 0.25 : 0.45;
+                attackValue *= std::max( 0.55, 1.0 - retaliationRatio * penaltyStrength );
+            }
         }
 
         if ( attacker.isAbilityPresent( fheroes2::MonsterAbilityType::SOUL_EATER ) || attacker.isAbilityPresent( fheroes2::MonsterAbilityType::HP_DRAIN ) ) {
