@@ -27,6 +27,7 @@
 #include <array>
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -520,11 +521,6 @@ namespace
     void captureOfflineKingdomState( OfflineProgressData & data, const Kingdom & kingdom )
     {
         data.dailyIncome = kingdom.GetIncome();
-
-        // Gold funds long-running offline recruitment. Keep all other resources tied to
-        // normal kingdom income while giving gold a controlled persistent boost.
-        const int64_t boostedGold = static_cast<int64_t>( data.dailyIncome.gold ) * 175 / 100;
-        data.dailyIncome.gold = clampResourceValue( boostedGold );
         data.stateCastles = kingdom.GetCountCastle();
         data.stateTowns = kingdom.GetCountTown();
         data.stateHeroes = static_cast<uint32_t>( kingdom.GetHeroes().size() );
@@ -637,16 +633,21 @@ namespace
         }
 
         const double baseline = std::max( 1000.0, mapStartingStrength );
-        const double strengthRatio = std::max( 1.0, carriedStrength / baseline );
+        const double rawStrengthRatio = carriedStrength / baseline;
+        if ( rawStrengthRatio <= 1.25 ) {
+            return;
+        }
 
-        // Square-root scaling makes modest carry-over nearly free while progressively
-        // strengthening opposition against very large veteran rosters.
-        const double enemyMultiplier = std::clamp( 1.0 + ( std::sqrt( strengthRatio ) - 1.0 ) * 0.65, 1.0, 2.5 );
+        const double strengthRatio = rawStrengthRatio / 1.25;
+
+        // A 25% dead-zone lets modest carry-over feel rewarding. Beyond that, square-root
+        // scaling progressively strengthens opposition without matching the player 1:1.
+        const double enemyMultiplier = std::clamp( 1.0 + ( std::sqrt( strengthRatio ) - 1.0 ) * 0.75, 1.0, 2.5 );
         const double neutralMultiplier = std::clamp( 1.0 + ( enemyMultiplier - 1.0 ) * 0.70, 1.0, 2.0 );
 
         if ( enemyMultiplier > 1.0 ) {
             for ( Player * player : Settings::Get().GetPlayers().getVector() ) {
-                if ( player == nullptr || player->GetColor() == playerColor
+                if ( player == nullptr || player->GetColor() == playerColor || player->isControlHuman()
                      || Players::isFriends( playerColor, static_cast<PlayerColorsSet>( player->GetColor() ) ) ) {
                     continue;
                 }
@@ -672,13 +673,13 @@ namespace
                     continue;
                 }
 
-                const uint32_t count = getMonsterCountFromTile( tile );
+                const uint32_t count = Maps::getMonsterCountFromTile( tile );
                 if ( count == 0 ) {
                     continue;
                 }
 
                 const uint64_t scaledCount = static_cast<uint64_t>( std::ceil( static_cast<double>( count ) * neutralMultiplier ) );
-                setMonsterCountOnTile( tile, static_cast<uint32_t>( std::min<uint64_t>( scaledCount, std::numeric_limits<uint32_t>::max() ) ) );
+                Maps::setMonsterCountOnTile( tile, static_cast<uint32_t>( std::min<uint64_t>( scaledCount, std::numeric_limits<uint32_t>::max() ) ) );
             }
         }
     }
@@ -729,6 +730,22 @@ namespace
         std::sort( monsterIds.begin(), monsterIds.end(), []( const size_t lhs, const size_t rhs ) {
             return Monster( static_cast<int>( lhs ) ).GetMonsterStrength() > Monster( static_cast<int>( rhs ) ).GetMonsterStrength();
         } );
+
+        if ( !monsterIds.empty() ) {
+            const size_t seedMonsterId = monsterIds.front();
+            const Monster seedMonster( static_cast<int>( seedMonsterId ) );
+            uint64_t & seedCount = data.creatureRoster[seedMonsterId];
+
+            for ( Heroes * hero : kingdom.GetHeroes() ) {
+                if ( hero == nullptr || seedCount == 0 ) {
+                    continue;
+                }
+
+                if ( hero->GetArmy().JoinTroop( seedMonster, 1, false ) ) {
+                    --seedCount;
+                }
+            }
+        }
 
         for ( const size_t monsterId : monsterIds ) {
             uint64_t remaining = data.creatureRoster[monsterId];
@@ -1416,10 +1433,12 @@ namespace
                     continue;
                 }
 
-                const uint64_t scaledElapsed
-                    = static_cast<uint64_t>( summary.elapsedSeconds ) * static_cast<uint64_t>( summary.stateEfficiencyPercent ) / 100;
-                const uint64_t growthNumerator = static_cast<uint64_t>( monster.GetGrown() ) * scaledElapsed;
-                uint64_t recruitQuota = growthNumerator / static_cast<uint64_t>( fullGrowthSeconds );
+                const long double recruitRate = static_cast<long double>( monster.GetGrown() ) * static_cast<long double>( summary.elapsedSeconds )
+                                                * static_cast<long double>( summary.stateEfficiencyPercent )
+                                                / ( static_cast<long double>( fullGrowthSeconds ) * 100.0L );
+                uint64_t recruitQuota = recruitRate >= static_cast<long double>( std::numeric_limits<uint64_t>::max() )
+                                            ? std::numeric_limits<uint64_t>::max()
+                                            : static_cast<uint64_t>( recruitRate );
                 if ( recruitQuota == 0 ) {
                     recruitQuota = 1;
                 }
@@ -1499,7 +1518,10 @@ namespace
         for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
             const FundsMember member = offlineFundMembers[i];
             const int64_t baseResource = data.resources.*member;
-            const int64_t savedDailyIncome = std::max<int64_t>( 0, data.dailyIncome.*member );
+            int64_t savedDailyIncome = std::max<int64_t>( 0, data.dailyIncome.*member );
+            if ( offlineResourceTypes[i] == Resource::GOLD ) {
+                savedDailyIncome = savedDailyIncome * 175 / 100;
+            }
             const int64_t dailyIncome = savedDailyIncome * summary.stateEfficiencyPercent / 100;
             const int64_t capacity = std::numeric_limits<int32_t>::max() - baseResource;
 
