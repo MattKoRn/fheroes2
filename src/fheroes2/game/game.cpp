@@ -461,7 +461,7 @@ PlayerColorsSet Game::GetActualKingdomColors()
 std::string Game::formatMonsterCount( const uint32_t count, const bool isDetailedView, const bool abbreviateNumber /* = false */ )
 {
     if ( isDetailedView ) {
-        return ( abbreviateNumber ? fheroes2::abbreviateNumber( count ) : std::to_string( count ) );
+        return ( abbreviateNumber ? fheroes2::abbreviateNumber( static_cast<uint64_t>( count ) ) : std::to_string( count ) );
     }
 
     return Army::SizeString( count );

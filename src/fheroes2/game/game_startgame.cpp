@@ -198,7 +198,7 @@ namespace
         uint32_t supplyRushEarned{ 0 };
         uint32_t supplyRushAfter{ 0 };
         bool supplyRushTriggered{ false };
-        uint32_t recruitedCreatures{ 0 };
+        uint64_t recruitedCreatures{ 0 };
         uint32_t recruitedStacks{ 0 };
         uint32_t recruitmentSettlements{ 0 };
         Funds recruitmentSpent;
@@ -1493,13 +1493,24 @@ namespace
             return;
         }
 
-        // Auto-buy mode: every offline return spends from the real treasury to recruit as many
-        // currently available dwelling creatures as possible. Stronger tiers are considered first.
         constexpr std::array<uint32_t, 6> baseDwellings{ DWELLING_MONSTER1, DWELLING_MONSTER2, DWELLING_MONSTER3,
                                                          DWELLING_MONSTER4, DWELLING_MONSTER5, DWELLING_MONSTER6 };
 
-        // Version 9 used time-based fractional recruitment. Auto-buy no longer uses that bank.
         data.creatureRecruitCarry.fill( 0 );
+
+        const auto getJoinCapacity = []( Army & army, const Monster & monster ) -> uint64_t {
+            for ( size_t slot = 0; slot < army.Size(); ++slot ) {
+                Troop * troop = army.GetTroop( slot );
+                if ( troop == nullptr ) {
+                    continue;
+                }
+                if ( troop->isValid() && troop->isMonster( monster.GetID() ) ) {
+                    return std::numeric_limits<uint32_t>::max() - static_cast<uint64_t>( troop->GetCount() );
+                }
+            }
+
+            return army.GetOccupiedSlotCount() < army.Size() ? std::numeric_limits<uint32_t>::max() : 0;
+        };
 
         for ( size_t castleIndex = 0; castleIndex < settlementLimit; ++castleIndex ) {
             Castle * castle = castles[castleIndex];
@@ -1525,26 +1536,47 @@ namespace
                     continue;
                 }
 
-                const uint32_t available = castle->getMonstersInDwelling( actualDwelling );
-                if ( available == 0 ) {
+                const int affordable = kingdom.GetFunds().getLowestQuotient( monster.GetCost() );
+                if ( affordable <= 0 ) {
                     continue;
                 }
 
-                const uint32_t affordable = castle->getRecruitLimit( monster, kingdom.GetFunds() );
-                const uint32_t recruitCount = std::min( available, affordable );
-                if ( recruitCount == 0 ) {
+                const uint32_t recruitCount = static_cast<uint32_t>( affordable );
+                const Funds cost = monster.GetCost() * recruitCount;
+                if ( !kingdom.AllowPayment( cost ) ) {
                     continue;
                 }
 
-                const Troop troop( monster, recruitCount );
-                const Funds cost = troop.GetTotalCost();
+                uint64_t remaining = recruitCount;
 
-                // Castle::RecruitMonster() uses real dwelling stock, pays the normal price and
-                // falls back to a visiting hero if the castle garrison has no suitable slot.
-                if ( !castle->RecruitMonster( troop, false ) ) {
-                    continue;
+                Army & castleArmy = castle->GetArmy();
+                const uint64_t castleCapacity = getJoinCapacity( castleArmy, monster );
+                if ( castleCapacity > 0 ) {
+                    const uint32_t deployCount = static_cast<uint32_t>( std::min<uint64_t>( remaining, castleCapacity ) );
+                    if ( deployCount > 0 && castleArmy.JoinTroop( monster, deployCount, false ) ) {
+                        remaining -= deployCount;
+                    }
                 }
 
+                Heroes * guestHero = castle->GetHero();
+                if ( remaining > 0 && guestHero != nullptr ) {
+                    Army & heroArmy = guestHero->GetArmy();
+                    const uint64_t heroCapacity = getJoinCapacity( heroArmy, monster );
+                    if ( heroCapacity > 0 ) {
+                        const uint32_t deployCount = static_cast<uint32_t>( std::min<uint64_t>( remaining, heroCapacity ) );
+                        if ( deployCount > 0 && heroArmy.JoinTroop( monster, deployCount, false ) ) {
+                            remaining -= deployCount;
+                        }
+                    }
+                }
+
+                if ( remaining > 0 ) {
+                    const size_t monsterId = static_cast<size_t>( monster.GetID() );
+                    uint64_t & reserve = data.creatureReserve[monsterId];
+                    reserve = std::numeric_limits<uint64_t>::max() - reserve < remaining ? std::numeric_limits<uint64_t>::max() : reserve + remaining;
+                }
+
+                kingdom.OddFundsResource( cost );
                 summary.recruitmentSpent += cost;
                 summary.recruitedCreatures += recruitCount;
                 ++summary.recruitedStacks;

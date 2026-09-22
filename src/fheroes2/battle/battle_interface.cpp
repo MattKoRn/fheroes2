@@ -1240,7 +1240,7 @@ void Battle::TurnOrder::_redrawUnit( const fheroes2::Rect & pos, const Battle::U
                         pos.y + pos.height - monsterSpriteHeight - ( monsterSpriteHeight + 3 < pos.height ? 3 : 0 ), revert );
     }
 
-    const fheroes2::Text number( fheroes2::abbreviateNumber( static_cast<int32_t>( unit.GetCount() ) ), fheroes2::FontType::smallWhite() );
+    const fheroes2::Text number( fheroes2::abbreviateNumber( static_cast<uint64_t>( unit.GetCount() ) ), fheroes2::FontType::smallWhite() );
     number.drawInRoi( pos.x + 2, pos.y + 4, output, pos );
 
     fheroes2::DrawRect( output, pos, unitColor );
@@ -2219,7 +2219,7 @@ void Battle::Interface::RedrawTroopCount( const Unit & unit )
 
     fheroes2::Copy( bar, 0, 0, _mainSurface, sx, sy, bar.width(), bar.height() );
 
-    const fheroes2::Text text( fheroes2::abbreviateNumber( static_cast<int32_t>( unit.GetCount() ) ), fheroes2::FontType::smallWhite() );
+    const fheroes2::Text text( fheroes2::abbreviateNumber( static_cast<uint64_t>( unit.GetCount() ) ), fheroes2::FontType::smallWhite() );
     text.draw( sx + ( bar.width() - text.width() ) / 2, sy + 2, _mainSurface );
 }
 

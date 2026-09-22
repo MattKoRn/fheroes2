@@ -154,15 +154,66 @@ namespace fheroes2
 
     std::string abbreviateNumber( const int num )
     {
-        if ( std::abs( num ) >= 1000000 ) {
-            return std::to_string( num / 1000000 ) + 'M';
+        if ( num < 0 ) {
+            return "-" + abbreviateNumber( static_cast<uint64_t>( -( static_cast<int64_t>( num ) ) ) );
         }
 
-        if ( std::abs( num ) >= 1000 ) {
-            return std::to_string( num / 1000 ) + 'K';
+        return abbreviateNumber( static_cast<uint64_t>( num ) );
+    }
+
+    std::string abbreviateNumber( uint64_t num )
+    {
+        if ( num < 1000 ) {
+            return std::to_string( num );
         }
 
-        return std::to_string( num );
+        uint64_t divisor = 1000;
+        size_t group = 1;
+        while ( num / divisor >= 1000 && divisor <= std::numeric_limits<uint64_t>::max() / 1000 ) {
+            divisor *= 1000;
+            ++group;
+        }
+
+        std::string suffix;
+        if ( group == 1 ) {
+            suffix = "K";
+        }
+        else if ( group == 2 ) {
+            suffix = "M";
+        }
+        else if ( group == 3 ) {
+            suffix = "B";
+        }
+        else {
+            uint64_t index = group - 4;
+            size_t length = 2;
+            uint64_t block = 26 * 26;
+
+            while ( index >= block ) {
+                index -= block;
+                ++length;
+                if ( block > std::numeric_limits<uint64_t>::max() / 26 ) {
+                    break;
+                }
+                block *= 26;
+            }
+
+            suffix.assign( length, 'a' );
+            for ( size_t pos = length; pos > 0; --pos ) {
+                suffix[pos - 1] = static_cast<char>( 'a' + index % 26 );
+                index /= 26;
+            }
+        }
+
+        const uint64_t whole = num / divisor;
+        if ( whole < 10 ) {
+            const uint32_t decimal = static_cast<uint32_t>( static_cast<long double>( num % divisor ) * 10.0L / divisor );
+            if ( decimal > 0 ) {
+                return std::to_string( whole ) + "." + std::to_string( decimal ) + suffix;
+            }
+        }
+
+        return std::to_string( whole ) + suffix;
     }
 
     void appendModifierToString( std::string & str, const int mod )

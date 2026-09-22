@@ -95,6 +95,7 @@ namespace fheroes2
     void replaceStringEnding( std::string & output, const char * originalEnding, const char * correctedEnding );
 
     std::string abbreviateNumber( const int num );
+    std::string abbreviateNumber( uint64_t num );
 
     // Appends the given modifier to the end of the given string (e.g. "Coliseum +2")
     void appendModifierToString( std::string & str, const int mod );
