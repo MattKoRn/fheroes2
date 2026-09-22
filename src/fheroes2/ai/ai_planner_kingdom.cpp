@@ -328,11 +328,22 @@ void AI::Planner::evaluateRegionSafety()
         RegionStats & stats = _regions[regionID];
 
         if ( ( stats.friendlyCastles && stats.enemyCastles ) || ( stats.highestThreat > 0 && !stats.enemyCastles ) ) {
-            // contested space OR enemy heroes invaded our region
-            // TODO: assess army strength to get more accurate reading
-            stats.safetyFactor = -50;
+            // Distinguish between an undefended invasion and a region where friendly heroes are
+            // already present. This feeds castle defense, reinforcement and hero recruitment
+            // priorities without treating every enemy incursion as the same emergency.
+            const bool contestedCastleRegion = stats.friendlyCastles > 0 && stats.enemyCastles > 0;
+
+            int safety = contestedCastleRegion ? -75 : -70;
+            if ( stats.friendlyHeroes == 1 ) {
+                safety += contestedCastleRegion ? 15 : 20;
+            }
+            else if ( stats.friendlyHeroes >= 2 ) {
+                safety += contestedCastleRegion ? 30 : 40;
+            }
+
+            stats.safetyFactor = std::clamp( safety, -100, -20 );
             stats.evaluated = true;
-            regionsToCheck.emplace_back( regionID, -50 );
+            regionsToCheck.emplace_back( regionID, stats.safetyFactor );
         }
         else if ( stats.enemyCastles ) {
             // straight up enemy territory

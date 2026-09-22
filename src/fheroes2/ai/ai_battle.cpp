@@ -363,6 +363,43 @@ namespace
             }
         }
 
+        if ( !attacker.isAllAdjacentCellsAttack() ) {
+            for ( auto & [position, value] : result ) {
+                std::set<const Battle::Unit *> adjacentEnemies;
+
+                for ( const int32_t index : Battle::Board::GetAroundIndexes( position ) ) {
+                    const Battle::Cell * cell = Battle::Board::GetCell( index );
+                    if ( cell == nullptr ) {
+                        continue;
+                    }
+
+                    const Battle::Unit * unit = cell->GetUnit();
+                    if ( unit == nullptr || unit == &attacker || unit->GetCurrentColor() == attacker.GetCurrentColor() ) {
+                        continue;
+                    }
+
+                    adjacentEnemies.insert( unit );
+                }
+
+                if ( adjacentEnemies.size() <= 1 ) {
+                    continue;
+                }
+
+                // One adjacent enemy is the intended target. Penalize only the additional
+                // exposure so aggressive melee attacks remain attractive without rewarding
+                // positions that get the stack surrounded unnecessarily.
+                double totalThreat = 0.0;
+                double highestThreat = 0.0;
+                for ( const Battle::Unit * enemy : adjacentEnemies ) {
+                    const double threat = enemy->evaluateThreatForUnit( attacker );
+                    totalThreat += threat;
+                    highestThreat = std::max( highestThreat, threat );
+                }
+
+                value -= ( totalThreat - highestThreat ) * 0.30;
+            }
+        }
+
         return result;
     }
 
