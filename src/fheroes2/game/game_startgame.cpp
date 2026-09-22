@@ -503,12 +503,14 @@ namespace
 
         // Replace the live file only after the temporary file is fully written. Keep one backup
         // during the swap so an interrupted rename cannot destroy the last valid snapshot.
-        System::Unlink( backupFilePath );
         const bool hadOriginal = System::IsFile( filePath );
-        if ( hadOriginal && std::rename( filePath.c_str(), backupFilePath.c_str() ) != 0 ) {
-            ERROR_LOG( "Unable to back up offline progress data." )
-            System::Unlink( tempFilePath );
-            return;
+        if ( hadOriginal ) {
+            System::Unlink( backupFilePath );
+            if ( std::rename( filePath.c_str(), backupFilePath.c_str() ) != 0 ) {
+                ERROR_LOG( "Unable to back up offline progress data." )
+                System::Unlink( tempFilePath );
+                return;
+            }
         }
 
         if ( std::rename( tempFilePath.c_str(), filePath.c_str() ) != 0 ) {
@@ -520,6 +522,8 @@ namespace
             return;
         }
 
+        // If there was no primary file, an existing backup may be the snapshot we just recovered
+        // from. Do not delete it until the new primary has been installed successfully.
         System::Unlink( backupFilePath );
     }
 
