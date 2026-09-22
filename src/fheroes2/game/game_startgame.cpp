@@ -128,6 +128,7 @@ namespace
         uint32_t stateMines{ 0 };
         uint32_t stateArtifacts{ 0 };
         uint32_t stateEfficiencyPercent{ 100 };
+        uint32_t supplyRushMeter{ 0 };
     };
 
     struct OfflineEvent
@@ -186,6 +187,10 @@ namespace
         uint32_t stateMines{ 0 };
         uint32_t stateArtifacts{ 0 };
         uint32_t stateEfficiencyPercent{ 100 };
+        uint32_t supplyRushBefore{ 0 };
+        uint32_t supplyRushEarned{ 0 };
+        uint32_t supplyRushAfter{ 0 };
+        bool supplyRushTriggered{ false };
         bool showPopup{ false };
     };
 
@@ -231,6 +236,7 @@ namespace
         bool hasStateMines = false;
         bool hasStateArtifacts = false;
         bool hasStateEfficiency = false;
+        bool hasSupplyRushMeter = false;
 
         const auto readFunds = [&input]( Funds & funds ) {
             for ( const FundsMember member : offlineFundMembers ) {
@@ -331,6 +337,11 @@ namespace
                 data.stateEfficiencyPercent = std::clamp<uint32_t>( data.stateEfficiencyPercent, 100, 150 );
                 hasStateEfficiency = true;
             }
+            else if ( key == "supply_rush_meter" ) {
+                input >> data.supplyRushMeter;
+                data.supplyRushMeter = std::min<uint32_t>( data.supplyRushMeter, 99 );
+                hasSupplyRushMeter = true;
+            }
             else {
                 std::string ignoredLine;
                 std::getline( input, ignoredLine );
@@ -350,8 +361,11 @@ namespace
                    && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted )
               || ( version == 6 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
                    && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
-                   && hasStateMines && hasStateArtifacts && hasStateEfficiency );
-        return ( version >= 1 && version <= 6 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
+                   && hasStateMines && hasStateArtifacts && hasStateEfficiency )
+              || ( version == 7 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
+                   && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
+                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter );
+        return ( version >= 1 && version <= 7 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
     }
 
     void saveOfflineProgressData( const OfflineProgressData & data )
@@ -372,7 +386,7 @@ namespace
             output << '\n';
         };
 
-        output << "version 6\n";
+        output << "version 7\n";
         output << "last_seen_unix " << data.lastSeenUnix << '\n';
         output << "resources ";
         writeFunds( data.resources );
@@ -401,6 +415,7 @@ namespace
         output << "state_mines " << data.stateMines << '\n';
         output << "state_artifacts " << data.stateArtifacts << '\n';
         output << "state_efficiency_percent " << data.stateEfficiencyPercent << '\n';
+        output << "supply_rush_meter " << data.supplyRushMeter << '\n';
     }
 
     void setKingdomFundsExact( Kingdom & kingdom, const Funds & target )
@@ -957,6 +972,55 @@ namespace
         summary.treasureMapsCompleted = data.treasureMapsCompleted;
     }
 
+    void applyOfflineSupplyRush( OfflineProgressSummary & summary, OfflineProgressData & data )
+    {
+        summary.supplyRushBefore = data.supplyRushMeter;
+        summary.supplyRushAfter = data.supplyRushMeter;
+
+        if ( summary.elapsedSeconds < 30 * 60 || summary.productionRewards.GetValidItemsCount() == 0 ) {
+            return;
+        }
+
+        const uint64_t elapsedHours = std::max<uint64_t>( 1, static_cast<uint64_t>( summary.elapsedSeconds ) / ( 60 * 60 ) );
+        const uint32_t timePoints = static_cast<uint32_t>( std::min<uint64_t>( 20, elapsedHours / 6 ) );
+        const uint32_t statePoints = ( summary.stateEfficiencyPercent - 100 ) / 5;
+        const uint32_t tierPoints = static_cast<uint32_t>( summary.homecomingTier * 3 );
+
+        summary.supplyRushEarned = 5 + timePoints + statePoints + tierPoints;
+
+        const uint32_t accumulated = data.supplyRushMeter + summary.supplyRushEarned;
+        if ( accumulated < 100 ) {
+            data.supplyRushMeter = accumulated;
+            summary.supplyRushAfter = data.supplyRushMeter;
+            return;
+        }
+
+        summary.supplyRushTriggered = true;
+        data.supplyRushMeter = accumulated - 100;
+        summary.supplyRushAfter = data.supplyRushMeter;
+
+        constexpr int rushBonusPercent = 20;
+        for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
+            const FundsMember member = offlineFundMembers[i];
+            const int64_t baseReward = summary.productionRewards.*member;
+            if ( baseReward <= 0 ) {
+                continue;
+            }
+
+            const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
+            const int64_t calculatedBonus = std::max<int64_t>( 1, ( baseReward * rushBonusPercent ) / 100 );
+            const int64_t grantedBonus = std::min<int64_t>( calculatedBonus, capacity );
+            if ( grantedBonus <= 0 ) {
+                continue;
+            }
+
+            const int32_t bonus = static_cast<int32_t>( grantedBonus );
+            summary.bonusRewards.*member += bonus;
+            summary.rewards.*member += bonus;
+            data.resources.*member += bonus;
+        }
+    }
+
     void applyOfflineRenownProgress( OfflineProgressSummary & summary, OfflineProgressData & data )
     {
         summary.rankBefore = getOfflineRank( data.offlineRenown );
@@ -981,6 +1045,9 @@ namespace
         }
         if ( summary.treasureMapCompleted ) {
             earned += 12;
+        }
+        if ( summary.supplyRushTriggered ) {
+            earned += 10;
         }
 
         summary.renownEarned = earned;
@@ -1093,6 +1160,7 @@ namespace
         applyOfflineRareDiscovery( summary, data, data.lastSeenUnix );
         applyOfflineContractProgress( summary, data );
         applyOfflineTreasureHunt( summary, data, data.lastSeenUnix );
+        applyOfflineSupplyRush( summary, data );
         applyOfflineRenownProgress( summary, data );
 
         setKingdomFundsExact( kingdom, data.resources );
@@ -1164,14 +1232,20 @@ namespace
         message += "\n";
         message += income;
 
-        std::string state = _( "State: %{efficiency}% | C%{castles} T%{towns} H%{heroes} M%{mines}." );
+        std::string state = _( "State: %{efficiency}% | C%{castles} T%{towns} H%{heroes} M%{mines} | Rush %{rush}/100." );
         StringReplace( state, "%{efficiency}", std::to_string( summary.stateEfficiencyPercent ) );
         StringReplace( state, "%{castles}", std::to_string( summary.stateCastles ) );
         StringReplace( state, "%{towns}", std::to_string( summary.stateTowns ) );
         StringReplace( state, "%{heroes}", std::to_string( summary.stateHeroes ) );
         StringReplace( state, "%{mines}", std::to_string( summary.stateMines ) );
+        StringReplace( state, "%{rush}", std::to_string( summary.supplyRushAfter ) );
         message += "\n";
         message += state;
+
+        if ( summary.supplyRushTriggered ) {
+            message += "\n";
+            message += _( "SUPPLY RUSH: +20% base production." );
+        }
 
         if ( summary.homecomingTier > 0 && summary.eventCount > 0 ) {
             std::string homecoming = _( "Homecoming: %{chest} +%{percent}%, %{events} events." );
