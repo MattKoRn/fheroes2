@@ -504,11 +504,7 @@ void Battle::Arena::UnitTurn( const Units & orderHistory )
                 _bridge->SetPassability( *_currentUnit );
             }
 
-            const Player * currentPlayer = Players::Get( _currentUnit->GetCurrentColor() );
-            const bool isManualBattleForAutoPlayer = _interface != nullptr && currentPlayer != nullptr && currentPlayer->isAIAutoControlMode();
-
-            if ( !isManualBattleForAutoPlayer
-                 && ( ( _currentUnit->GetCurrentControl() & CONTROL_AI ) || ( _autoCombatColors & _currentUnit->GetCurrentColor() ) ) ) {
+            if ( ( _currentUnit->GetCurrentControl() & CONTROL_AI ) || ( _autoCombatColors & _currentUnit->GetCurrentColor() ) ) {
                 AI::BattlePlanner::Get().BattleTurn( *this, *_currentUnit, actions );
             }
             else {

@@ -42,6 +42,7 @@
 #include "captain.h"
 #include "dialog.h"
 #include "game.h"
+#include "game_delays.h"
 #include "heroes.h"
 #include "heroes_base.h"
 #include "kingdom.h"
@@ -61,6 +62,36 @@
 
 namespace
 {
+    class AutoPlayBattleSpeedGuard
+    {
+    public:
+        explicit AutoPlayBattleSpeedGuard( const bool enabled )
+            : _enabled( enabled )
+            , _originalBattleSpeed( Settings::Get().BattleSpeed() )
+        {
+            if ( _enabled && _originalBattleSpeed != defaultBattleSpeed ) {
+                Settings::Get().SetBattleSpeed( defaultBattleSpeed );
+                Game::UpdateGameSpeed();
+            }
+        }
+
+        AutoPlayBattleSpeedGuard( const AutoPlayBattleSpeedGuard & ) = delete;
+
+        ~AutoPlayBattleSpeedGuard()
+        {
+            if ( _enabled && Settings::Get().BattleSpeed() != _originalBattleSpeed ) {
+                Settings::Get().SetBattleSpeed( _originalBattleSpeed );
+                Game::UpdateGameSpeed();
+            }
+        }
+
+        AutoPlayBattleSpeedGuard & operator=( const AutoPlayBattleSpeedGuard & ) = delete;
+
+    private:
+        const bool _enabled;
+        const int _originalBattleSpeed;
+    };
+
     bool isArtifactSuitableForTransfer( const Artifact & art )
     {
         return art.isValid() && art.GetID() != Artifact::MAGIC_BOOK;
@@ -363,14 +394,19 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
     const Settings & conf = Settings::Get();
     bool showBattle = !conf.BattleAutoResolve() && isHumanBattle;
 
-    // Auto-play controls only the adventure map. Battles involving a human player under
-    // AI auto-control are deliberately shown so the player can fight them manually.
     const Player * attackingPlayer = Players::Get( attackingArmy.GetColor() );
     const Player * defendingPlayer = Players::Get( defendingArmy.GetColor() );
-    if ( ( attackingPlayer != nullptr && attackingPlayer->isAIAutoControlMode() )
-         || ( defendingPlayer != nullptr && defendingPlayer->isAIAutoControlMode() ) ) {
+    const bool isAutoPlayBattle = ( attackingPlayer != nullptr && attackingPlayer->isAIAutoControlMode() )
+                                  || ( defendingPlayer != nullptr && defendingPlayer->isAIAutoControlMode() );
+
+    // Auto-play battles are never auto-resolved. They are shown in full while the battle AI
+    // controls auto-play players. Use the engine's normal/default animation speed for the
+    // watched battle and restore the user's configured battle speed afterwards.
+    if ( isAutoPlayBattle ) {
         showBattle = true;
     }
+
+    const AutoPlayBattleSpeedGuard autoPlayBattleSpeedGuard( isAutoPlayBattle );
 
 #ifdef WITH_DEBUG
     if ( !showBattle && IS_DEBUG( DBG_BATTLE, DBG_TRACE ) ) {

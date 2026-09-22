@@ -1,6 +1,6 @@
-# Auto-play with manual battles cheat
+# Auto-play with visible AI battles
 
-This fork exposes the adventure-map AI auto-control feature in normal builds and keeps tactical battles under manual control.
+This fork exposes the adventure-map AI auto-control feature in normal builds. Tactical battles for auto-play players are AI-controlled, but they are shown in full instead of being skipped or auto-resolved.
 
 ## Command
 
@@ -8,16 +8,18 @@ While an adventure map is active, press **F8**.
 
 - Confirm **Enable** to hand your adventure-map turns to the AI.
 - Enabling the cheat ends the current human turn so the AI can take over immediately.
-- Whenever your auto-play player enters a battle, the battle screen opens and your troops are controlled manually.
-- Neutral or normal AI opponents remain AI-controlled in battle. If Auto Play-Test puts both map players under auto-control, both player sides are manual in their battle.
+- Whenever your auto-play player enters a battle, the battle screen opens and the battle AI controls your troops.
+- Auto-play battles are never skipped or instant-resolved, even if the normal instant-battle option is enabled.
+- Auto-play battles run at the engine's normal/default battle animation speed. Your configured battle-speed setting is restored when the battle ends.
+- Neutral and normal AI opponents remain AI-controlled. If Auto Play-Test puts both map players under auto-control, both sides are AI-controlled while the full battle remains visible.
 - **Left-click while your auto-controlled hero is moving to pause/stop auto-play.** The current hero stops immediately, no more AI hero or castle tasks are scheduled for your side that turn, and manual control is restored cleanly for your next turn.
 - Press **F8** again to queue the same return to normal adventure-map control without clicking.
 - While F8 auto-play is active, the adventure-map camera follows only your auto-controlled side. Enemy and unrelated AI turns still happen, but they do not steal camera focus.
 - The command is ignored while a battle is already open.
 
-The default hotkey is configurable through the normal fheroes2 hotkey file. Its entry is named **auto-play with manual battles**.
+The default hotkey is configurable through the normal fheroes2 hotkey file. Its legacy entry name remains **auto-play with manual battles** so existing hotkey files stay compatible.
 
-Auto Play-Test uses the same manual-battle path automatically, so its adventure map stays automated but its battles stop for player input.
+Auto Play-Test uses the same visible-AI-battle path automatically, so its adventure map and battles stay automated while every battle is still shown at normal speed.
 
 ## Offline progress and persistent resources
 

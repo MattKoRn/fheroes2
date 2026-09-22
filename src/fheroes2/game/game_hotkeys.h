@@ -148,7 +148,7 @@ namespace Game
         WORLD_TOGGLE_STATUS,
         WORLD_TOGGLE_ICONS,
 
-        // Cheat: AI controls the adventure map while battles stay manual.
+        // Cheat: AI controls the adventure map and battles; auto-play battles remain visible.
         WORLD_TRANSFER_CONTROL_TO_AI,
 
         BATTLE_RETREAT,
