@@ -1635,15 +1635,22 @@ namespace
         constexpr std::array<uint32_t, 6> baseDwellings{ DWELLING_MONSTER1, DWELLING_MONSTER2, DWELLING_MONSTER3,
                                                          DWELLING_MONSTER4, DWELLING_MONSTER5, DWELLING_MONSTER6 };
 
-        data.creatureRecruitCarry.fill( 0 );
+        struct RecruitmentOption
+        {
+            Castle * castle;
+            size_t settlementIndex;
+            int tier;
+            Monster monster;
+        };
+
+        std::vector<RecruitmentOption> options;
+        options.reserve( settlementLimit * baseDwellings.size() );
 
         for ( size_t castleIndex = 0; castleIndex < settlementLimit; ++castleIndex ) {
             Castle * castle = castles[castleIndex];
             if ( castle == nullptr || castle->GetColor() != kingdom.GetColor() ) {
                 continue;
             }
-
-            bool recruitedAtSettlement = false;
 
             for ( int tier = Castle::maxNumOfDwellings - 1; tier >= 0; --tier ) {
                 const uint32_t baseDwelling = baseDwellings[static_cast<size_t>( tier )];
@@ -1657,90 +1664,119 @@ namespace
                 }
 
                 const Monster monster( castle->GetRace(), actualDwelling );
-                if ( !monster.isValid() ) {
-                    continue;
+                if ( monster.isValid() ) {
+                    options.push_back( { castle, castleIndex, tier, monster } );
                 }
+            }
+        }
 
-                const int affordable = kingdom.GetFunds().getLowestQuotient( monster.GetCost() );
-                if ( affordable <= 0 ) {
-                    continue;
-                }
-
-                const uint32_t recruitCount = static_cast<uint32_t>( affordable );
-                const Funds cost = monster.GetCost() * recruitCount;
-                if ( !kingdom.AllowPayment( cost ) ) {
-                    continue;
-                }
-
-                uint64_t remaining = recruitCount;
-
-                // Prefer the settlement that produced the creatures, then its visiting hero.
-                remaining = deployCreatureCountToArmy( castle->GetArmy(), monster, remaining );
-
-                Heroes * guestHero = castle->GetHero();
-                if ( remaining > 0 && guestHero != nullptr ) {
-                    remaining = deployCreatureCountToArmy( guestHero->GetArmy(), monster, remaining );
-                }
-
-                // If that settlement is full, immediately place the paid creatures into any
-                // other owned army with capacity instead of leaving them invisible until turn end.
-                if ( remaining > 0 ) {
-                    for ( Heroes * hero : kingdom.GetHeroes() ) {
-                        if ( hero == nullptr || hero == guestHero ) {
-                            continue;
-                        }
-
-                        remaining = deployCreatureCountToArmy( hero->GetArmy(), monster, remaining );
-                        if ( remaining == 0 ) {
-                            break;
-                        }
-                    }
-                }
-
-                if ( remaining > 0 ) {
-                    for ( Castle * otherCastle : castles ) {
-                        if ( otherCastle == nullptr || otherCastle == castle ) {
-                            continue;
-                        }
-
-                        remaining = deployCreatureCountToArmy( otherCastle->GetArmy(), monster, remaining );
-                        if ( remaining == 0 ) {
-                            break;
-                        }
-                    }
-                }
-
-                if ( remaining > 0 ) {
-                    const size_t monsterId = static_cast<size_t>( monster.GetID() );
-                    if ( monsterId < data.creatureReserve.size() ) {
-                        uint64_t & reserve = data.creatureReserve[monsterId];
-                        reserve = std::numeric_limits<uint64_t>::max() - reserve < remaining ? std::numeric_limits<uint64_t>::max() : reserve + remaining;
-                    }
-                    else {
-                        // Never charge for creatures that cannot be represented by persistent storage.
-                        const uint64_t deployedCount = static_cast<uint64_t>( recruitCount ) - remaining;
-                        if ( deployedCount == 0 ) {
-                            continue;
-                        }
-
-                        const Funds deployedCost = monster.GetCost() * static_cast<uint32_t>( deployedCount );
-                        kingdom.OddFundsResource( deployedCost );
-                        summary.recruitmentSpent += deployedCost;
-                        summary.recruitedCreatures += deployedCount;
-                        ++summary.recruitedStacks;
-                        recruitedAtSettlement = true;
-                        continue;
-                    }
-                }
-
-                kingdom.OddFundsResource( cost );
-                summary.recruitmentSpent += cost;
-                summary.recruitedCreatures += recruitCount;
-                ++summary.recruitedStacks;
-                recruitedAtSettlement = true;
+        // Tier priority must apply to the entire kingdom, not only within one castle. Otherwise
+        // a low-tier dwelling in an earlier castle can empty the treasury before a later tier-6
+        // dwelling is ever considered.
+        std::sort( options.begin(), options.end(), []( const RecruitmentOption & lhs, const RecruitmentOption & rhs ) {
+            if ( lhs.tier != rhs.tier ) {
+                return lhs.tier > rhs.tier;
             }
 
-            if ( recruitedAtSettlement ) {
+            const double lhsStrength = lhs.monster.GetMonsterStrength();
+            const double rhsStrength = rhs.monster.GetMonsterStrength();
+            if ( lhsStrength != rhsStrength ) {
+                return lhsStrength > rhsStrength;
+            }
+
+            return lhs.settlementIndex < rhs.settlementIndex;
+        } );
+
+        data.creatureRecruitCarry.fill( 0 );
+        std::vector<bool> recruitedAtSettlement( settlementLimit, false );
+
+        for ( const RecruitmentOption & option : options ) {
+            Castle * castle = option.castle;
+            const Monster & monster = option.monster;
+
+            const int affordable = kingdom.GetFunds().getLowestQuotient( monster.GetCost() );
+            if ( affordable <= 0 ) {
+                continue;
+            }
+
+            const uint32_t recruitCount = static_cast<uint32_t>( affordable );
+            const Funds cost = monster.GetCost() * recruitCount;
+            if ( !kingdom.AllowPayment( cost ) ) {
+                continue;
+            }
+
+            uint64_t remaining = recruitCount;
+
+            // Prefer the settlement that produced the creatures, then its visiting hero.
+            remaining = deployCreatureCountToArmy( castle->GetArmy(), monster, remaining );
+
+            Heroes * guestHero = castle->GetHero();
+            if ( remaining > 0 && guestHero != nullptr ) {
+                remaining = deployCreatureCountToArmy( guestHero->GetArmy(), monster, remaining );
+            }
+
+            // If that settlement is full, immediately place the paid creatures into any
+            // other owned army with capacity instead of leaving them invisible until turn end.
+            if ( remaining > 0 ) {
+                for ( Heroes * hero : kingdom.GetHeroes() ) {
+                    if ( hero == nullptr || hero == guestHero ) {
+                        continue;
+                    }
+
+                    remaining = deployCreatureCountToArmy( hero->GetArmy(), monster, remaining );
+                    if ( remaining == 0 ) {
+                        break;
+                    }
+                }
+            }
+
+            if ( remaining > 0 ) {
+                for ( Castle * otherCastle : castles ) {
+                    if ( otherCastle == nullptr || otherCastle == castle ) {
+                        continue;
+                    }
+
+                    remaining = deployCreatureCountToArmy( otherCastle->GetArmy(), monster, remaining );
+                    if ( remaining == 0 ) {
+                        break;
+                    }
+                }
+            }
+
+            if ( remaining > 0 ) {
+                const size_t monsterId = static_cast<size_t>( monster.GetID() );
+                if ( monsterId < data.creatureReserve.size() ) {
+                    uint64_t & reserve = data.creatureReserve[monsterId];
+                    reserve = std::numeric_limits<uint64_t>::max() - reserve < remaining ? std::numeric_limits<uint64_t>::max() : reserve + remaining;
+                }
+                else {
+                    // Never charge for creatures that cannot be represented by persistent storage.
+                    const uint64_t deployedCount = static_cast<uint64_t>( recruitCount ) - remaining;
+                    if ( deployedCount == 0 ) {
+                        continue;
+                    }
+
+                    const Funds deployedCost = monster.GetCost() * static_cast<uint32_t>( deployedCount );
+                    kingdom.OddFundsResource( deployedCost );
+                    summary.recruitmentSpent += deployedCost;
+                    summary.recruitedCreatures += deployedCount;
+                    ++summary.recruitedStacks;
+
+                    if ( !recruitedAtSettlement[option.settlementIndex] ) {
+                        recruitedAtSettlement[option.settlementIndex] = true;
+                        ++summary.recruitmentSettlements;
+                    }
+                    continue;
+                }
+            }
+
+            kingdom.OddFundsResource( cost );
+            summary.recruitmentSpent += cost;
+            summary.recruitedCreatures += recruitCount;
+            ++summary.recruitedStacks;
+
+            if ( !recruitedAtSettlement[option.settlementIndex] ) {
+                recruitedAtSettlement[option.settlementIndex] = true;
                 ++summary.recruitmentSettlements;
             }
         }
