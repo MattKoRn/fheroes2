@@ -91,6 +91,7 @@ echo [8/11] Configuring Release build...
 cmake -S "%ROOT%" -B "%BUILD_DIR%" ^
     -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" ^
     -DVCPKG_TARGET_TRIPLET=%TRIPLET% ^
+    -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON ^
     -DENABLE_IMAGE=ON ^
     -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"
 if errorlevel 1 (
@@ -114,9 +115,15 @@ if errorlevel 1 (
     goto :fail
 )
 
-if exist "%BUILD_DIR%\vcpkg_installed\%TRIPLET%\bin\*.dll" (
-    if not exist "%INSTALL_DIR%\bin" mkdir "%INSTALL_DIR%\bin"
+if not exist "%INSTALL_DIR%\bin" mkdir "%INSTALL_DIR%\bin"
+
+if exist "%VCPKG_ROOT%\installed\%TRIPLET%\bin\*.dll" (
+    copy /Y "%VCPKG_ROOT%\installed\%TRIPLET%\bin\*.dll" "%INSTALL_DIR%\bin\" >nul
+) else if exist "%BUILD_DIR%\vcpkg_installed\%TRIPLET%\bin\*.dll" (
+    rem Manifest-mode fallback, in case the project switches to it later.
     copy /Y "%BUILD_DIR%\vcpkg_installed\%TRIPLET%\bin\*.dll" "%INSTALL_DIR%\bin\" >nul
+) else (
+    echo WARNING: No vcpkg runtime DLL directory was found.
 )
 
 if not exist "%INSTALL_DIR%\bin\fheroes2.exe" (
