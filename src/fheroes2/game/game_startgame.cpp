@@ -1709,133 +1709,15 @@ namespace
         StringReplace( message, "%{hours}", std::to_string( hours ) );
         StringReplace( message, "%{minutes}", std::to_string( minutes ) );
 
-        if ( summary.totalOfflineSeconds > 0 ) {
-            const uint64_t lifetimeDays = summary.totalOfflineSeconds / static_cast<uint64_t>( offlineSecondsPerDay );
-            std::string lifetime = _( " | Life %{days}d" );
-            StringReplace( lifetime, "%{days}", std::to_string( lifetimeDays ) );
-            message += lifetime;
-        }
+        message += "\n";
 
         if ( summary.rewards.GetValidItemsCount() == 0 ) {
-            message += "\n";
-            if ( summary.recruitedCreatures > 0 ) {
-                std::string recruited = _( "Auto-buy: %{count} creatures | %{towns} towns." );
-                StringReplace( recruited, "%{count}", fheroes2::abbreviateNumber( summary.recruitedCreatures ) );
-                StringReplace( recruited, "%{towns}", std::to_string( summary.recruitmentSettlements ) );
-                message += recruited;
-            }
-            else {
-                message += _( "Rewards: none." );
-            }
-
+            message += _( "Rewards: none." );
             fheroes2::showStandardTextMessage( _( "Offline Progress" ), std::move( message ), Dialog::OK );
             return;
         }
 
-        std::string economy = _( "Income %{income} | State %{state}% | Rush %{rush}/100" );
-        StringReplace( economy, "%{income}", std::to_string( summary.productionRewards.GetValidItemsCount() ) );
-        StringReplace( economy, "%{state}", std::to_string( summary.stateEfficiencyPercent ) );
-        StringReplace( economy, "%{rush}", std::to_string( summary.supplyRushAfter ) );
-        message += "\n";
-        message += economy;
-
-        std::string progress = _( "Streak %{streak} | Renown +%{earned} (%{total})" );
-        StringReplace( progress, "%{streak}", std::to_string( summary.homecomingStreak ) );
-        StringReplace( progress, "%{earned}", std::to_string( summary.renownEarned ) );
-        StringReplace( progress, "%{total}", std::to_string( summary.renownTotal ) );
-        message += "\n";
-        message += progress;
-
-        std::string title = _( "Title: %{rank}" );
-        StringReplace( title, "%{rank}", getOfflineRankName( summary.rankAfter ) );
-        if ( summary.rankAfter < 6 ) {
-            const uint64_t nextThreshold = getOfflineRankThreshold( summary.rankAfter + 1 );
-            const uint64_t remainingRenown = nextThreshold > summary.renownTotal ? nextThreshold - summary.renownTotal : 0;
-            std::string next = _( " | Next %{renown}" );
-            StringReplace( next, "%{renown}", std::to_string( remainingRenown ) );
-            title += next;
-        }
-        message += "\n";
-        message += title;
-
-        {
-            std::string bonuses = _( "Bonus:" );
-            bool hasBonus = false;
-
-            if ( summary.homecomingTier > 0 && summary.eventCount > 0 ) {
-                std::string home = _( " Home %{percent}%" );
-                StringReplace( home, "%{percent}", std::to_string( getHomecomingBonusPercent( summary.homecomingTier ) ) );
-                bonuses += home;
-                hasBonus = true;
-            }
-            if ( summary.supplyRushTriggered ) {
-                bonuses += _( " Rush" );
-                hasBonus = true;
-            }
-            if ( summary.milestoneBonus > 0 ) {
-                bonuses += _( " Streak" );
-                hasBonus = true;
-            }
-            if ( summary.rareDiscoveryBonus > 0 ) {
-                bonuses += _( " Rare" );
-                hasBonus = true;
-            }
-            if ( summary.rankUpBonus > 0 ) {
-                bonuses += _( " Rank" );
-                hasBonus = true;
-            }
-
-            if ( hasBonus ) {
-                message += "\n";
-                message += bonuses;
-            }
-        }
-
-        {
-            std::string objectives;
-            if ( summary.contractId >= 0 ) {
-                if ( summary.contractCompleted ) {
-                    objectives = _( "Contract done" );
-                }
-                else {
-                    objectives = _( "Contract %{progress}/%{target}" );
-                    StringReplace( objectives, "%{progress}", std::to_string( summary.contractProgressAfter ) );
-                    StringReplace( objectives, "%{target}", std::to_string( summary.contractTarget ) );
-                }
-            }
-
-            if ( summary.treasureFragmentsEarned > 0 ) {
-                if ( !objectives.empty() ) {
-                    objectives += " | ";
-                }
-
-                if ( summary.treasureMapCompleted ) {
-                    objectives += _( "Map done" );
-                }
-                else {
-                    std::string fragments = _( "Map +%{earned} (%{current}/5)" );
-                    StringReplace( fragments, "%{earned}", std::to_string( summary.treasureFragmentsEarned ) );
-                    StringReplace( fragments, "%{current}", std::to_string( summary.treasureFragmentsAfter ) );
-                    objectives += fragments;
-                }
-            }
-
-            if ( !objectives.empty() ) {
-                message += "\n";
-                message += objectives;
-            }
-        }
-
-        if ( summary.recruitedCreatures > 0 ) {
-            std::string recruited = _( "Auto-buy %{count} | %{towns} towns | paid" );
-            StringReplace( recruited, "%{count}", fheroes2::abbreviateNumber( summary.recruitedCreatures ) );
-            StringReplace( recruited, "%{towns}", std::to_string( summary.recruitmentSettlements ) );
-            message += "\n";
-            message += recruited;
-        }
-
-        message += "\n";
-        message += _( "Treasury:" );
+        message += _( "Rewards:" );
 
         fheroes2::showResourceMessage( fheroes2::Text( _( "Offline Progress" ), fheroes2::FontType::normalYellow() ),
                                        fheroes2::Text( std::move( message ), fheroes2::FontType::normalWhite() ), Dialog::OK, summary.rewards );
