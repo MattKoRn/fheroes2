@@ -1383,8 +1383,31 @@ double AI::Planner::getGeneralObjectValue( const Heroes & hero, const int32_t in
             return -dangerousTaskPenalty;
         }
 
-        // TODO: we should add logic to compare monsters and hero army strengths.
-        return 1000.0 + monsters.getTotalHP() / 100.0;
+        const double heroStrength = hero.GetArmy().GetStrength();
+        const double monsterStrength = monsters.GetStrength();
+        if ( heroStrength <= 0.0 || monsterStrength <= 0.0 ) {
+            return valueToIgnore;
+        }
+
+        const double strengthRatio = heroStrength / monsterStrength;
+        double value = 1000.0 + monsters.getTotalHP() / 100.0;
+
+        // Prefer fights that consume little of the hero's persistent army. Marginal fights are
+        // still possible when needed, but they should lose to similarly valuable low-risk goals.
+        if ( strengthRatio >= 4.0 ) {
+            value *= 1.35;
+        }
+        else if ( strengthRatio >= 2.5 ) {
+            value *= 1.20;
+        }
+        else if ( strengthRatio >= 1.5 ) {
+            value *= 1.05;
+        }
+        else if ( strengthRatio < 1.15 ) {
+            value *= 0.55;
+        }
+
+        return value;
     }
     case MP2::OBJ_ALCHEMIST_LAB:
     case MP2::OBJ_MINE:

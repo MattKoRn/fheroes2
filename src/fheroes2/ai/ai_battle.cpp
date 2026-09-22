@@ -1318,15 +1318,6 @@ Battle::Actions AI::BattlePlanner::archerDecision( Battle::Arena & arena, const 
 
     // Assess the current threat level and decide whether to retreat to another position
     const int32_t retreatPositionIndex = [&arena, &currentUnit, &enemies]() -> int32_t {
-        // There is no point in trying to retreat from flying units regardless of their speed
-        if ( std::any_of( enemies.begin(), enemies.end(), []( const Battle::Unit * enemy ) {
-                 assert( enemy != nullptr );
-
-                 return enemy->isFlying();
-             } ) ) {
-            return -1;
-        }
-
         struct PositionCharacteristics
         {
             // Indexes of the head cells of all enemy units that can potentially reach this position
@@ -1470,7 +1461,12 @@ Battle::Actions AI::BattlePlanner::archerDecision( Battle::Arena & arena, const 
             const bool isItWorthTryingToRetreat = std::all_of( characteristics.threateningEnemiesIndexes.begin(), characteristics.threateningEnemiesIndexes.end(),
                                                                [&arena, currentUnitSpeed]( const int32_t enemyIdx ) {
                                                                    const Battle::Unit * enemy = arena.GetTroopBoard( enemyIdx );
-                                                                   assert( enemy != nullptr && !enemy->isFlying() );
+                                                                   assert( enemy != nullptr );
+
+                                                                   // A flyer that already threatens the archer cannot be escaped reliably by normal movement.
+                                                                   if ( enemy->isFlying() ) {
+                                                                       return false;
+                                                                   }
 
                                                                    // Also consider the next turn, even if this unit has already acted during the current turn
                                                                    const uint32_t enemySpeed = enemy->GetSpeed( false, true );
@@ -1672,7 +1668,15 @@ Battle::Actions AI::BattlePlanner::archerDecision( Battle::Arena & arena, const 
                 continue;
             }
 
-            updateBestTarget( getTacticalTargetValue( currentUnit, *enemy ), -1 );
+            double priority = getTacticalTargetValue( currentUnit, *enemy );
+
+            // When an enemy can reach the shooter, removing or weakening that immediate threat
+            // is more valuable than spreading damage into a distant stack.
+            if ( isUnitAbleToApproachPosition( enemy, currentUnit.GetPosition() ) ) {
+                priority *= enemy->isFlying() ? 1.25 : 1.15;
+            }
+
+            updateBestTarget( priority, -1 );
         }
 
         if ( target.unit ) {
