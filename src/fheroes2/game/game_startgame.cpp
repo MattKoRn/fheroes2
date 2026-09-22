@@ -1747,32 +1747,24 @@ namespace
                 const size_t monsterId = static_cast<size_t>( monster.GetID() );
                 if ( monsterId < data.creatureReserve.size() ) {
                     uint64_t & reserve = data.creatureReserve[monsterId];
-                    reserve = std::numeric_limits<uint64_t>::max() - reserve < remaining ? std::numeric_limits<uint64_t>::max() : reserve + remaining;
-                }
-                else {
-                    // Never charge for creatures that cannot be represented by persistent storage.
-                    const uint64_t deployedCount = static_cast<uint64_t>( recruitCount ) - remaining;
-                    if ( deployedCount == 0 ) {
-                        continue;
-                    }
-
-                    const Funds deployedCost = monster.GetCost() * static_cast<uint32_t>( deployedCount );
-                    kingdom.OddFundsResource( deployedCost );
-                    summary.recruitmentSpent += deployedCost;
-                    summary.recruitedCreatures += deployedCount;
-                    ++summary.recruitedStacks;
-
-                    if ( !recruitedAtSettlement[option.settlementIndex] ) {
-                        recruitedAtSettlement[option.settlementIndex] = true;
-                        ++summary.recruitmentSettlements;
-                    }
-                    continue;
+                    const uint64_t reserveCapacity = std::numeric_limits<uint64_t>::max() - reserve;
+                    const uint64_t storedCount = std::min( remaining, reserveCapacity );
+                    reserve += storedCount;
+                    remaining -= storedCount;
                 }
             }
 
-            kingdom.OddFundsResource( cost );
-            summary.recruitmentSpent += cost;
-            summary.recruitedCreatures += recruitCount;
+            const uint64_t purchasedCount = static_cast<uint64_t>( recruitCount ) - remaining;
+            if ( purchasedCount == 0 ) {
+                continue;
+            }
+
+            // Charge only for creatures that were actually deployed or represented in persistent
+            // storage. This prevents silent losses if the reserve ever reaches uint64 capacity.
+            const Funds actualCost = monster.GetCost() * static_cast<uint32_t>( purchasedCount );
+            kingdom.OddFundsResource( actualCost );
+            summary.recruitmentSpent += actualCost;
+            summary.recruitedCreatures += purchasedCount;
             ++summary.recruitedStacks;
 
             if ( !recruitedAtSettlement[option.settlementIndex] ) {
