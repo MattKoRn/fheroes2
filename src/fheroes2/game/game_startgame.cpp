@@ -772,6 +772,79 @@ namespace
         scaleNewMapEnemies( kingdom.GetColor(), carriedStrength, mapStartingStrength );
     }
 
+    void assignPersistentCreatureReservesToHeroes( Kingdom & kingdom )
+    {
+        OfflineProgressData data;
+        if ( !loadOfflineProgressData( data ) ) {
+            return;
+        }
+
+        if ( std::none_of( data.creatureReserve.cbegin(), data.creatureReserve.cend(), []( const uint64_t count ) { return count > 0; } ) ) {
+            return;
+        }
+
+        std::vector<Heroes *> heroes;
+        heroes.reserve( kingdom.GetHeroes().size() );
+        for ( Heroes * hero : kingdom.GetHeroes() ) {
+            if ( hero != nullptr ) {
+                heroes.push_back( hero );
+            }
+        }
+
+        if ( heroes.empty() ) {
+            return;
+        }
+
+        // Freshly recruited heroes tend to have the weakest armies, so fill them first.
+        std::sort( heroes.begin(), heroes.end(), []( const Heroes * lhs, const Heroes * rhs ) {
+            return lhs->GetArmy().GetStrength() < rhs->GetArmy().GetStrength();
+        } );
+
+        std::vector<size_t> monsterIds;
+        for ( size_t i = 0; i < data.creatureReserve.size(); ++i ) {
+            if ( data.creatureReserve[i] == 0 ) {
+                continue;
+            }
+
+            const Monster monster( static_cast<int>( i ) );
+            if ( monster.isValid() ) {
+                monsterIds.push_back( i );
+            }
+        }
+
+        std::sort( monsterIds.begin(), monsterIds.end(), []( const size_t lhs, const size_t rhs ) {
+            return Monster( static_cast<int>( lhs ) ).GetMonsterStrength() > Monster( static_cast<int>( rhs ) ).GetMonsterStrength();
+        } );
+
+        bool changed = false;
+
+        for ( const size_t monsterId : monsterIds ) {
+            uint64_t & reserveCount = data.creatureReserve[monsterId];
+            const Monster monster( static_cast<int>( monsterId ) );
+
+            for ( Heroes * hero : heroes ) {
+                if ( reserveCount == 0 ) {
+                    break;
+                }
+
+                Army & army = hero->GetArmy();
+                if ( !army.CanJoinTroop( monster ) ) {
+                    continue;
+                }
+
+                const uint32_t chunk = static_cast<uint32_t>( std::min<uint64_t>( reserveCount, std::numeric_limits<uint32_t>::max() ) );
+                if ( army.JoinTroop( monster, chunk, false ) ) {
+                    reserveCount -= chunk;
+                    changed = true;
+                }
+            }
+        }
+
+        if ( changed ) {
+            saveOfflineProgressData( data );
+        }
+    }
+
     void persistOfflineProgressSnapshot( Kingdom & kingdom )
     {
         OfflineProgressData data;
@@ -2597,6 +2670,7 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
                 }
 
                 if ( !isAutoPlaytest && playerColor == persistentResourcePlayerColor ) {
+                    assignPersistentCreatureReservesToHeroes( kingdom );
                     persistOfflineProgressSnapshot( kingdom );
                 }
 
