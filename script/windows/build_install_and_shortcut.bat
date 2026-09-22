@@ -29,6 +29,9 @@ echo Missing Windows build tools will be installed automatically
 echo with Windows Package Manager (winget).
 echo.
 
+call :select_game_data
+if errorlevel 1 goto :fail
+
 call :ensure_winget
 if errorlevel 1 goto :fail
 
@@ -93,7 +96,7 @@ cmake -S "%ROOT%" -B "%BUILD_DIR%" ^
     -DVCPKG_TARGET_TRIPLET=%TRIPLET% ^
     -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON ^
     -DENABLE_IMAGE=ON ^
-    -DGET_HOMM2_DEMO=ON ^
+    -DGET_HOMM2_DEMO=%GET_HOMM2_DEMO% ^
     -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"
 if errorlevel 1 (
     echo ERROR: CMake configuration failed.
@@ -132,13 +135,23 @@ if not exist "%INSTALL_DIR%\bin\fheroes2.exe" (
     goto :fail
 )
 
+if "%GET_HOMM2_DEMO%"=="OFF" (
+    call :install_full_game_data
+    if errorlevel 1 goto :fail
+)
+
 if not exist "%INSTALL_DIR%\share\fheroes2\data\HEROES2.AGG" (
     echo ERROR: The game executable was installed, but the required HoMM II game data was not.
     echo Expected:
     echo   %INSTALL_DIR%\share\fheroes2\data\HEROES2.AGG
     echo.
-    echo The one-click installer is configured to install the official free demo data.
-    echo Review the CMake download/install messages above for the download error.
+    if "%GET_HOMM2_DEMO%"=="ON" (
+        echo The free demo was selected, but its data did not install correctly.
+        echo Review the CMake download/install messages above.
+    ) else (
+        echo Full Heroes II data was selected, but HEROES2.AGG was not copied correctly.
+        echo Verify the folder you selected contains DATA\HEROES2.AGG.
+    )
     goto :fail
 )
 
@@ -165,9 +178,122 @@ echo fheroes2 is installed at:
 echo   %INSTALL_DIR%
 echo.
 echo A Desktop shortcut named "fheroes2" has been created.
-echo HoMM II demo game data was installed automatically.
+if "%GET_HOMM2_DEMO%"=="ON" (
+    echo HoMM II demo game data was installed.
+) else (
+    echo Full HoMM II game data was imported from:
+    echo   %HOMM2_DIR%
+)
 echo.
 pause
+exit /b 0
+
+:select_game_data
+echo ============================================================
+echo  Heroes II game data
+echo ============================================================
+echo.
+echo fheroes2 needs data from Heroes of Might and Magic II.
+echo.
+echo [1] Use my full version of Heroes II
+echo [2] Use the free Heroes II demo
+echo.
+choice /C 12 /N /M "Choose 1 or 2: "
+if errorlevel 2 (
+    set "GET_HOMM2_DEMO=ON"
+    set "HOMM2_DIR="
+    echo.
+    echo The free demo will be downloaded during the build.
+    echo.
+    exit /b 0
+)
+
+set "GET_HOMM2_DEMO=OFF"
+echo.
+echo Enter the folder where the full version of Heroes II is installed.
+echo Example: C:\GOG Games\HoMM 2 Gold
+echo.
+set /p "HOMM2_DIR=Full Heroes II folder: "
+
+if not defined HOMM2_DIR (
+    echo ERROR: No Heroes II folder was entered.
+    exit /b 1
+)
+
+for %%I in ("%HOMM2_DIR%") do set "HOMM2_DIR=%%~fI"
+
+if not exist "%HOMM2_DIR%\DATA\HEROES2.AGG" (
+    echo.
+    echo ERROR: This does not appear to be a full Heroes II installation.
+    echo The installer could not find:
+    echo   %HOMM2_DIR%\DATA\HEROES2.AGG
+    echo.
+    echo Run the installer again and select the folder containing DATA\HEROES2.AGG.
+    exit /b 1
+)
+
+echo.
+echo Full Heroes II data found:
+echo   %HOMM2_DIR%
+echo.
+exit /b 0
+
+:install_full_game_data
+echo.
+echo Importing full Heroes II game data...
+set "GAME_DATA_DIR=%INSTALL_DIR%\share\fheroes2"
+
+if not exist "%GAME_DATA_DIR%" mkdir "%GAME_DATA_DIR%"
+
+call :copy_game_data_dir "%HOMM2_DIR%\DATA" "%GAME_DATA_DIR%\data" "DATA"
+if errorlevel 1 exit /b 1
+
+call :copy_game_data_dir "%HOMM2_DIR%\MAPS" "%GAME_DATA_DIR%\maps" "MAPS"
+if errorlevel 1 exit /b 1
+
+if exist "%HOMM2_DIR%\MUSIC" (
+    call :copy_game_data_dir "%HOMM2_DIR%\MUSIC" "%GAME_DATA_DIR%\music" "MUSIC"
+    if errorlevel 1 exit /b 1
+)
+
+if exist "%HOMM2_DIR%\ANIM" (
+    call :copy_game_data_dir "%HOMM2_DIR%\ANIM" "%GAME_DATA_DIR%\anim" "ANIM"
+    if errorlevel 1 exit /b 1
+) else if exist "%HOMM2_DIR%\HEROES2\ANIM" (
+    call :copy_game_data_dir "%HOMM2_DIR%\HEROES2\ANIM" "%GAME_DATA_DIR%\anim" "ANIM"
+    if errorlevel 1 exit /b 1
+)
+
+if not exist "%GAME_DATA_DIR%\data\HEROES2.AGG" (
+    echo ERROR: HEROES2.AGG was not copied into the fheroes2 data directory.
+    exit /b 1
+)
+
+echo Full Heroes II resources imported successfully.
+exit /b 0
+
+:copy_game_data_dir
+set "SOURCE_DIR=%~1"
+set "DEST_DIR=%~2"
+set "DATA_LABEL=%~3"
+
+if not exist "%SOURCE_DIR%" (
+    if /I "%DATA_LABEL%"=="MAPS" (
+        echo ERROR: Required Heroes II MAPS directory was not found:
+        echo   %SOURCE_DIR%
+        exit /b 1
+    )
+    exit /b 0
+)
+
+if not exist "%DEST_DIR%" mkdir "%DEST_DIR%"
+
+robocopy "%SOURCE_DIR%" "%DEST_DIR%" /E /R:2 /W:1 /NFL /NDL /NJH /NJS /NP >nul
+if errorlevel 8 (
+    echo ERROR: Failed to copy Heroes II %DATA_LABEL% files.
+    exit /b 1
+)
+
 exit /b 0
 
 :ensure_winget
@@ -292,8 +418,8 @@ echo Review the specific error above.
 echo.
 echo If winget itself is missing, install or update "App Installer"
 echo from the Microsoft Store. The script handles Git, CMake,
-echo vcpkg, Visual Studio C++ Build Tools, demo game data, compilation,
-echo installation, and Desktop shortcut creation automatically.
+echo vcpkg, Visual Studio C++ Build Tools, game data import/download,
+echo compilation, installation, and Desktop shortcut creation automatically.
 echo.
 pause
 exit /b 1

@@ -31,6 +31,9 @@ The original `install_packages.bat` helper remains available for the older Visua
 
 ## Game data
 
-The one-click installer configures CMake with `GET_HOMM2_DEMO=ON`, so the official free Heroes of Might and Magic II demo data is downloaded and installed automatically. A successful install must contain `share\fheroes2\data\HEROES2.AGG`; the installer checks this before creating the Desktop shortcut.
+The one-click installer asks which Heroes II data set to use before building.
 
-If you later want to use a legally purchased full Heroes II data set instead, you can replace/install the corresponding `ANIM`, `DATA`, `MAPS`, and `MUSIC` resources using the bundled extraction tools.
+- **Full version:** enter the folder containing the installed full game, such as `C:\GOG Games\HoMM 2 Gold`. The installer validates `DATA\HEROES2.AGG` and imports `DATA`, `MAPS`, `MUSIC`, and `ANIM` (including the common `HEROES2\ANIM` layout) into the fheroes2 install.
+- **Free demo:** choose the demo option and CMake downloads and installs the supported Heroes II demo data automatically.
+
+A successful install must contain `share\fheroes2\data\HEROES2.AGG`; the installer verifies this before creating the Desktop shortcut.
