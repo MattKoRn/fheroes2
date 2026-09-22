@@ -1686,7 +1686,16 @@ namespace
 
         if ( summary.rewards.GetValidItemsCount() == 0 ) {
             message += "\n";
-            message += _( "Rewards: none." );
+            if ( summary.recruitedCreatures > 0 ) {
+                std::string recruited = _( "Auto-buy: %{count} creatures | %{towns} towns." );
+                StringReplace( recruited, "%{count}", std::to_string( summary.recruitedCreatures ) );
+                StringReplace( recruited, "%{towns}", std::to_string( summary.recruitmentSettlements ) );
+                message += recruited;
+            }
+            else {
+                message += _( "Rewards: none." );
+            }
+
             fheroes2::showStandardTextMessage( _( "Offline Progress" ), std::move( message ), Dialog::OK );
             return;
         }
@@ -1786,7 +1795,7 @@ namespace
         }
 
         if ( summary.recruitedCreatures > 0 ) {
-            std::string recruited = _( "Recruit %{count} | %{towns} towns | paid" );
+            std::string recruited = _( "Auto-buy %{count} | %{towns} towns | paid" );
             StringReplace( recruited, "%{count}", std::to_string( summary.recruitedCreatures ) );
             StringReplace( recruited, "%{towns}", std::to_string( summary.recruitmentSettlements ) );
             message += "\n";
