@@ -107,6 +107,9 @@ namespace
     constexpr std::array<int, 7> offlineResourceTypes{ Resource::WOOD, Resource::MERCURY, Resource::ORE, Resource::SULFUR,
                                                        Resource::CRYSTAL, Resource::GEMS, Resource::GOLD };
 
+    constexpr size_t persistentCreatureTypeCount = static_cast<size_t>( Monster::MONSTER_COUNT );
+    using PersistentCreatureRoster = std::array<uint64_t, persistentCreatureTypeCount>;
+
     struct OfflineProgressData
     {
         int64_t lastSeenUnix{ 0 };
@@ -129,6 +132,8 @@ namespace
         uint32_t stateArtifacts{ 0 };
         uint32_t stateEfficiencyPercent{ 100 };
         uint32_t supplyRushMeter{ 0 };
+        PersistentCreatureRoster creatureRoster{};
+        PersistentCreatureRoster creatureReserve{};
     };
 
     struct OfflineEvent
@@ -241,6 +246,8 @@ namespace
         bool hasStateArtifacts = false;
         bool hasStateEfficiency = false;
         bool hasSupplyRushMeter = false;
+        bool hasCreatureRoster = false;
+        bool hasCreatureReserve = false;
 
         const auto readFunds = [&input]( Funds & funds ) {
             for ( const FundsMember member : offlineFundMembers ) {
@@ -346,6 +353,22 @@ namespace
                 data.supplyRushMeter = std::min<uint32_t>( data.supplyRushMeter, 99 );
                 hasSupplyRushMeter = true;
             }
+            else if ( key == "creature_roster" ) {
+                hasCreatureRoster = true;
+                for ( uint64_t & count : data.creatureRoster ) {
+                    if ( !( input >> count ) ) {
+                        return false;
+                    }
+                }
+            }
+            else if ( key == "creature_reserve" ) {
+                hasCreatureReserve = true;
+                for ( uint64_t & count : data.creatureReserve ) {
+                    if ( !( input >> count ) ) {
+                        return false;
+                    }
+                }
+            }
             else {
                 std::string ignoredLine;
                 std::getline( input, ignoredLine );
@@ -368,8 +391,11 @@ namespace
                    && hasStateMines && hasStateArtifacts && hasStateEfficiency )
               || ( version == 7 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
                    && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
-                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter );
-        return ( version >= 1 && version <= 7 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
+                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter )
+              || ( version == 8 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
+                   && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
+                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter && hasCreatureRoster && hasCreatureReserve );
+        return ( version >= 1 && version <= 8 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
     }
 
     void saveOfflineProgressData( const OfflineProgressData & data )
@@ -390,7 +416,7 @@ namespace
             output << '\n';
         };
 
-        output << "version 7\n";
+        output << "version 8\n";
         output << "last_seen_unix " << data.lastSeenUnix << '\n';
         output << "resources ";
         writeFunds( data.resources );
@@ -420,6 +446,18 @@ namespace
         output << "state_artifacts " << data.stateArtifacts << '\n';
         output << "state_efficiency_percent " << data.stateEfficiencyPercent << '\n';
         output << "supply_rush_meter " << data.supplyRushMeter << '\n';
+
+        output << "creature_roster";
+        for ( const uint64_t count : data.creatureRoster ) {
+            output << ' ' << count;
+        }
+        output << '\n';
+
+        output << "creature_reserve";
+        for ( const uint64_t count : data.creatureReserve ) {
+            output << ' ' << count;
+        }
+        output << '\n';
     }
 
     void setKingdomFundsExact( Kingdom & kingdom, const Funds & target )
@@ -482,6 +520,11 @@ namespace
     void captureOfflineKingdomState( OfflineProgressData & data, const Kingdom & kingdom )
     {
         data.dailyIncome = kingdom.GetIncome();
+
+        // Gold funds long-running offline recruitment. Keep all other resources tied to
+        // normal kingdom income while giving gold a controlled persistent boost.
+        const int64_t boostedGold = static_cast<int64_t>( data.dailyIncome.gold ) * 175 / 100;
+        data.dailyIncome.gold = clampResourceValue( boostedGold );
         data.stateCastles = kingdom.GetCountCastle();
         data.stateTowns = kingdom.GetCountTown();
         data.stateHeroes = static_cast<uint32_t>( kingdom.GetHeroes().size() );
@@ -489,6 +532,226 @@ namespace
         data.stateArtifacts = kingdom.GetCountArtifacts();
         data.stateEfficiencyPercent
             = getOfflineStateEfficiencyPercent( data.stateCastles, data.stateTowns, data.stateHeroes, data.stateMines, data.stateArtifacts );
+    }
+
+    void addArmyToPersistentRoster( PersistentCreatureRoster & roster, const Army & army )
+    {
+        for ( size_t slot = 0; slot < army.Size(); ++slot ) {
+            const Troop * troop = army.GetTroop( slot );
+            if ( troop == nullptr || !troop->isValid() ) {
+                continue;
+            }
+
+            const int monsterId = troop->GetID();
+            if ( monsterId <= Monster::UNKNOWN || static_cast<size_t>( monsterId ) >= roster.size() ) {
+                continue;
+            }
+
+            uint64_t & count = roster[static_cast<size_t>( monsterId )];
+            const uint64_t troopCount = troop->GetCount();
+            count = std::numeric_limits<uint64_t>::max() - count < troopCount ? std::numeric_limits<uint64_t>::max() : count + troopCount;
+        }
+    }
+
+    void capturePersistentCreatureRoster( OfflineProgressData & data, const Kingdom & kingdom )
+    {
+        PersistentCreatureRoster roster{};
+
+        for ( const Heroes * hero : kingdom.GetHeroes() ) {
+            if ( hero != nullptr ) {
+                addArmyToPersistentRoster( roster, hero->GetArmy() );
+            }
+        }
+
+        for ( const Castle * castle : kingdom.GetCastles() ) {
+            if ( castle != nullptr ) {
+                addArmyToPersistentRoster( roster, castle->GetArmy() );
+            }
+        }
+
+        for ( size_t i = 0; i < roster.size(); ++i ) {
+            const uint64_t reserve = data.creatureReserve[i];
+            roster[i] = std::numeric_limits<uint64_t>::max() - roster[i] < reserve ? std::numeric_limits<uint64_t>::max() : roster[i] + reserve;
+        }
+
+        data.creatureRoster = roster;
+    }
+
+    double getPersistentRosterStrength( const PersistentCreatureRoster & roster )
+    {
+        double strength = 0.0;
+        for ( size_t i = 0; i < roster.size(); ++i ) {
+            const uint64_t count = roster[i];
+            if ( count == 0 ) {
+                continue;
+            }
+
+            const Monster monster( static_cast<int>( i ) );
+            if ( !monster.isValid() ) {
+                continue;
+            }
+
+            strength += monster.GetMonsterStrength() * static_cast<double>( count );
+        }
+
+        return strength;
+    }
+
+    double getKingdomArmyStrength( const Kingdom & kingdom )
+    {
+        double strength = 0.0;
+        for ( const Heroes * hero : kingdom.GetHeroes() ) {
+            if ( hero != nullptr ) {
+                strength += hero->GetArmy().GetStrength();
+            }
+        }
+        for ( const Castle * castle : kingdom.GetCastles() ) {
+            if ( castle != nullptr ) {
+                strength += castle->GetArmy().GetStrength();
+            }
+        }
+        return strength;
+    }
+
+    void scaleArmyStrength( Army & army, const double multiplier )
+    {
+        if ( multiplier <= 1.0 ) {
+            return;
+        }
+
+        for ( size_t slot = 0; slot < army.Size(); ++slot ) {
+            Troop * troop = army.GetTroop( slot );
+            if ( troop == nullptr || !troop->isValid() ) {
+                continue;
+            }
+
+            const uint64_t scaledCount = static_cast<uint64_t>( std::ceil( static_cast<double>( troop->GetCount() ) * multiplier ) );
+            troop->SetCount( static_cast<uint32_t>( std::min<uint64_t>( scaledCount, std::numeric_limits<uint32_t>::max() ) ) );
+        }
+    }
+
+    void scaleNewMapEnemies( const PlayerColor playerColor, const double carriedStrength, const double mapStartingStrength )
+    {
+        if ( carriedStrength <= 0.0 ) {
+            return;
+        }
+
+        const double baseline = std::max( 1000.0, mapStartingStrength );
+        const double strengthRatio = std::max( 1.0, carriedStrength / baseline );
+
+        // Square-root scaling makes modest carry-over nearly free while progressively
+        // strengthening opposition against very large veteran rosters.
+        const double enemyMultiplier = std::clamp( 1.0 + ( std::sqrt( strengthRatio ) - 1.0 ) * 0.65, 1.0, 2.5 );
+        const double neutralMultiplier = std::clamp( 1.0 + ( enemyMultiplier - 1.0 ) * 0.70, 1.0, 2.0 );
+
+        if ( enemyMultiplier > 1.0 ) {
+            for ( Player * player : Settings::Get().GetPlayers().getVector() ) {
+                if ( player == nullptr || player->GetColor() == playerColor
+                     || Players::isFriends( playerColor, static_cast<PlayerColorsSet>( player->GetColor() ) ) ) {
+                    continue;
+                }
+
+                Kingdom & enemyKingdom = world.GetKingdom( player->GetColor() );
+                for ( Heroes * hero : enemyKingdom.GetHeroes() ) {
+                    if ( hero != nullptr ) {
+                        scaleArmyStrength( hero->GetArmy(), enemyMultiplier );
+                    }
+                }
+                for ( Castle * castle : enemyKingdom.GetCastles() ) {
+                    if ( castle != nullptr ) {
+                        scaleArmyStrength( castle->GetArmy(), enemyMultiplier );
+                    }
+                }
+            }
+        }
+
+        if ( neutralMultiplier > 1.0 ) {
+            for ( size_t tileIndex = 0; tileIndex < world.getSize(); ++tileIndex ) {
+                Maps::Tile & tile = world.getTile( static_cast<int32_t>( tileIndex ) );
+                if ( tile.getMainObjectType( false ) != MP2::OBJ_MONSTER ) {
+                    continue;
+                }
+
+                const uint32_t count = getMonsterCountFromTile( tile );
+                if ( count == 0 ) {
+                    continue;
+                }
+
+                const uint64_t scaledCount = static_cast<uint64_t>( std::ceil( static_cast<double>( count ) * neutralMultiplier ) );
+                setMonsterCountOnTile( tile, static_cast<uint32_t>( std::min<uint64_t>( scaledCount, std::numeric_limits<uint32_t>::max() ) ) );
+            }
+        }
+    }
+
+    void restorePersistentCreaturesForNewMap( Kingdom & kingdom )
+    {
+        OfflineProgressData data;
+        if ( !loadOfflineProgressData( data ) ) {
+            return;
+        }
+
+        const bool hasRoster = std::any_of( data.creatureRoster.cbegin(), data.creatureRoster.cend(), []( const uint64_t count ) { return count > 0; } );
+        if ( !hasRoster ) {
+            return;
+        }
+
+        const double mapStartingStrength = getKingdomArmyStrength( kingdom );
+        const double carriedStrength = getPersistentRosterStrength( data.creatureRoster );
+
+        std::vector<Army *> targetArmies;
+        targetArmies.reserve( kingdom.GetHeroes().size() + kingdom.GetCastles().size() );
+
+        for ( Heroes * hero : kingdom.GetHeroes() ) {
+            if ( hero != nullptr ) {
+                hero->GetArmy().Clean();
+                targetArmies.push_back( &hero->GetArmy() );
+            }
+        }
+        for ( Castle * castle : kingdom.GetCastles() ) {
+            if ( castle != nullptr ) {
+                castle->GetArmy().Clean();
+                targetArmies.push_back( &castle->GetArmy() );
+            }
+        }
+
+        PersistentCreatureRoster reserve{};
+        std::vector<size_t> monsterIds;
+        monsterIds.reserve( data.creatureRoster.size() );
+        for ( size_t i = 0; i < data.creatureRoster.size(); ++i ) {
+            if ( data.creatureRoster[i] > 0 ) {
+                const Monster monster( static_cast<int>( i ) );
+                if ( monster.isValid() ) {
+                    monsterIds.push_back( i );
+                }
+            }
+        }
+
+        std::sort( monsterIds.begin(), monsterIds.end(), []( const size_t lhs, const size_t rhs ) {
+            return Monster( static_cast<int>( lhs ) ).GetMonsterStrength() > Monster( static_cast<int>( rhs ) ).GetMonsterStrength();
+        } );
+
+        for ( const size_t monsterId : monsterIds ) {
+            uint64_t remaining = data.creatureRoster[monsterId];
+            const Monster monster( static_cast<int>( monsterId ) );
+
+            for ( Army * army : targetArmies ) {
+                if ( army == nullptr || remaining == 0 || !army->CanJoinTroop( monster ) ) {
+                    continue;
+                }
+
+                const uint32_t chunk = static_cast<uint32_t>( std::min<uint64_t>( remaining, std::numeric_limits<uint32_t>::max() ) );
+                if ( army->JoinTroop( monster, chunk, false ) ) {
+                    remaining -= chunk;
+                }
+            }
+
+            reserve[monsterId] = remaining;
+        }
+
+        data.creatureReserve = reserve;
+        saveOfflineProgressData( data );
+
+        scaleNewMapEnemies( kingdom.GetColor(), carriedStrength, mapStartingStrength );
     }
 
     void persistOfflineProgressSnapshot( Kingdom & kingdom )
@@ -499,6 +762,7 @@ namespace
         data.lastSeenUnix = getCurrentUnixTime();
         data.resources = kingdom.GetFunds();
         captureOfflineKingdomState( data, kingdom );
+        capturePersistentCreatureRoster( data, kingdom );
 
         saveOfflineProgressData( data );
     }
@@ -1118,20 +1382,15 @@ namespace
             return;
         }
 
-        // Offline recruitment is automation, not free population: only a conservative portion
-        // of the current treasury may be spent, and only creatures already present in dwellings
-        // can be recruited.
-        Funds remainingBudget = kingdom.GetFunds() / 5;
+        // Recruitment has no elapsed-time ceiling. It accrues forever, but at only one normal
+        // week of base growth per 35 real-world days. Normal creature prices still apply.
+        Funds remainingBudget = kingdom.GetFunds() / 4;
 
         constexpr std::array<uint32_t, 6> baseDwellings{ DWELLING_MONSTER1, DWELLING_MONSTER2, DWELLING_MONSTER3,
                                                          DWELLING_MONSTER4, DWELLING_MONSTER5, DWELLING_MONSTER6 };
         constexpr std::array<int64_t, 6> tierUnlockSeconds{ 12 * 60 * 60, 18 * 60 * 60, 24 * 60 * 60,
                                                             36 * 60 * 60, 72 * 60 * 60, 7 * offlineSecondsPerDay };
-
-        constexpr int64_t maxRecruitmentWindow = 7 * offlineSecondsPerDay;
-        const int64_t cappedElapsed = std::min<int64_t>( summary.elapsedSeconds, maxRecruitmentWindow );
-        const int64_t effectiveWindow
-            = std::min<int64_t>( maxRecruitmentWindow, cappedElapsed * static_cast<int64_t>( summary.stateEfficiencyPercent ) / 100 );
+        constexpr int64_t fullGrowthSeconds = 35 * offlineSecondsPerDay;
 
         for ( size_t castleIndex = 0; castleIndex < settlementLimit; ++castleIndex ) {
             Castle * castle = castles[castleIndex];
@@ -1141,8 +1400,6 @@ namespace
 
             bool recruitedAtSettlement = false;
 
-            // Prefer stronger creatures first, while the 20% mobilization budget prevents them
-            // from consuming the player's whole treasury.
             for ( int tier = Castle::maxNumOfDwellings - 1; tier >= 0; --tier ) {
                 const uint32_t baseDwelling = baseDwellings[static_cast<size_t>( tier )];
                 if ( !castle->isBuild( baseDwelling ) || summary.elapsedSeconds < tierUnlockSeconds[static_cast<size_t>( tier )] ) {
@@ -1159,18 +1416,12 @@ namespace
                     continue;
                 }
 
-                const uint32_t available = castle->getMonstersInDwelling( actualDwelling );
-                if ( available == 0 ) {
-                    continue;
-                }
-
-                // At seven effective offline days, the normal cap is half one week's base growth.
-                // A minimum of one becomes available only after the tier-specific unlock time,
-                // which keeps rare/high-tier creatures much slower than low tiers.
-                const uint64_t growthNumerator = static_cast<uint64_t>( monster.GetGrown() ) * static_cast<uint64_t>( effectiveWindow );
-                uint32_t growthCap = static_cast<uint32_t>( growthNumerator / static_cast<uint64_t>( 14 * offlineSecondsPerDay ) );
-                if ( growthCap == 0 ) {
-                    growthCap = 1;
+                const uint64_t scaledElapsed
+                    = static_cast<uint64_t>( summary.elapsedSeconds ) * static_cast<uint64_t>( summary.stateEfficiencyPercent ) / 100;
+                const uint64_t growthNumerator = static_cast<uint64_t>( monster.GetGrown() ) * scaledElapsed;
+                uint64_t recruitQuota = growthNumerator / static_cast<uint64_t>( fullGrowthSeconds );
+                if ( recruitQuota == 0 ) {
+                    recruitQuota = 1;
                 }
 
                 const int affordable = remainingBudget.getLowestQuotient( monster.GetCost() );
@@ -1178,18 +1429,27 @@ namespace
                     continue;
                 }
 
-                const uint32_t recruitCount = std::min<uint32_t>( { available, growthCap, static_cast<uint32_t>( affordable ) } );
+                recruitQuota = std::min<uint64_t>( recruitQuota, static_cast<uint64_t>( affordable ) );
+                const uint32_t recruitCount = static_cast<uint32_t>( std::min<uint64_t>( recruitQuota, std::numeric_limits<uint32_t>::max() ) );
                 if ( recruitCount == 0 ) {
                     continue;
                 }
 
-                const Troop troop( monster, recruitCount );
-                const Funds cost = troop.GetTotalCost();
+                Army * destination = &castle->GetArmy();
+                if ( !destination->CanJoinTroop( monster ) ) {
+                    Heroes * guestHero = castle->GetHero();
+                    if ( guestHero == nullptr || !guestHero->GetArmy().CanJoinTroop( monster ) ) {
+                        continue;
+                    }
+                    destination = &guestHero->GetArmy();
+                }
 
-                if ( !castle->RecruitMonster( troop, false ) ) {
+                const Funds cost = monster.GetCost() * recruitCount;
+                if ( !kingdom.AllowPayment( cost ) || !destination->JoinTroop( monster, recruitCount, false ) ) {
                     continue;
                 }
 
+                kingdom.OddFundsResource( cost );
                 remainingBudget -= cost;
                 summary.recruitmentSpent += cost;
                 summary.recruitedCreatures += recruitCount;
@@ -1202,8 +1462,8 @@ namespace
             }
         }
 
-        // Castle::RecruitMonster() charges the real kingdom wallet, so persist the post-recruitment balance.
         data.resources = kingdom.GetFunds();
+        capturePersistentCreatureRoster( data, kingdom );
     }
 
     OfflineProgressSummary applyOfflineProgress( Kingdom & kingdom )
@@ -1215,6 +1475,7 @@ namespace
             data.lastSeenUnix = now;
             data.resources = kingdom.GetFunds();
             captureOfflineKingdomState( data, kingdom );
+            capturePersistentCreatureRoster( data, kingdom );
             saveOfflineProgressData( data );
             return {};
         }
@@ -1278,6 +1539,7 @@ namespace
         // The next offline interval uses the active map and player state at this snapshot.
         data.lastSeenUnix = now;
         captureOfflineKingdomState( data, kingdom );
+        capturePersistentCreatureRoster( data, kingdom );
         saveOfflineProgressData( data );
 
         return summary;
@@ -2103,7 +2365,11 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
     const PlayerColor persistentResourcePlayerColor = isAutoPlaytest ? PlayerColor::NONE : getPersistentResourcePlayerColor( conf );
     OfflineProgressSummary offlineProgressSummary;
     if ( persistentResourcePlayerColor != PlayerColor::NONE ) {
-        offlineProgressSummary = applyOfflineProgress( world.GetKingdom( persistentResourcePlayerColor ) );
+        Kingdom & persistentKingdom = world.GetKingdom( persistentResourcePlayerColor );
+        if ( !conf.LoadedGameVersion() ) {
+            restorePersistentCreaturesForNewMap( persistentKingdom );
+        }
+        offlineProgressSummary = applyOfflineProgress( persistentKingdom );
     }
 
     // Prepare for render the whole game interface with adventure map filled with fog as it was not uncovered by 'updateMapFogDirections()'.
