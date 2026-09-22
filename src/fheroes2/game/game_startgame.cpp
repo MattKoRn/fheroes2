@@ -120,6 +120,8 @@ namespace
         uint64_t contractProgress{ 0 };
         uint64_t contractTarget{ 0 };
         uint32_t contractsCompleted{ 0 };
+        uint32_t treasureFragments{ 0 };
+        uint32_t treasureMapsCompleted{ 0 };
     };
 
     struct OfflineEvent
@@ -164,6 +166,14 @@ namespace
         uint32_t contractsCompleted{ 0 };
         int nextContractId{ -1 };
         uint64_t nextContractTarget{ 0 };
+        uint32_t treasureFragmentsBefore{ 0 };
+        uint32_t treasureFragmentsEarned{ 0 };
+        uint32_t treasureFragmentsAfter{ 0 };
+        uint32_t treasureMapsCompleted{ 0 };
+        bool treasureMapCompleted{ false };
+        int treasureMapId{ -1 };
+        int treasureRewardResource{ Resource::UNKNOWN };
+        int32_t treasureRewardBonus{ 0 };
         bool showPopup{ false };
     };
 
@@ -201,6 +211,8 @@ namespace
         bool hasContractProgress = false;
         bool hasContractTarget = false;
         bool hasContractsCompleted = false;
+        bool hasTreasureFragments = false;
+        bool hasTreasureMapsCompleted = false;
 
         const auto readFunds = [&input]( Funds & funds ) {
             for ( const FundsMember member : offlineFundMembers ) {
@@ -268,6 +280,14 @@ namespace
                 input >> data.contractsCompleted;
                 hasContractsCompleted = true;
             }
+            else if ( key == "treasure_fragments" ) {
+                input >> data.treasureFragments;
+                hasTreasureFragments = true;
+            }
+            else if ( key == "treasure_maps_completed" ) {
+                input >> data.treasureMapsCompleted;
+                hasTreasureMapsCompleted = true;
+            }
             else {
                 std::string ignoredLine;
                 std::getline( input, ignoredLine );
@@ -282,8 +302,10 @@ namespace
             = version == 1 || ( version == 2 && hasStreak && hasTotalOfflineSeconds )
               || ( version == 3 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown )
               || ( version == 4 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
-                   && hasContractsCompleted );
-        return ( version >= 1 && version <= 4 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
+                   && hasContractsCompleted )
+              || ( version == 5 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
+                   && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted );
+        return ( version >= 1 && version <= 5 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
     }
 
     void saveOfflineProgressData( const OfflineProgressData & data )
@@ -304,7 +326,7 @@ namespace
             output << '\n';
         };
 
-        output << "version 4\n";
+        output << "version 5\n";
         output << "last_seen_unix " << data.lastSeenUnix << '\n';
         output << "resources ";
         writeFunds( data.resources );
@@ -325,6 +347,8 @@ namespace
         output << "contract_progress " << data.contractProgress << '\n';
         output << "contract_target " << data.contractTarget << '\n';
         output << "contracts_completed " << data.contractsCompleted << '\n';
+        output << "treasure_fragments " << data.treasureFragments << '\n';
+        output << "treasure_maps_completed " << data.treasureMapsCompleted << '\n';
     }
 
     void setKingdomFundsExact( Kingdom & kingdom, const Funds & target )
@@ -808,6 +832,97 @@ namespace
         summary.nextContractTarget = data.contractTarget;
     }
 
+    std::string getTreasureMapName( const int mapId )
+    {
+        switch ( mapId ) {
+        case 0:
+            return _( "The Cartographer's Secret" );
+        case 1:
+            return _( "The Dragon Coast Cache" );
+        case 2:
+            return _( "The Wizard's Lost Vault" );
+        case 3:
+            return _( "The Pirate King's Hoard" );
+        default:
+            return _( "Forgotten Treasure" );
+        }
+    }
+
+    int getTreasureMapRewardPercent( const int mapId )
+    {
+        constexpr std::array<int, 4> rewardPercent{ 35, 40, 45, 50 };
+        assert( mapId >= 0 && static_cast<size_t>( mapId ) < rewardPercent.size() );
+
+        return rewardPercent[mapId];
+    }
+
+    void applyOfflineTreasureHunt( OfflineProgressSummary & summary, OfflineProgressData & data, const int64_t previousLastSeenUnix )
+    {
+        summary.treasureFragmentsBefore = data.treasureFragments;
+        summary.treasureFragmentsAfter = data.treasureFragments;
+        summary.treasureMapsCompleted = data.treasureMapsCompleted;
+
+        if ( summary.elapsedSeconds < 2 * 60 * 60 || summary.productionRewards.GetValidItemsCount() == 0 ) {
+            return;
+        }
+
+        uint32_t fragmentsEarned = 1;
+        if ( summary.elapsedSeconds >= offlineSecondsPerDay ) {
+            ++fragmentsEarned;
+        }
+        if ( summary.rareDiscovery || summary.contractCompleted ) {
+            ++fragmentsEarned;
+        }
+        fragmentsEarned = std::min<uint32_t>( fragmentsEarned, 3 );
+
+        summary.treasureFragmentsEarned = fragmentsEarned;
+        data.treasureFragments = std::min<uint32_t>( 8, data.treasureFragments + fragmentsEarned );
+        summary.treasureFragmentsAfter = data.treasureFragments;
+
+        if ( data.treasureFragments < 5 ) {
+            return;
+        }
+
+        data.treasureFragments -= 5;
+        summary.treasureFragmentsAfter = data.treasureFragments;
+        summary.treasureMapCompleted = true;
+        summary.treasureMapId = static_cast<int>( data.treasureMapsCompleted % 4 );
+
+        std::array<size_t, 7> eligibleIndices{};
+        size_t eligibleCount = 0;
+        for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
+            if ( summary.productionRewards.*offlineFundMembers[i] > 0 ) {
+                eligibleIndices[eligibleCount] = i;
+                ++eligibleCount;
+            }
+        }
+
+        if ( eligibleCount > 0 ) {
+            const uint64_t seed = getOfflineEventSeed( previousLastSeenUnix,
+                                                        summary.elapsedSeconds + static_cast<int64_t>( data.treasureMapsCompleted + 1 ) * 7919 );
+            const size_t selectedIndex = eligibleIndices[( seed >> 24 ) % eligibleCount];
+            const FundsMember member = offlineFundMembers[selectedIndex];
+            const int rewardPercent = getTreasureMapRewardPercent( summary.treasureMapId );
+            const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
+            const int64_t baseReward = summary.productionRewards.*member;
+            const int64_t calculatedBonus = std::max<int64_t>( 1, ( baseReward * rewardPercent ) / 100 );
+            const int64_t grantedBonus = std::min<int64_t>( calculatedBonus, capacity );
+
+            if ( grantedBonus > 0 ) {
+                summary.treasureRewardResource = offlineResourceTypes[selectedIndex];
+                summary.treasureRewardBonus = static_cast<int32_t>( grantedBonus );
+                summary.bonusRewards.*member += summary.treasureRewardBonus;
+                summary.rewards.*member += summary.treasureRewardBonus;
+                data.resources.*member += summary.treasureRewardBonus;
+            }
+        }
+
+        if ( data.treasureMapsCompleted < std::numeric_limits<uint32_t>::max() ) {
+            ++data.treasureMapsCompleted;
+        }
+        summary.treasureMapsCompleted = data.treasureMapsCompleted;
+    }
+
     void applyOfflineRenownProgress( OfflineProgressSummary & summary, OfflineProgressData & data )
     {
         summary.rankBefore = getOfflineRank( data.offlineRenown );
@@ -829,6 +944,9 @@ namespace
         }
         if ( summary.contractCompleted ) {
             earned += 8;
+        }
+        if ( summary.treasureMapCompleted ) {
+            earned += 12;
         }
 
         summary.renownEarned = earned;
@@ -933,6 +1051,7 @@ namespace
         applyOfflineStreakProgress( summary, data );
         applyOfflineRareDiscovery( summary, data, data.lastSeenUnix );
         applyOfflineContractProgress( summary, data );
+        applyOfflineTreasureHunt( summary, data, data.lastSeenUnix );
         applyOfflineRenownProgress( summary, data );
 
         setKingdomFundsExact( kingdom, data.resources );
@@ -1250,6 +1369,41 @@ namespace
                     std::string gainedText = _( " +%{progress} contract progress this return." );
                     StringReplace( gainedText, "%{progress}", std::to_string( gained ) );
                     message += gainedText;
+                }
+            }
+        }
+
+        if ( summary.treasureFragmentsEarned > 0 ) {
+            message += "\n";
+
+            if ( summary.treasureMapCompleted ) {
+                std::string treasureFound = _( "Treasure map completed: %{map}!" );
+                StringReplace( treasureFound, "%{map}", getTreasureMapName( summary.treasureMapId ) );
+                message += treasureFound;
+
+                if ( summary.treasureRewardBonus > 0 ) {
+                    std::string treasureReward = _( " Treasure cache: +%{amount} %{resource}." );
+                    StringReplace( treasureReward, "%{amount}", std::to_string( summary.treasureRewardBonus ) );
+                    StringReplace( treasureReward, "%{resource}", Resource::String( summary.treasureRewardResource ) );
+                    message += treasureReward;
+                }
+
+                std::string mapCount = _( " Maps completed: %{count}. New map fragments: %{fragments}/5." );
+                StringReplace( mapCount, "%{count}", std::to_string( summary.treasureMapsCompleted ) );
+                StringReplace( mapCount, "%{fragments}", std::to_string( summary.treasureFragmentsAfter ) );
+                message += mapCount;
+            }
+            else {
+                std::string fragments = _( "Treasure hunt: +%{earned} map fragments (%{current}/5)." );
+                StringReplace( fragments, "%{earned}", std::to_string( summary.treasureFragmentsEarned ) );
+                StringReplace( fragments, "%{current}", std::to_string( summary.treasureFragmentsAfter ) );
+                message += fragments;
+
+                const uint32_t remaining = 5 - std::min<uint32_t>( 5, summary.treasureFragmentsAfter );
+                if ( remaining > 0 ) {
+                    std::string remainingText = _( " %{remaining} fragments until the next treasure map." );
+                    StringReplace( remainingText, "%{remaining}", std::to_string( remaining ) );
+                    message += remainingText;
                 }
             }
         }
