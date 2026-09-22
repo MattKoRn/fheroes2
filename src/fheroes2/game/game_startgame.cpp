@@ -24,12 +24,17 @@
 #include "game.h" // IWYU pragma: associated
 
 #include <algorithm>
+#include <array>
 #include <cassert>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <fstream>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -79,6 +84,7 @@
 #include "resource.h"
 #include "screen.h"
 #include "settings.h"
+#include "system.h"
 #include "tools.h"
 #include "translations.h"
 #include "ui_dialog.h"
@@ -90,6 +96,282 @@
 
 namespace
 {
+    constexpr int64_t offlineSecondsPerDay{ 24 * 60 * 60 };
+    constexpr char offlineProgressFileName[]{ "offline_progress.dat" };
+
+    using FundsMember = int32_t Funds::*;
+
+    constexpr std::array<FundsMember, 7> offlineFundMembers{ &Funds::wood, &Funds::mercury, &Funds::ore, &Funds::sulfur,
+                                                             &Funds::crystal, &Funds::gems, &Funds::gold };
+
+    struct OfflineProgressData
+    {
+        int64_t lastSeenUnix{ 0 };
+        Funds resources;
+        Funds dailyIncome;
+        std::array<int64_t, 7> carry{};
+    };
+
+    struct OfflineProgressSummary
+    {
+        int64_t elapsedSeconds{ 0 };
+        Funds rewards;
+        bool showPopup{ false };
+    };
+
+    int64_t getCurrentUnixTime()
+    {
+        return std::chrono::duration_cast<std::chrono::seconds>( std::chrono::system_clock::now().time_since_epoch() ).count();
+    }
+
+    std::string getOfflineProgressFilePath()
+    {
+        return System::concatPath( System::GetConfigDirectory( "fheroes2" ), offlineProgressFileName );
+    }
+
+    int32_t clampResourceValue( const int64_t value )
+    {
+        return static_cast<int32_t>( std::clamp<int64_t>( value, 0, std::numeric_limits<int32_t>::max() ) );
+    }
+
+    bool loadOfflineProgressData( OfflineProgressData & data )
+    {
+        std::ifstream input( getOfflineProgressFilePath() );
+        if ( !input ) {
+            return false;
+        }
+
+        int version = 0;
+        bool hasTimestamp = false;
+        bool hasResources = false;
+        bool hasIncome = false;
+        bool hasCarry = false;
+
+        const auto readFunds = [&input]( Funds & funds ) {
+            for ( const FundsMember member : offlineFundMembers ) {
+                int64_t value = 0;
+                if ( !( input >> value ) ) {
+                    return false;
+                }
+
+                funds.*member = clampResourceValue( value );
+            }
+
+            return true;
+        };
+
+        std::string key;
+        while ( input >> key ) {
+            if ( key == "version" ) {
+                input >> version;
+            }
+            else if ( key == "last_seen_unix" ) {
+                input >> data.lastSeenUnix;
+                hasTimestamp = true;
+            }
+            else if ( key == "resources" ) {
+                hasResources = readFunds( data.resources );
+            }
+            else if ( key == "daily_income" ) {
+                hasIncome = readFunds( data.dailyIncome );
+            }
+            else if ( key == "carry" ) {
+                hasCarry = true;
+                for ( int64_t & value : data.carry ) {
+                    if ( !( input >> value ) ) {
+                        return false;
+                    }
+
+                    value = std::clamp<int64_t>( value, 0, offlineSecondsPerDay - 1 );
+                }
+            }
+            else {
+                std::string ignoredLine;
+                std::getline( input, ignoredLine );
+            }
+
+            if ( !input ) {
+                return false;
+            }
+        }
+
+        return version == 1 && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
+    }
+
+    void saveOfflineProgressData( const OfflineProgressData & data )
+    {
+        std::ofstream output( getOfflineProgressFilePath(), std::ios::trunc );
+        if ( !output ) {
+            ERROR_LOG( "Unable to write offline progress data." )
+            return;
+        }
+
+        const auto writeFunds = [&output]( const Funds & funds ) {
+            for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
+                if ( i != 0 ) {
+                    output << ' ';
+                }
+                output << funds.*offlineFundMembers[i];
+            }
+            output << '\n';
+        };
+
+        output << "version 1\n";
+        output << "last_seen_unix " << data.lastSeenUnix << '\n';
+        output << "resources ";
+        writeFunds( data.resources );
+        output << "daily_income ";
+        writeFunds( data.dailyIncome );
+        output << "carry ";
+        for ( size_t i = 0; i < data.carry.size(); ++i ) {
+            if ( i != 0 ) {
+                output << ' ';
+            }
+            output << data.carry[i];
+        }
+        output << '\n';
+    }
+
+    void setKingdomFundsExact( Kingdom & kingdom, const Funds & target )
+    {
+        const Funds current = kingdom.GetFunds();
+        Funds toAdd;
+        Funds toRemove;
+
+        for ( const FundsMember member : offlineFundMembers ) {
+            if ( target.*member >= current.*member ) {
+                toAdd.*member = target.*member - current.*member;
+            }
+            else {
+                toRemove.*member = current.*member - target.*member;
+            }
+        }
+
+        kingdom.AddFundsResource( toAdd );
+        kingdom.OddFundsResource( toRemove );
+    }
+
+    PlayerColor getPersistentResourcePlayerColor( Settings & conf )
+    {
+        Player * currentPlayer = conf.GetPlayers().GetCurrent();
+        if ( currentPlayer != nullptr && ( currentPlayer->isControlHuman() || currentPlayer->isAIAutoControlMode() ) ) {
+            return currentPlayer->GetColor();
+        }
+
+        for ( Player * player : conf.GetPlayers().getVector() ) {
+            if ( player != nullptr && ( player->isControlHuman() || player->isAIAutoControlMode() ) ) {
+                return player->GetColor();
+            }
+        }
+
+        return PlayerColor::NONE;
+    }
+
+    void persistOfflineProgressSnapshot( Kingdom & kingdom )
+    {
+        OfflineProgressData data;
+        loadOfflineProgressData( data );
+
+        data.lastSeenUnix = getCurrentUnixTime();
+        data.resources = kingdom.GetFunds();
+        data.dailyIncome = kingdom.GetIncome();
+
+        saveOfflineProgressData( data );
+    }
+
+    OfflineProgressSummary applyOfflineProgress( Kingdom & kingdom )
+    {
+        OfflineProgressData data;
+        const int64_t now = getCurrentUnixTime();
+
+        if ( !loadOfflineProgressData( data ) ) {
+            data.lastSeenUnix = now;
+            data.resources = kingdom.GetFunds();
+            data.dailyIncome = kingdom.GetIncome();
+            saveOfflineProgressData( data );
+            return {};
+        }
+
+        // The persistent wallet is authoritative across new maps and loaded games.
+        setKingdomFundsExact( kingdom, data.resources );
+
+        OfflineProgressSummary summary;
+        summary.elapsedSeconds = std::max<int64_t>( 0, now - data.lastSeenUnix );
+        summary.showPopup = summary.elapsedSeconds > 0;
+
+        const int64_t wholeDays = summary.elapsedSeconds / offlineSecondsPerDay;
+        const int64_t remainingSeconds = summary.elapsedSeconds % offlineSecondsPerDay;
+
+        for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
+            const FundsMember member = offlineFundMembers[i];
+            const int64_t baseResource = data.resources.*member;
+            const int64_t dailyIncome = std::max<int64_t>( 0, data.dailyIncome.*member );
+            const int64_t capacity = std::numeric_limits<int32_t>::max() - baseResource;
+
+            // Carry is measured in resource-seconds, modulo one real-world day. This preserves
+            // fractional rewards exactly across arbitrarily many offline sessions.
+            const int64_t partialNumerator = dailyIncome * remainingSeconds + data.carry[i];
+            const int64_t partialReward = partialNumerator / offlineSecondsPerDay;
+            data.carry[i] = partialNumerator % offlineSecondsPerDay;
+
+            int64_t reward = std::min<int64_t>( partialReward, capacity );
+            if ( reward < capacity && dailyIncome > 0 ) {
+                const int64_t remainingCapacity = capacity - reward;
+                if ( wholeDays > remainingCapacity / dailyIncome ) {
+                    reward = capacity;
+                }
+                else {
+                    reward += wholeDays * dailyIncome;
+                }
+            }
+
+            summary.rewards.*member = static_cast<int32_t>( reward );
+            data.resources.*member = static_cast<int32_t>( baseResource + reward );
+        }
+
+        setKingdomFundsExact( kingdom, data.resources );
+
+        // The next offline interval uses the income available on the map that is now active.
+        data.lastSeenUnix = now;
+        data.dailyIncome = kingdom.GetIncome();
+        saveOfflineProgressData( data );
+
+        return summary;
+    }
+
+    void showOfflineProgressPopup( const OfflineProgressSummary & summary )
+    {
+        if ( !summary.showPopup ) {
+            return;
+        }
+
+        int64_t seconds = summary.elapsedSeconds;
+        const int64_t days = seconds / offlineSecondsPerDay;
+        seconds %= offlineSecondsPerDay;
+        const int64_t hours = seconds / ( 60 * 60 );
+        seconds %= 60 * 60;
+        const int64_t minutes = seconds / 60;
+        seconds %= 60;
+
+        std::string message = _( "You were away for %{days} days, %{hours} hours, %{minutes} minutes and %{seconds} seconds." );
+        StringReplace( message, "%{days}", std::to_string( days ) );
+        StringReplace( message, "%{hours}", std::to_string( hours ) );
+        StringReplace( message, "%{minutes}", std::to_string( minutes ) );
+        StringReplace( message, "%{seconds}", std::to_string( seconds ) );
+
+        if ( summary.rewards.GetValidItemsCount() == 0 ) {
+            message += "\n\n";
+            message += _( "Rewards: none." );
+            fheroes2::showStandardTextMessage( _( "Offline Progress" ), std::move( message ), Dialog::OK );
+            return;
+        }
+
+        message += "\n\n";
+        message += _( "Rewards:" );
+        fheroes2::showResourceMessage( fheroes2::Text( _( "Offline Progress" ), fheroes2::FontType::normalYellow() ),
+                                       fheroes2::Text( std::move( message ), fheroes2::FontType::normalWhite() ), Dialog::OK, summary.rewards );
+    }
+
     bool SortPlayers( const Player * player1, const Player * player2 )
     {
         return ( player1->isControlHuman() && !player2->isControlHuman() )
@@ -749,8 +1031,16 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
     _iconsPanel.hideIcons( ICON_ANY );
     _statusPanel.Reset();
 
+    const PlayerColor persistentResourcePlayerColor = isAutoPlaytest ? PlayerColor::NONE : getPersistentResourcePlayerColor( conf );
+    OfflineProgressSummary offlineProgressSummary;
+    if ( persistentResourcePlayerColor != PlayerColor::NONE ) {
+        offlineProgressSummary = applyOfflineProgress( world.GetKingdom( persistentResourcePlayerColor ) );
+    }
+
     // Prepare for render the whole game interface with adventure map filled with fog as it was not uncovered by 'updateMapFogDirections()'.
     redraw( REDRAW_GAMEAREA | REDRAW_RADAR | REDRAW_ICONS | REDRAW_BUTTONS | REDRAW_STATUS | REDRAW_BORDER );
+
+    showOfflineProgressPopup( offlineProgressSummary );
 
     bool isLoadedFromSave = conf.LoadedGameVersion();
     bool skipTurns = isLoadedFromSave;
@@ -928,23 +1218,19 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
 
                     kingdom.ActionBeforeTurn();
 
-#if defined( WITH_DEBUG )
                     if ( !isAutoPlaytest && !isLoadedFromSave && player->isAIAutoControlMode() && conf.isAutoSaveAtBeginningOfTurnEnabled() ) {
                         // This is a human player which gave control to AI so we need to do autosave here.
                         Game::AutoSave();
                     }
-#endif
 
                     res = AI::Planner::Get().KingdomTurn( kingdom );
                     // This function must return only game state related values.
                     assert( res != fheroes2::GameMode::CANCEL );
 
-#if defined( WITH_DEBUG )
                     if ( !isAutoPlaytest && !isLoadedFromSave && player->isAIAutoControlMode() && !conf.isAutoSaveAtBeginningOfTurnEnabled() ) {
                         // This is a human player which gave control to AI so we need to do autosave here.
                         Game::AutoSave();
                     }
-#endif
                     if ( isAutoPlaytest && kingdom.GetControl() != CONTROL_AI ) {
                         res = fheroes2::GameMode::MAIN_MENU;
                         break;
@@ -955,6 +1241,10 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
                     // So far no other player type is supported so this should not happen.
                     assert( 0 );
                     break;
+                }
+
+                if ( !isAutoPlaytest && playerColor == persistentResourcePlayerColor ) {
+                    persistOfflineProgressSnapshot( kingdom );
                 }
 
                 if ( res != fheroes2::GameMode::END_TURN ) {
@@ -1112,17 +1402,15 @@ fheroes2::GameMode Interface::AdventureMap::HumanTurn( const bool isLoadedFromSa
             continue;
         }
 
-#if defined( WITH_DEBUG )
         {
             const Player * player = Players::Get( myKingdom.GetColor() );
             assert( player != nullptr );
 
-            // Control has just been transferred to AI, end the turn immediately
+            // Control has just been transferred to AI, end the turn immediately.
             if ( player->isAIAutoControlMode() ) {
                 return fheroes2::GameMode::END_TURN;
             }
         }
-#endif
 
         // Pending timer events
         _statusPanel.TimerEventProcessing();

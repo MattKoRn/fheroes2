@@ -148,10 +148,8 @@ namespace Game
         WORLD_TOGGLE_STATUS,
         WORLD_TOGGLE_ICONS,
 
-#if defined( WITH_DEBUG )
-        // This hotkey is only for debug mode as of now.
+        // Cheat: AI controls the adventure map while battles stay manual.
         WORLD_TRANSFER_CONTROL_TO_AI,
-#endif
 
         BATTLE_RETREAT,
         BATTLE_SURRENDER,

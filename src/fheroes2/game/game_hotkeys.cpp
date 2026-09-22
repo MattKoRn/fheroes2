@@ -280,10 +280,8 @@ namespace
         hotKeyEventInfo[hotKeyEventToInt( Game::HotKeyEvent::WORLD_TOGGLE_ICONS )]
             = { Game::HotKeyCategory::WORLD_MAP, gettext_noop( "hotkey|toggle icons" ), fheroes2::Key::KEY_5 };
 
-#if defined( WITH_DEBUG )
         hotKeyEventInfo[hotKeyEventToInt( Game::HotKeyEvent::WORLD_TRANSFER_CONTROL_TO_AI )]
-            = { Game::HotKeyCategory::WORLD_MAP, gettext_noop( "hotkey|transfer control to ai" ), fheroes2::Key::KEY_F8 };
-#endif
+            = { Game::HotKeyCategory::WORLD_MAP, gettext_noop( "hotkey|auto-play with manual battles" ), fheroes2::Key::KEY_F8 };
 
         hotKeyEventInfo[hotKeyEventToInt( Game::HotKeyEvent::BATTLE_RETREAT )]
             = { Game::HotKeyCategory::BATTLE, gettext_noop( "hotkey|retreat from battle" ), fheroes2::Key::KEY_R };
@@ -510,6 +508,7 @@ void Game::globalKeyDownEvent( const fheroes2::Key key, const int32_t modifier )
     else if ( key == hotKeyEventInfo[hotKeyEventToInt( HotKeyEvent::GLOBAL_TOGGLE_DEVELOPER_MODE )].key ) {
         Logging::setDebugLevel( DBG_DEVEL ^ Logging::getDebugLevel() );
     }
+#endif
     else if ( key == hotKeyEventInfo[hotKeyEventToInt( HotKeyEvent::WORLD_TRANSFER_CONTROL_TO_AI )].key ) {
         static bool recursiveCall = false;
 
@@ -543,17 +542,18 @@ void Game::globalKeyDownEvent( const fheroes2::Key key, const int32_t modifier )
             // Do not allow to transfer control to/from AI during battle
             if ( player && ( player->isControlHuman() || player->isAIAutoControlMode() ) && Battle::GetArena() == nullptr ) {
                 if ( player->isAIAutoControlMode() ) {
-                    if ( fheroes2::showStandardTextMessage( _( "Warning" ),
-                                                            _( "Do you want to regain control from AI? The effect will take place only on the next turn." ),
+                    if ( fheroes2::showStandardTextMessage( _( "Auto-play with Manual Battles" ),
+                                                            _( "Disable auto-play and regain adventure-map control? The change takes effect on the next turn." ),
                                                             Dialog::YES | Dialog::NO )
                          == Dialog::YES ) {
                         player->setAIAutoControlMode( false );
                     }
                 }
                 else {
-                    if ( fheroes2::showStandardTextMessage( _( "Warning" ),
-                                                            _( "Do you want to transfer control from you to the AI? The effect will take place only on the next turn." ),
-                                                            Dialog::YES | Dialog::NO )
+                    if ( fheroes2::showStandardTextMessage(
+                             _( "Auto-play with Manual Battles" ),
+                             _( "Enable auto-play? The AI will control your adventure-map turns, while battles involving your player stay manual." ),
+                             Dialog::YES | Dialog::NO )
                          == Dialog::YES ) {
                         player->setAIAutoControlMode( true );
                     }
@@ -561,7 +561,6 @@ void Game::globalKeyDownEvent( const fheroes2::Key key, const int32_t modifier )
             }
         }
     }
-#endif
 }
 
 const char * Game::getHotKeyCategoryName( const HotKeyCategory category )

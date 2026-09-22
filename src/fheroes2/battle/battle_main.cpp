@@ -363,22 +363,18 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
     const Settings & conf = Settings::Get();
     bool showBattle = !conf.BattleAutoResolve() && isHumanBattle;
 
-#ifdef WITH_DEBUG
-    if ( !showBattle ) {
-        // The battle is always shown either in battle debugging mode ...
-        if ( IS_DEBUG( DBG_BATTLE, DBG_TRACE ) ) {
-            showBattle = true;
-        }
-        // ... or when any of the participating human players are controlled by AI.
-        // Never show battle during auto playtest mode.
-        else if ( !conf.IsGameType( Game::TYPE_AUTO_PLAYTEST ) ) {
-            const Player * attackingPlayer = Players::Get( attackingArmy.GetColor() );
-            const Player * defendingPlayer = Players::Get( defendingArmy.GetColor() );
+    // Auto-play controls only the adventure map. Battles involving a human player under
+    // AI auto-control are deliberately shown so the player can fight them manually.
+    const Player * attackingPlayer = Players::Get( attackingArmy.GetColor() );
+    const Player * defendingPlayer = Players::Get( defendingArmy.GetColor() );
+    if ( ( attackingPlayer != nullptr && attackingPlayer->isAIAutoControlMode() )
+         || ( defendingPlayer != nullptr && defendingPlayer->isAIAutoControlMode() ) ) {
+        showBattle = true;
+    }
 
-            if ( ( attackingPlayer != nullptr && attackingPlayer->isAIAutoControlMode() ) || ( defendingPlayer != nullptr && defendingPlayer->isAIAutoControlMode() ) ) {
-                showBattle = true;
-            }
-        }
+#ifdef WITH_DEBUG
+    if ( !showBattle && IS_DEBUG( DBG_BATTLE, DBG_TRACE ) ) {
+        showBattle = true;
     }
 #endif
 

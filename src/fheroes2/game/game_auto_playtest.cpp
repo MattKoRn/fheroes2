@@ -435,7 +435,7 @@ namespace fheroes2
         text.draw( soundsCheckboxArea.x + soundsCheckboxArea.width + 5, soundsCheckboxArea.y + 2, display );
 
         positionY += ySpacing;
-        text.set( _( "Left-clicking at any point will interrupt the playtest." ), FontType::normalYellow() );
+        text.set( _( "Battles are manual. Left-clicking during adventure-map auto-play will offer to interrupt the playtest." ), FontType::normalYellow() );
         text.draw( positionX, positionY, activeArea.width, display );
 
         Button buttonCancel;
