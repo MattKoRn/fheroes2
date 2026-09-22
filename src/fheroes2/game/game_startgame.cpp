@@ -872,23 +872,30 @@ namespace
         for ( const size_t monsterId : monsterIds ) {
             uint64_t & reserveCount = data.creatureReserve[monsterId];
             const Monster monster( static_cast<int>( monsterId ) );
+            const uint64_t originalReserve = reserveCount;
 
             for ( Heroes * hero : heroes ) {
                 if ( reserveCount == 0 ) {
                     break;
                 }
 
-                Army & army = hero->GetArmy();
-                if ( !army.CanJoinTroop( monster ) ) {
-                    continue;
-                }
+                reserveCount = deployCreatureCountToArmy( hero->GetArmy(), monster, reserveCount );
+            }
 
-                const uint32_t chunk = static_cast<uint32_t>( std::min<uint64_t>( reserveCount, std::numeric_limits<uint32_t>::max() ) );
-                if ( army.JoinTroop( monster, chunk, false ) ) {
-                    reserveCount -= chunk;
-                    changed = true;
+            if ( reserveCount > 0 ) {
+                for ( Castle * castle : kingdom.GetCastles() ) {
+                    if ( castle == nullptr ) {
+                        continue;
+                    }
+
+                    reserveCount = deployCreatureCountToArmy( castle->GetArmy(), monster, reserveCount );
+                    if ( reserveCount == 0 ) {
+                        break;
+                    }
                 }
             }
+
+            changed = changed || reserveCount != originalReserve;
         }
 
         if ( changed ) {
@@ -1507,6 +1514,49 @@ namespace
         data.resources.*member += summary.rankUpBonus;
     }
 
+    uint64_t deployCreatureCountToArmy( Army & army, const Monster & monster, uint64_t remaining )
+    {
+        if ( remaining == 0 || !monster.isValid() ) {
+            return remaining;
+        }
+
+        // Fill existing stacks first without ever overflowing the engine's uint32 troop count.
+        for ( size_t slot = 0; slot < army.Size() && remaining > 0; ++slot ) {
+            Troop * troop = army.GetTroop( slot );
+            if ( troop == nullptr || !troop->isValid() || !troop->isMonster( monster.GetID() ) ) {
+                continue;
+            }
+
+            const uint64_t capacity = std::numeric_limits<uint32_t>::max() - static_cast<uint64_t>( troop->GetCount() );
+            const uint32_t amount = static_cast<uint32_t>( std::min<uint64_t>( remaining, capacity ) );
+            if ( amount == 0 ) {
+                continue;
+            }
+
+            troop->SetCount( troop->GetCount() + amount );
+            remaining -= amount;
+        }
+
+        // If one stack reaches uint32 max, continue into free army slots instead of wrapping
+        // the existing stack or silently banking creatures that can still be deployed.
+        for ( size_t slot = 0; slot < army.Size() && remaining > 0; ++slot ) {
+            Troop * troop = army.GetTroop( slot );
+            if ( troop == nullptr || troop->isValid() ) {
+                continue;
+            }
+
+            const uint32_t amount = static_cast<uint32_t>( std::min<uint64_t>( remaining, std::numeric_limits<uint32_t>::max() ) );
+            if ( amount == 0 ) {
+                break;
+            }
+
+            troop->Set( monster, amount );
+            remaining -= amount;
+        }
+
+        return remaining;
+    }
+
     void applyOfflineCreatureRecruitment( OfflineProgressSummary & summary, OfflineProgressData & data, Kingdom & kingdom )
     {
         if ( summary.elapsedSeconds <= 0 ) {
@@ -1528,20 +1578,6 @@ namespace
                                                          DWELLING_MONSTER4, DWELLING_MONSTER5, DWELLING_MONSTER6 };
 
         data.creatureRecruitCarry.fill( 0 );
-
-        const auto getJoinCapacity = []( Army & army, const Monster & monster ) -> uint64_t {
-            for ( size_t slot = 0; slot < army.Size(); ++slot ) {
-                Troop * troop = army.GetTroop( slot );
-                if ( troop == nullptr ) {
-                    continue;
-                }
-                if ( troop->isValid() && troop->isMonster( monster.GetID() ) ) {
-                    return std::numeric_limits<uint32_t>::max() - static_cast<uint64_t>( troop->GetCount() );
-                }
-            }
-
-            return army.GetOccupiedSlotCount() < army.Size() ? std::numeric_limits<uint32_t>::max() : 0;
-        };
 
         for ( size_t castleIndex = 0; castleIndex < settlementLimit; ++castleIndex ) {
             Castle * castle = castles[castleIndex];
@@ -1580,31 +1616,63 @@ namespace
 
                 uint64_t remaining = recruitCount;
 
-                Army & castleArmy = castle->GetArmy();
-                const uint64_t castleCapacity = getJoinCapacity( castleArmy, monster );
-                if ( castleCapacity > 0 ) {
-                    const uint32_t deployCount = static_cast<uint32_t>( std::min<uint64_t>( remaining, castleCapacity ) );
-                    if ( deployCount > 0 && castleArmy.JoinTroop( monster, deployCount, false ) ) {
-                        remaining -= deployCount;
-                    }
-                }
+                // Prefer the settlement that produced the creatures, then its visiting hero.
+                remaining = deployCreatureCountToArmy( castle->GetArmy(), monster, remaining );
 
                 Heroes * guestHero = castle->GetHero();
                 if ( remaining > 0 && guestHero != nullptr ) {
-                    Army & heroArmy = guestHero->GetArmy();
-                    const uint64_t heroCapacity = getJoinCapacity( heroArmy, monster );
-                    if ( heroCapacity > 0 ) {
-                        const uint32_t deployCount = static_cast<uint32_t>( std::min<uint64_t>( remaining, heroCapacity ) );
-                        if ( deployCount > 0 && heroArmy.JoinTroop( monster, deployCount, false ) ) {
-                            remaining -= deployCount;
+                    remaining = deployCreatureCountToArmy( guestHero->GetArmy(), monster, remaining );
+                }
+
+                // If that settlement is full, immediately place the paid creatures into any
+                // other owned army with capacity instead of leaving them invisible until turn end.
+                if ( remaining > 0 ) {
+                    for ( Heroes * hero : kingdom.GetHeroes() ) {
+                        if ( hero == nullptr || hero == guestHero ) {
+                            continue;
+                        }
+
+                        remaining = deployCreatureCountToArmy( hero->GetArmy(), monster, remaining );
+                        if ( remaining == 0 ) {
+                            break;
+                        }
+                    }
+                }
+
+                if ( remaining > 0 ) {
+                    for ( Castle * otherCastle : castles ) {
+                        if ( otherCastle == nullptr || otherCastle == castle ) {
+                            continue;
+                        }
+
+                        remaining = deployCreatureCountToArmy( otherCastle->GetArmy(), monster, remaining );
+                        if ( remaining == 0 ) {
+                            break;
                         }
                     }
                 }
 
                 if ( remaining > 0 ) {
                     const size_t monsterId = static_cast<size_t>( monster.GetID() );
-                    uint64_t & reserve = data.creatureReserve[monsterId];
-                    reserve = std::numeric_limits<uint64_t>::max() - reserve < remaining ? std::numeric_limits<uint64_t>::max() : reserve + remaining;
+                    if ( monsterId < data.creatureReserve.size() ) {
+                        uint64_t & reserve = data.creatureReserve[monsterId];
+                        reserve = std::numeric_limits<uint64_t>::max() - reserve < remaining ? std::numeric_limits<uint64_t>::max() : reserve + remaining;
+                    }
+                    else {
+                        // Never charge for creatures that cannot be represented by persistent storage.
+                        const uint64_t deployedCount = static_cast<uint64_t>( recruitCount ) - remaining;
+                        if ( deployedCount == 0 ) {
+                            continue;
+                        }
+
+                        const Funds deployedCost = monster.GetCost() * static_cast<uint32_t>( deployedCount );
+                        kingdom.OddFundsResource( deployedCost );
+                        summary.recruitmentSpent += deployedCost;
+                        summary.recruitedCreatures += deployedCount;
+                        ++summary.recruitedStacks;
+                        recruitedAtSettlement = true;
+                        continue;
+                    }
                 }
 
                 kingdom.OddFundsResource( cost );
