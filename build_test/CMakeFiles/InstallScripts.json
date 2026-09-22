@@ -1,0 +1,11 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/Boyo Laptop/Downloads/fheroes2-master/fheroes2-master/build_test/cmake_install.cmake",
+		"C:/Users/Boyo Laptop/Downloads/fheroes2-master/fheroes2-master/build_test/src/cmake_install.cmake",
+		"C:/Users/Boyo Laptop/Downloads/fheroes2-master/fheroes2-master/build_test/src/thirdparty/cmake_install.cmake",
+		"C:/Users/Boyo Laptop/Downloads/fheroes2-master/fheroes2-master/build_test/src/engine/cmake_install.cmake",
+		"C:/Users/Boyo Laptop/Downloads/fheroes2-master/fheroes2-master/build_test/src/fheroes2/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

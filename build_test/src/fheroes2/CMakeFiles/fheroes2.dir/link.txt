@@ -1,0 +1,3 @@
+"C:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\fheroes2.dir/objects.a
+C:\mingw64\bin\ar.exe qc CMakeFiles\fheroes2.dir/objects.a @CMakeFiles\fheroes2.dir\objects1.rsp
+C:\mingw64\bin\g++.exe -O3 -DNDEBUG -Wl,--whole-archive CMakeFiles\fheroes2.dir/objects.a -Wl,--no-whole-archive -o ..\..\fheroes2.exe -Wl,--out-implib,libfheroes2.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\fheroes2.dir\linkLibs.rsp

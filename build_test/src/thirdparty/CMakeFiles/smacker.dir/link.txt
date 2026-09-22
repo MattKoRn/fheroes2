@@ -1,0 +1,2 @@
+C:\mingw64\bin\ar.exe qc libsmacker.a CMakeFiles/smacker.dir/libsmacker/smacker.c.obj
+C:\mingw64\bin\ranlib.exe libsmacker.a

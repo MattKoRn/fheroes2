@@ -1,0 +1,3428 @@
+version 1.1.17 (30 June 2026)
+- update the Russian translation
+- greatly speed up application startup
+- update the German translation
+- update the Ukrainian translation
+- fix terrain reset on exit for the Battle Only mode
+- fix New Creature Week right-click delay
+- fix status window layout alignment on the Adventure Map
+- swap Archery Range Building sprites to match the colors of units
+- match castle's hero/building fade animation delay to classic H2
+- fix assertion hit for AI battle during Teleport spell evaluation
+- make AI heroes stay in castles if they get a movement bonus the next day
+- fix the title alignment in the resolution window
+- add an initial version of the Auto Playtest feature for the Editor
+- fix validation issue when updating enemy army in Battle Only mode
+- update the Swedish translation
+- remove assertion as it leads to a crash while loading a map
+- do not allow to start a battle in Battle Only mode if the START button is disabled
+- update the application exiting confirmation dialog in the Editor to include potential unsaved map changes
+- allow scrolling among all objects in a group using the mouse wheel in the Editor
+- fix spell sprite position in the first spell animation frame on the battlefield
+- improve AI decision making when using damage spells for Mirror Image monsters
+- speed up object evaluation for AI on the Adventure Map
+- do not allow placing Adventure Map Events on other objects
+- add "?" to the random terrain icon in Battle Only mode
+- show object highlighted area while moving or copying it
+- update the Hungarian translation
+- do not place roads under the obstacles in Random Map Generator
+- keep hero sprite invisible after hero fade-out animation
+- add Adventure Map smooth scrolling option
+- add the ability to directly extract all assets from the GOG installer on Android
+
+version 1.1.16 (17 May 2026)
+- update the Brazilian Portuguese translation
+- update the Russian translation
+- update the Polish translation
+- update castle mound after new terrain being placed in the Editor
+- fix missing tile passability update while removing objects in the Editor
+- allow to select certain artifacts to be buried as Ultimate Artifact in the Editor
+- fix the first editing of the hero when cancelling in the Editor
+- expand detail mode in the Editor to support editing, moving and copying brushes
+- add separate hotkeys to merge troops in castle
+- display all maps, even duplicates for both the game and the Editor
+- sort maps alphabetically by file name in the Editor
+- make hero turning animation depend on the animation speed
+- reduce application resources usage for object update actions in the Editor
+- make Eraser tool in the Editor more granular
+- fix castle entrance road update on placing/erasing a castle in the Editor
+- speed up eraser functionality in case of no objects to be erased in the Editor
+- add a popup dialog to confirm unsaved changes for hero in the Editor
+- allow placement of non-action objects over the edges of the map in the Editor
+- add ability to move an object in the Editor
+- update the Ukrainian translation
+- add drag-to-draw ability to Roads and Streams in the Editor
+- add a confirmation window while exiting castle's window in the Editor
+- add application exiting logic for the Editor's Main Menu
+- reduce the application startup time
+- add Esperanto translation
+
+version 1.1.15 (12 April 2026)
+- fix inconsistency in the Editor's window titles
+- add "Ravenhold" map to the fheroes2 bundle
+- add "Apocalypse" map to the fheroes2 bundle
+- add "Final Invasion" map to the fheroes2 bundle
+- update the Ukrainian translation
+- update the Russian translation
+- consolidate all translated versions of the "Eruption" map into a single map file
+- add ability to show Turn Order window below the battlefield
+- add popup windows for all buttons for the Virtual Keyboard
+- rework Battle Only interface
+- add ability to select artifacts for Random Artifact objects in the Editor
+- fix rendering deadlock for vertical text when a character width is bigger than the maximum width
+- fix issues for the text input window
+- consolidate all translated versions of the "7 deserts" map into a single map file
+- add NBSP character to all fonts
+- update the Greek translation
+- update the Belarusian translation
+- make the ABOUT button available from the scenario info during gameplay
+- speed up engine loading and language switching
+- recalculate hero path after "Dimension Door" spell usage
+- fix rendering of dead monsters during Resurrection spell animation
+- make AI heroes sort artifacts from worst to best to minimize losses on defeat
+- separate battle animation Speed string from monster Speed
+- add Brazilian Portuguese language support for the Virtual Keyboard
+- remove death monster animation in the castle's well dialog
+- adjust castle image and castle name in Town's dialog
+- add Norwegian language support for the Virtual Keyboard
+- add Swedish language support for the Virtual Keyboard
+- add Hungarian language support for the Virtual Keyboard
+- add Spanish language support to Virtual Keyboard
+- add Bulgarian language support for the Virtual Keyboard
+- update CP-1253 fonts for the Greek language
+- loosen the conditions for action object placement in the Editor
+- improve adventure map spells message order
+- move scrollbar only to discrete positions corresponding to the list items
+- avoid terrain objects being placed under road objects in the Random Map Generator
+- update object passabilities after the Random Map Generator finishes generating map
+- compress fheroes2 assets data in h2d file
+- add Timidity PAT files to PS Vita package
+- generate new sprites for diagonal road crossings
+- update the Portuguese Translation
+- adjust morale and luck descriptions
+- update the Polish translation
+- show water percentage limit in Random Generator
+- fix vertical offset for small monster images
+- make it possible to change terrain type in the Battle Only mode with the mouse wheel
+- fix animation freezing while playing the sound of Petrification spell
+- set 'exchange all troops' default hotkey to 'X' to avoid conflicting with Mage Guild
+- update the Swedish translation
+
+version 1.1.14 (24 February 2026)
+- fix hero removal leftovers from the map in the Editor
+- add new variants of Abandoned Mines
+- enable several hardware buttons for all Virtual Keyboards
+- fix an assertion crash while viewing a Puzzle with The Succession Wars resources
+- update the Russian translation
+- add a battle option to highlight the creature's movement area
+- update the Polish translation
+- properly render the moat water effect for troops during a castle siege
+- fix invalid logic for future value of objects on the Adventure Map
+- add an extra check for Navigation skill in Witch's Hut to avoid AI heroes wasting resources
+- modify the check for Well to take into account days to reach it, rather than assuming it takes one day
+- do not allow the random map generator to place more than one action object on a tile
+- add all possible road directions using original assets
+- add multi-language support for maps
+- place free pickup objects during random map generation
+- add Evil interface buttons to the High Scores dialog
+- fix the direct attacking up and down cursor offset in battles
+- add missing translation of some texts
+- disable the Standard/Campaign button in the High Score dialog for the demo version of the game or when campaign files aren't present
+- speed up AI computations
+- speed up the check whether a tile contains water terrain
+- speed up game type switching in High Scores dialog
+- make AI heroes not move around blindly if they are on patrol
+- fill empty areas with decorative/flavour objects on randomly generated maps
+- make Liches avoid wasting friendly units while under AI control
+- update the Hungarian translation
+- AI no longer wastes spells on mirrored monsters while retreating
+- add ability to select terrain type for Battle Only mode
+- fix the inability to save files on iOS
+- do not do screen fading within the High Scores dialog
+- update the German translation
+- fix an assertion failed crash in the German version when line breaking after hyphens
+- show damage info dialog popup when targeting enemy unit with damage spells
+- adjust Guardian Spell usage by AI
+- add Screen Scaling Type to the graphics settings dialog and Interface Type to the game settings dialog
+- update the Ukrainian translation
+- fix two bad pixels on Jezebel's portrait
+- reduce memory usage for single-layer images
+
+version 1.1.13 (21 December 2025)
+- update the Russian translation
+- add several missing letters for the CP-1251 code page
+- improve the use of certain battle spells by the AI
+- fix several iOS-related issues and bring the iOS build into a playable state
+- improve road network and verify object placement immediately for the random map generator
+- set starting hero and player information for RMG maps
+- update the Hungarian translation
+- show a dialog when there are no items to select to avoid a crash after pressing OK in the empty list
+- reduce overall RAM usage by the engine
+- speed up the CRC32 algorithm to improve translation file loading times
+- fix an assertion issue with original corrupted maps
+- add a UI screen to configure the random map generator
+- add drag-to-draw functionality to the Terrain and Erase brushes
+- add missing popups for the second hero control in Battle Only mode
+- display Traveller's Tent and Barrier colors in popups in the Editor
+- avoid using Shield spell by AI when it has no effect
+- document compilation steps for iOS
+- significantly reduce RAM usage by the Editor when doing actions
+- show map type explicitly, as icons are too small to differentiate for some players
+- make the interactive area for each building in the Castle window consist of multiple rectangles
+- fully render the FPS text on the screen on every frame render call
+- make AI use the Earthquake spell in battles
+- speed up several instances of button generation
+- truncate text within the Monster Info dialog to avoid incorrect rendering
+- truncate building names for building image within the Castle window to avoid incorrect rendering
+- do not show troop counter during elementals' summoning animation
+- teach the AI how to use the Teleport spell
+- improve random map generator consistency and treasure distribution
+- update the Swedish translation
+- speed up the AI pathfinder algorithm
+- update the Belarusian translation
+- fix "E with 2 dots on top" letter for CP-1251 small font
+- do not react to world scroll keys when scrolling is disabled
+- fix status bar flickering in the main Castle Window when switching castles
+- move the Adventure Map view area to the center of the map in hot-seat mode
+- fix rendering while toggling the Turn Order option during battles
+- fix a case when AI was not using the Disrupting Ray spell when the enemy defense value is equal to 2
+- update FPS counter and color cycling synchronization logic
+- implement custom monster levels for the random map generation
+- update the Ukrainian translation
+- fix an assertion when opening map info for maps with defeat hero condition or capture/lose castle condition
+
+version 1.1.12 (09 November 2025)
+- add a hot key modifier to move hero portrait to the top of the heroes list
+- increase the limit for event messages, map description and about section, Sphinx riddle and Sign text to 999
+- make AI not cast Curse and Mass Curse spells on monsters with no damage range
+- add a button inside multi-monster selection window to toggle all on/off
+- add basic random map generator support
+- add army estimation mode option
+- display month, week and day in the castle construction screen
+- add ability to switch between towns/castles in Mage Guild
+- update calculation display of hero's remaining spell points in the spell point bar
+- improve the Town Gate description
+- add "4 Dimensions" map
+- add new Mass Dispel icon
+- fix Castle dialog's status bar flickering
+- use bigger EXIT button for Puzzle dialog
+- update the French translation
+- update Random Ultimate Artifact icon
+- add translation support for Hero's and Town's names for Resurrection maps
+- add a button to toggle on/off all Secondary Skills in Witch's Hut
+- fix incorrect AI army pre-battle optimization for flying units
+- add missing button mapping for Switch
+- use ISO 639-1 standard for language abbreviations
+- add army swap hot-key support inside the Castle dialog
+- update the Swedish translation
+- fix incorrect text area calculation for hot key dialog
+- make AI heroes on patrol return to their original position if there's nothing to do
+- add a button to toggle on/off all spells in the Shrines and Castles for the Editor
+- add Restart and Quick Save buttons in File Options dialog
+- make Adventure Options button resizable for better translation support
+- allow to use Backward and Forward mouse buttons as hot key buttons
+- do not cancel Marketplace resource selection if no gift was made
+- add startup text mode message
+- make AI heroes predict weekly object states
+- add extra conditions on hiring AI heroes
+- fix blinking cursor while scrolling with keyboard in the Editor
+- remove hanging shadow part of the Ultimate Artifact
+- show hero levels in the Hero Meeting dialog
+- allow to hold a character to repeat an action in the Virtual Keyboard
+- add a new resolution icon
+- show Turn Order dialog above the arena if there is enough space
+- add missing popups for all buttons in the Hero Meeting dialog
+- add missing popup dialog for Exit button in the Puzzle dialog
+- set a limit on multi-line text input to avoid going beyond the dialog
+- align Save Map right-click info with scenario selector
+- update the Danish translation
+- add support for simultaneous playback of multiple videos
+- add ability to delete maps from the map lists
+- do not show cell selection frame when no monster is selected for a brush in the Editor
+- update the German translation
+- add up and down arrows for multiline dialog
+- retry other spells from the guaranteed list if the chosen spell was not added
+- update the Ukrainian translation
+- update the Hungarian translation
+- grammar fix for winning condition
+- add initial iOS support
+- remove translation need to numbers
+- fix an assertion for maps that were made with a previous engine version
+- fix changing the resource amount in the Editor for newly placed resources
+
+version 1.1.11 (14 September 2025)
+- update the Russian translation
+- allow to customize and ban spells for the Mage Guild in the Editor
+- update the Portuguese translation
+- allow to select monsters for Random Monster objects in the Editor
+- expand the pop-up message for objects with an owner in the Editor
+- fix invalid cursor while choosing an object in the Editor
+- fix Hero Dialog EXIT button flickering
+- fix incorrect sentence for Mines and Observation Tower popup message for OKAY button
+- update the Ukrainian translation
+- fix logic for hero selection window in the Editor
+- add extra checks to avoid corrupted MP2 maps from being loaded
+- allow to cast the Summon Boat spell on more tiles
+- make the Toolset activities compatible with Android 15 edge-to-edge enforcements
+- show the creature image in the "Week of..." and "Month of..." dialog windows
+- update the Hungarian translation
+- reduce the size of the bundled resurrection.h2d resource file
+- update the configuration file to be more human-readable
+- fix the shifted by 16 pixels position of a map for the first opening in the Editor
+- limit all resolutions to the currently selected resolution in the system in software rendering mode
+- bring back compilation of x86_64 for macOS
+- add a pop-up window when right-clicking a scenario title in the campaign window
+- rename strings in the Editor to use "class" instead of "race"
+- fix Wagon object evaluation for the AI when it contains resources
+- improve video processing logic
+- fix incorrect boat setting logic on a map tile
+- save days spent value for each scenario of a campaign
+- add popup messages for buttons in the Count Selection dialog
+- update the Swedish translation
+- fix the desynchronization of results between instant combat and auto/quick combat
+- bring the logic of calculating experience and losses in line with the logic of the original game
+- rename the "always retaliates" unit ability to "unlimited retaliation"
+- don't let heroes reuse the Whirlpools while standing on them
+- add stack highlight on arena or in queue when user hovers over it
+- set the proper object layer when placing a digging hole
+- fix loss condition regression for MP2/MX2 maps
+- do not show "View previous/next page" message when no pages can be listed in the Magic Book
+- show the unit upgrade cost in the quick info window of the "UPGRADE" button
+
+version 1.1.10 (20 July 2025)
+- limit maximum number of heroes and jails allowed to place in the Editor
+- fix a crash when setting victory condition "One side defeats another" and then removing all players from the map
+- fix a crash when the number of placed castles in the Editor exceeds the limit
+- add the Good, Bad, Magne map
+- update the Eruption map
+- update the Spanish translation
+- update the Hungarian translation
+- show the proper message when picking-up an empty water chest
+- implement the hotkey to toggle the display of the battle turn order
+- allow heroes to disembark on proper tiles even if they aren't marked as coast
+- remove or move to the nearest water the boats that are placed on land in hacked maps
+- update the Russian translation
+- fix passability issue for a mountain object
+- fix rendering bug for a particular crack object
+- use engine-generated Russian fonts and buttons even when Russian assets are present
+- update the German translation
+- add a frame to the Swordsman walking animation to make it smoother
+- allow to exit Town Settings without applying changes in the Editor
+- fix map and players' info update when restarting the map that was changed and saved in the Editor
+- fix erasure of object by clicking on its flag in the Editor
+- fix placement of an object that overlaps with a flag of an existing object in the Editor
+- add a new keyboard icon to the button that opens Virtual Keyboard
+- fix the position adjustment logic in case of a tail attack in battles
+- fix passabilites update after erasing an object in the Editor
+- update the Swedish translation
+- remember the position of the game window after closing the application
+- fix scroll cursor ("arrow") positioning on screen edges for software rendered cursor
+- update the Hungarian translation
+- support 8-directions of attack for wide creatures in battles
+- use original button sizes as the minimum size for Editor and Main Menu generated buttons
+- add hero casting animation to Teleport, Summon Elemental, Mirror Image, and Earthquake spells animation
+- make Editor's File Dialog buttons' size auto-adjustable
+- add straight corners to the Magic Book to indicate that a player cannot switch to the next page
+- update the Ukrainian translation
+- fix white pixels in Sorceress castle sky and rainbow
+- add missing bay artwork for Wizard castle
+- do not place monsters during the "Month of" event on tiles with Adventure Events
+- fix incorrect event removal after removing a nearby object on a map in the Editor
+- make random generation code platform-independent
+- fix button font generation when using non-English assets
+- speed up rendering in battles
+- add the ability to sort save files by name or date
+- rework New Game, Load Game and Editor menus
+
+version 1.1.9 (10 June 2025)
+- update the Swedish translation
+- fix showing one 1st level troop in hero's army during the hero fade-out animation after losing a battle
+- bundle several maps with fheroes2
+- update the Ukrainian translation
+- update the Russian translation
+- add the Barrel object
+- reduce map reloads when erasing objects or placing terrain in the Editor
+- remove the rumor about the latest update
+- add the Black Cat object
+- fix map centering when AI interacts with an action object
+- render hero's Spell Points on two lines if they don't fit on one line
+- fix rendering of tall obstacles in battles
+- add Greek translation support
+- fix button behavior when pressing and holding them
+- update the German translation
+- allow AI to dig for Ultimate Artifact and win via the "Find a particular artifact" victory condition
+- do not allow units to cause zero damage in case of a bad luck event
+- add an optional field for map creator's notes
+- add the ability to set owner color for capturable objects in the Editor
+- add the Danish language to the Virtual keyboard
+- fix troop count display during monster animation in battles
+- make Bad Luck animation closer to the original game
+- make Disrupting Ray and Teleport spells animation closer to the original game
+- center the map on a hero before rendering action object's event
+- significantly speed up language switching operation
+- optimize rendering and timers
+- add UP and DOWN hotkeys support in "Select Count" dialogs
+- Android: optimize the asset extraction process
+- fix a conflict between scrolling by dragging and regular scrolling
+- fix Barbarian castle's Shipyard rendering
+- fix incorrect pixels near the SKIP button when Hero's options are opened
+- fix unit overlap in battles when a unit is moving to the row above another unit
+- make the scouting area match the original game
+
+version 1.1.8 (04 May 2025)
+- add defense penalty to moat building info and adjust wording
+- add the translation of buttons in Editor's main menu
+- implement scrollable text input
+- allow to navigate item lists using keyboard keys
+- allow to close a dialog with a single OK or CANCEL button in a button group using OK and CANCEL hotkeys
+- if a hero was moved to a castle when loading the map, train him in the Mage Guild
+- fix cursor positioning for the Virtual Keyboard
+- add a shadow for the Heroes Meeting dialog
+- add color name to Traveler Tent's popup message
+- allow the use of a hardware keyboard when Virtual Numpad is opened
+- fix the scroll bar behavior after visiting a castle
+- do not ask for additional confirmation if Auto Combat or Quick Combat have been started from the GUI dialog
+- add stat bonus values to Battle Garb of Anduran information
+- update the Swedish translation
+- improve the input of numbers from the hardware keyboard
+- fix status bar offset to prevent text from overlapping the status bar bottom border
+- fix missing height values in Czech assets
+- allow to move the Virtual Keyboard cursor using the hardware keyboard buttons
+- add German language support for Virtual Keyboard
+- update the Czech translation
+- update the Russian translation
+- fix clearing diacritic signs in the status bar
+- update the Hungarian translation
+- update the German translations related to artifacts
+- fix multiple sound issues while playing MIDI on Windows OS
+- change text input cursor from '_' to '|'
+- update the Danish translation
+- replace "gold only" chest dialog with "gold or exp" one in case when a hero has no space for an artifact
+- update the Belarusian translation
+- end game immediately during AI turn if there are changes in the game results
+
+version 1.1.7 (23 March 2025)
+- add French virtual keyboard
+- fix broken tiles with mines at the time of loading maps
+- update the Russian translation
+- campaign: allow to raise the game difficulty during the campaign
+- add shadow to Damage Popup Info dialog during battles
+- make an effort to retain the artifact position when swapping artifacts between heroes
+- AI heroes should buy spellbook if there isn't one
+- add disable/enable logic for Editor's undo/redo buttons
+- fix resetting heroes icons focus after opening Castle
+- fix an assertion crash for hacked mines on old saves
+- fix creature info dialog shadow draw on right click
+- implement Dragon Slayer spell casting for the AI
+- make the AI share visit info about some objects on the Adventure Map
+- fix a delay during battle after having displayed the monster info dialog by right clicking
+- make the AI use Guardian spells on Mines and Abandoned Mines
+- fix Golden bow sprite's glowing pixels
+- fix object visiting marking logic
+- fix visited status for certain Adventure Map objects for the AI
+- fix rendering of tall objects and extra objects (ghosts and flags) over the top map edge
+- update the Hungarian translation
+- add proper translation support for Sign objects
+- allow to activate Czech virtual keyboard
+- do not center on the defeated hero after an instant movement
+- update the Portuguese translation
+- fix the logic of transferring artifacts after battle
+- check the contents of the resurrection.h2d file for correctness
+- add dynamic interface option
+- fix several button issues and do more button code cleanup
+- avoid stacking units when defending archers for the AI
+- update the Swedish translation
+- fix the operation of MIN/MAX buttons in various dialogs
+- clean up Russian empty guild/well button
+
+version 1.1.6 (16 February 2025)
+- fix Ultimate Artifact being erased for any action done on a map
+- fix Editor buttons not being translated
+- fix an assertion regarding maximum spell points
+- update the French translation
+- update the Czech translation
+- add return to the Main Menu and Play Map buttons to the Editor
+- replace "max" text with MIN and MAX buttons for integer input dialog
+- check Loss conditions before Victory conditions
+- expand the functionality of the Adventure map event
+- update the Swedish translation
+- show a proper icon for music and audio settings when they are off
+- rework rendering of experience indicator
+- increase the maximum allowed map name length from the original 17 characters to 50
+- show a range of available values in the input dialog
+- fix the interface not being updated in time in the Editor
+- show the total obelisk number while clicking on the Adventure Map object
+- update the Spanish translation
+- add a script to extract resources from CD images
+- fix rendering of text for several checkboxes
+- display monster count for the Monster object for the Editor
+- update the Hungarian translation
+- add more game options for the Editor
+- use a single button to switch between castle and town in the Editor dialog
+- make the "Week of Monster" deterministic
+- fix text rendering for the level-up dialog
+- display the chosen resource amount in the right-click popup info in the Editor
+- fix the Main Menu rendering after calling the Settings dialog
+- add a dialog pop-up when pressing standing horse
+- add button shine to engine-generated buttons
+- shorten hero name if name plus level is too long
+- add Undo and Redo icons in the Editor
+- show the Artifact description window when clicking on it in the Editor
+- add info about 50% retaliation damage to the Blind spell description
+- update Hero Movement button
+- fix Mine flag rendering on the Adventure Map
+- fix a crash in the View World mode for the Editor
+- add dialog to choose between Auto Combat and Quick Combat
+- fix the project version not being properly displayed in the PSV port of the engine
+- fix overlap of the FPS info and popup message in the Editor
+- fix selected Ore mine resetting in the Mine placement dialog
+- fix the Hideous Mask behavior causing neutral units to never flee
+- fix issues with pressed button states on the battle screen
+- improve morale UI for the undead army
+- update the background image for the PSV port of the engine
+- display spell name in the dialog for spell casting error
+- remove additional passability marks on the bottom part of tiles
+- improve side tile passability logic
+- modify Button layout to be similar to the original game
+- Android: gracefully handle errors when the system chooser does not start for some reason
+- add swap army and swap artifacts to the heroes meeting screen
+- expand Text Support mode for New Map selection dialogs
+
+version 1.1.5 (30 December 2024)
+- add 3 new variants of the Observation Tower object
+- show Monster and Artifact names in the popup dialog of the Editor
+- show the minus sign for the numeric keypad only if a range allows the use of negative values
+- fix Spell Scroll artifact horizontal position on the Adventure Map
+- update the Portuguese translation
+- update the Swedish translation
+- fix the spell cost displayed in the quick info window when a hero has an artifact that reduces this cost
+- add the ability to set Secondary Skills in Witch's Hut inside the Editor
+- fix the mouse interaction in the Editor's spell selection and castle properties windows
+- fix cursor positioning with non-English characters and improve positioning at the end of the line
+- display a description of the mechanics of right-clicking on devices with touch input
+- fix assertion while loading different maps in the Editor
+- add the ability to edit spells in Pyramid inside the Editor
+- add the ability to set the amount in the Resource object in the Editor
+- add the ability to set spells in Shrine in the Editor
+- add a new variant of Stone Liths object
+- update the Russian translation
+- show a warning dialog upon map file loading failure
+- fix spell randomization logic for Artifacts and the Adventure Map objects
+- fix text input cursor setting for multi-line text input with many spaces at the line end
+- fix scrollbars being shifted while changing resolution on the Adventure Map
+- reset the damage info popup when spellcasting is cancelled
+- fix a bug when picking up an object whose type does not match its sprite on the map
+- update the Hungarian translation
+- add range values for default experience within the Editor
+- add missing CP1254 button letters
+- fix French and German ultimate staff sprite with PoL assets
+- updated the Czech translation
+- update the Turkish translation
+- improve the castle reinforcement logic for AI
+- synchronize the maximum allowed number of characters for input and the Virtual Keyboard
+- fix PS Vita touchpad usage
+- add file support for non-quite-POSIX-compliant filesystems (such as Amiga FS)
+- put several dialog box headers in order
+- enable the number input dialog for the recruitment window
+- use the platform-dependent byte order for the SDL audio format
+
+version 1.1.4 (27 November 2024)
+- add Virtual Numpad support for integer inputs
+- add new Lean-To object variant
+- update the Czech translation
+- add Belarusian language support for the Virtual Keyboard
+- improve & speed up the translation-related logic
+- update the German translation related to the Price of Loyalty Campaign
+- update the Swedish translation
+- update initial passability logic
+- fix the attack value estimation for a Hypnotized unit with the ALL_ADJACENT_CELL_MELEE_ATTACK ability
+- improve the retreat logic for archers
+- update the Portuguese Translation
+- fix overlapping text in the High Scores dialog
+- add support of Evil interface for the Scenario Information dialog
+- fix the penalty calculation for enemy units that can evade the engagement during battle
+- fix passability for several objects on maps made the original Editor
+- center Magic Book artifact on the Adventure Map
+- speed up ICN image decoding
+- do not download the wing32.dll for HoMM2 demo version
+- add u with two dots to buttons and translate and improve German buttons
+
+version 1.1.3 (23 October 2024)
+- fix invalid behavior and crash during interaction with whirlpools by heroes on boats
+- fix French small font i with circumflex
+- add Czech Virtual Keyboard support
+- fix rendering of overlapped UI elements
+- shorten map title when too long in several places
+- add missing popup dialogs to buttons within View World mode
+- update the Hungarian translation
+- speed up language switching I/O operations
+- update the Swedish translation
+- fix Sorceress Statue construction fade-in animation
+- fix map titles not being cleared when changing map
+- add language support for fh2m map format
+- update the Portuguese translation
+- use an original image to draw hexagons on the battlefield
+- improve Dismiss button for French and Spanish languages
+- fix event handling for dialogs in No Interface mode
+- improve error handling for I/O operations
+- increase most of object selection windows in the Editor by 50 pixels 
+- update army information after battle before showing any dialogs
+- add missing sand animation for hourglass while waiting for a turn
+- speed up AI calculations on the Adventure Map
+- improve AI decision making while using Dimension Door spell
+- ease object requirements while erasing them in the Editor
+- split long phrases into two lines for battle log
+- fix blinking arrow cursor during scrolling in Editor
+- properly show damage info pop-up dialog for 2-hex monsters during battle
+- make default knowledge value for random hero 1
+- fix inability to erase monsters on the map under certain conditions within the Editor
+- fix the triggering of invalid drag events for the game area when casting certain spells
+- fix out of mini-map mouse dragging behavior in the Editor
+- update the Russian translation
+- add vertical gradient fonts
+- add a popup dialog to the list of resolutions
+- allow to resize vertical buttons for translations
+- fix issues with non-English path detection on Windows
+- center sprites and text in adventure map treasure chest dialog
+- do not discard area selection while moving mouse out of the map in the Editor
+- fix a crash while trying to distribute an army with 1 unit
+
+version 1.1.2 (15 September 2024)
+- preserve the order of artifacts when adding the Spell Book to the artifacts bag
+- update the Portuguese translation
+- speed up MIDI file processing
+- update the German translation
+- update visited status for Tree of Knowledge object
+- update New Secondary Skill dialog
+- add an extra check to verify the game resources not being corrupted
+- update the Hungarian translation
+- limit the use of the Summon Boat by AI for the original maps
+- do not create an undo action in the Editor if nothing was changed for an object
+- allow to undo any castle modifications in the Editor
+- improve AI castle protection logic on the Adventure Map
+- render mirrored troop in dialog properly
+- update resources before showing construction animation inside castle dialog
+- update the Swedish translation
+- fix the audio playback and distance calculation in the 3D Audio mode
+- fix Cliff Nest glowing pixel
+- update Earthquake spell animation and improve its logic to allow bridge and nearby towers demolition
+- disable mouse popup for empty space in map selection window
+- fix AI heroes ignoring patrol limit
+- AI should determine best skill when leveling up heroes
+- update hero spell points indicator after the battle and before performing defeated opponent fade animation
+- fix creature and header overlap in recruit window
+- fix map special conditions render after drop list is closed
+- implement alliances in the Editor
+- fix original maps bottom layer (hacky) placed resources and artifacts
+- add Backslash character to normal and small fonts
+- add missed Small Cliff (Dirt terrain) to the Landscape Miscellaneous objects in the Editor
+- add Ukrainian language virtual keyboard
+- fix inability to save maps within the Editor for some installations
+- add monster statistics popup window inside the Editor monster information dialog
+- Android Toolset: add Russian translation for FH2M file manager
+- fix Anti-Magic spell description
+- update the Polish translation
+- fix mini-map updates while picking up certain objects on the Adventure Map
+- fix invalid animation while picking up an artifact hidden by another object on the Adventure Map
+- remove scouting & movement bonuses for AI-controlled players
+- fix rendering issues in mine selection dialog for the Editor
+- allow to input "/", "*", "-", "+" and "." from the keypad
+- add new River Deltas objects
+- add Slovak virtual keyboard support
+- update the Russian translation
+- fix lagging input controls on some devices
+- AI: properly evaluate the enemy heroes defending the castles
+
+version 1.1.1 (13 July 2024)
+- update the Russian translation
+- properly set tile information upon placing a new object
+- update the Hungarian translation
+- implement special victory and loss conditions for heroes and towns
+- add Evil theme for ADD, EDIT and DELETE buttons in the Editor
+- fix object UID restoration after Redo operation in the Editor
+- add support for double click within Sphinx, Daily Events and Rumors lists
+- show date description for daily events
+- allow to disable any building in castles and towns in the Editor
+- add Find Artifact victory condition in Editor
+- add popup messages for right clicking on special map conditions
+- restrict obelisk placement to 48 objects
+- update logic related to human player selection for maps
+- fix crash when entering an empty line in text boxes
+- fix town placement over action objects
+- allow normal victory for "Accumulate gold" condition
+- fix the display of identical artifacts captured in battle
+- Magic Book window: show the maximum number of spell points
+- add "Out of Time" and "Accumulate Gold" map conditions within the Editor
+- add support of editing daily events within the Editor
+- show pressed monster button on Editor panel while clicking on it
+- add hotkey for passability within the Editor
+- add color names to Traveller's Tent and Barrier objects within object selection window
+- reduce castle area for mouse right clicking inside Editor's castle selection window
+- update map type popup message by right clicking to include Resurrection maps
+- add a new variation of Cave object on the Adventure Map
+- change hero selection dialog in the Editor
+- add an ability in the Editor to edit Rumors for maps
+- bring the logic of the Summon Boat spell for the human player in line with its logic of operation in the case of AI
+- AI: fix the assertion failure when visiting an object that is impossible to stand on
+- fix castle and hero radar rendering in the Editor
+- fix Magic Garden being shown without animation within the Editor
+- speed up save file loading and saving operations
+- add '?' symbol to Virtual Keyboard
+- properly check the Price of Loyalty resources in order to enable the Editor
+- move an existing object in front while trying to place an exact one on the same tile in the Editor
+- generate a random hero portrait for the Editor
+- fix crash when a hero is killed defending a castle
+- differentiate Random Castle and Town names in the Editor
+- update the Swedish translation
+- fix invalid logic for setting random artifacts
+- put the Graveyard object to the correct category, "hide" the alternative versions of Graveyard sprites
+- remove the AI unit growth bonuses and tune the income bonuses for different difficulty levels
+- limit the minimum slider length to 15 pixels
+- update the Portuguese translation
+- fix hero editing assertion
+- update the Ukrainian translation
+- fix random artifact types
+- implement the file manager for FH2M maps in Android
+- force use the non-typeable hotkeys for text input dialog and allow starting a new line in multiline texts
+- fix Editor instruments' buttons rendering
+- AI: properly handle the Spell Book artifacts on the Adventure Map
+- add missing checks for Miscellaneous objects in the Editor
+- add missing Sphinx part
+- fix text editing crash
+- fix crash when using quick switch to hero when castle is current object
+- fix the evaluation of the DOUBLE_SHOOTING and DOUBLE_MELEE_ATTACK abilities
+
+version 1.1.0 (22 May 2024)
+- properly connect Streams and Deltas while placing Streams
+- do not allow placing Ultimate Artifact on non-diggable terrain in Editor
+- use golden color to highlight cells that are sometimes possible to edit
+- set the last edited map file as default for the new Standard game
+- allow picking-up the Magic Book artifact from the Adventure Map
+- show a warning message for no modification of normal artifacts
+- show a warning message that streams and roads cannot be placed on water
+- fix Editor interface items positions when Hide Interface mode is enabled in the engine
+- speed up object erasure in the Editor
+- allow only English to be used for text input within the Editor
+- add a general text for action objects with no metadata
+- display object coordinates in the right mouse click popup window
+- implement Event details window in the Editor
+- add generated buttons for map file dialog
+- make Editor panel buttons change good/evil interface
+- fix std::string serialization
+- implement base functions of Map Specifications dialog for the Editor
+- update the Swedish translation
+- add UI window to edit Sphinx properties
+- change a message while trying to get another Magic Book
+- fix the flickering of the map filter buttons in the map selection dialog
+- add an extra space between UI elements in the monster separation window
+- implement simple Save Map dialog for the Editor
+- properly handle objects while changing terrain in the Editor
+- properly connect roads and castles in the Editor
+- add a multi-line text editing feature to edit Sign and Bottle texts in the Editor
+- fix software cursor show delay
+- allow Events to be placed on Water within the Editor
+- remove Editor's beta flag
+- add Editor icon to the Main Menu
+- add a window to enter Random Ultimate Artifact radius
+- describe all Adventure Map objects used in the game
+- add relaxed requirements for object placement in the Editor
+- add a shortcut to go to the Main Menu from the Editor
+- allow river deltas to be placed anywhere in the Editor
+- implement Castle/Town details dialog in the Editor
+- add logic to handle victory and loss conditions for maps made by the Editor
+- fix typo in Hot Seat maximum players value
+- update the Russian translation
+- update the Portuguese translation
+- add a window to change Monster properties in the Editor
+- add the jailed hero details dialog in the Editor
+- implement hero details dialog in the Editor
+- do not add scaled resolutions for PS Vita
+- avoid extra I/O operations while changing game's settings
+- change the text in the monster separation window
+- introduce new object types: Swampy Lake and Frozen Lake
+- fix wrong name for Neutral race troops
+- update the Romanian translation
+- update the Ukrainian translation
+- use the AI pathfinder to assess the threat of enemy heroes instead of relying on the region database
+- update the Hungarian translation
+- fix hero battle info text X offset
+- make the default left and right hotkeys select skills in the level up dialog
+- add Editor related options
+- update the Spanish translation
+
+version 1.0.13 (16 March 2024)
+- fix Sphinx title offset
+- add a window telling about demo version being used
+- add possibility to "draw" the attack angle between two hexes on touch screens
+- fix double daily resources award
+- fix rendering flaws of battle journal when using scroll bar
+- update the French translation
+- fix delayed cursor in campaign briefing dialog
+- add convenient list scrolling for touch screens
+- fix army split dialog text overflowing the dialog and add troops name
+- fix multiple objects and add missing ones in the Editor
+- fix a crash with AI hero animation
+- fix the troops carry over mechanics for campaign
+- update the Ukrainian translation
+- update the Swedish translation
+- update the Danish translation
+- kingdom Overview screen: automatically update status of castle dwellings that have just been built or upgraded
+- update the Vietnamese Translation
+- fix the mechanics of Genie special ability
+- add multiline stats in hero info window in battle
+- update the Hungarian translation
+- update the Spanish translation
+- fix many typos and improve English strings
+- add info about ranged penalty elimination to archery skill description
+- update combat disabling dialog text
+- adjust the difficulties of campaign scenarios that were hard-coded in the original game
+- update the resource panel immediately after a purchase in a castle
+- speed up application loading
+- add a feature to align the text non-uniformly
+- make several buttons text adapted and fix okay button redraw
+- add quick hero switch feature to the adventure map interface
+- cursor update code improvements
+- fix accidental map scrolling after exiting castle/hero screen
+- auto combat toggling improvements
+
+version 1.0.12 (07 February 2024)
+- update the Russian translation
+- update the Spanish translation
+- correct icons alignment on the hero meeting screen
+- update the Polish translation
+- fix the retaliation of archers attacked by an ally under the influence of Berserker or Hypnotize spells, improve the AI usage of Hypnotize spell in general
+- fix incorrect Artesian Spring evaluation by the AI
+- make rules for AI surrender and retreat more unified
+- fix Oasis object passability
+- always offer one native hero at the beginning of a new week
+- puzzle and View World dialogs rendering improvements
+- implement Landscape Miscellaneous (non-action) objects placing in Editor
+- fix OKAY button translation for Interface Settings dialog after any setting change
+- make the AI not to know what objects contain
+- fix issue when Blind or Paralyze has been applied to a hypnotized unit during its turn
+- implement Adventure (action) Miscellaneous objects placing in Editor
+- tune the AI performance at different difficulty levels
+- add surrender cost to battle result dialog
+- improve overall image processing performance
+- update spell points, formations and artifacts descriptions
+- add infos on the cost of surrender
+- allow AI units covering an archer with the AREA_SHOT capability to attack neighboring units on their own
+- use proper name for PoL campaign in High Scores
+- use CP1257 code page for Lithaunian
+- offer the Wisdom skill to the heroes of "magic" classes on a mandatory basis at least once every three level-ups
+- implement Mountains, Rocks and Trees placing in the Editor
+- make the AI attack human heroes that have a greater chance to win than the AI heroes
+- implement Power-ups object placement in the Editor
+- allow AI units that ignore retaliatory strikes to attack neighboring enemy units while covering archers
+- avoid visiting Oasis and Watering Hole objects by AI heroes if they bring no benefit
+- make AI hero behavior depend on the time spent on the map
+- improve fog discovery by the AI heroes
+- adjust text in the skill popup dialog
+- implement Mines placing in the Editor
+- improve AI hero interaction with Witch's Hut object
+- allow the AI-controlled hero to surrender if his kingdom has sufficient gold reserves
+- add text width-adapted CANCEL button, change to StandardWindow for Resolution, Language, Adventure, File and Scenario Info dialogs
+- update Hungarian translation
+- add dwellings into the Editor
+- fix rare fog of war rendering issues
+- allow AI heroes to surrender if the conditions of retreat have been met, but it is impossible to retreat
+- implement the AI logic to transfer the slowest troops to the garrison at the end of the turn to try to get a movement bonus on the next turn
+- mark fheroes2 as DPI-aware on Windows
+- speed up image loading
+- speed up file loading and reduce memory usage on the Adventure Map
+- improve the AI logic for pay-to-hire dwellings on the Adventure Map
+- improve the AI heuristics of covering shooters when using defensive tactics
+- update buttons and add popup windows for them in Battle Only mode
+- use the "cautious offensive" tactics for AI only against melee-only armies without the distant attack potential (including damage spells)
+- update the Swedish translation
+- fix heroes with no names
+- add base code to load new map format files
+- use singular Mine form for the corresponding object
+- fix inaccurate Jail object removal
+- add missing rules for the plural in Hungarian language
+- restrict secondary skill name and level to the UI area
+- fix too wide text in quick hero info dialog
+- hide swap army/artifact buttons in the Battle Only mode
+- update several text descriptions
+- add Campfire object in the Editor
+- take into account SHIFT and CAPS LOCK being used at the same time
+- make radar rendering optimization
+- fix the AI spell damage estimation logic for units immune to the given spell
+- rework editor instrument groups: add new buttons, rework instrument panel, add evil interface
+- fix multiple spellbook-related issues in the Battle Only mode
+- update French translation
+- show an error when it is not possible to save a game on a hard disk
+
+version 1.0.11 (23 December 2023)
+- improve the logic of AI defensive tactics
+- add Tree of Knowledge claimed and cost info to quick info dialog
+- add a different object popup window logic for the Editor
+- implement town and castle placing in the Editor
+- update the Spanish translation
+- update the French translation and add missing offset for an A with accent
+- update Bulgarian translation
+- increase width and height of the Campaign Difficulty selection dialog
+- make speed of fade-in & fade-out animations for AI-controlled heroes dependent on the AI speed setting
+- speed up battle pathfinder logic
+- update Spanish translation
+- add Spanish and Portuguese button font letters
+- fix invalid focus update after AI hero battle
+- update Danish translation
+- speed up the original map format reading
+- fix a crash with castle overlapping inside a map
+- add basic logic to load and save maps through Editor UI
+- add text rendering within a given ROI
+- do not show quick info for hidden buttons inside castle building info dialog
+- add missing AI team alliance to Evil campaign's 6th scenario
+- update Swedish translation
+- update Hungarian translation
+- update Vietnamese Translation
+- fix update of the morale/luck indicator when changing the hero in the Battle Only mode
+- add base map file format for the Editor
+- add Hotkeys categories for the future UI improvements
+- fix scroll location on file deletion
+- rework Battle Only mode
+- add cell selection in Details mode for the Editor
+- speed up map loading for New Game
+- allow application closure by close button if no resources available
+- fix multi-font text offset calculation
+- properly evaluate potential attack positions for wide units
+- correctly manage touch device events
+- add ability to place Ocean Objects within the Editor
+
+version 1.0.10 (18 November 2023)
+- update Russian translation
+- rework Town Portal dialog
+- add artifact placement in the Editor
+- make Oracle dialog use selected interface mode (Good/Evil)
+- add treasure placement in the Editor
+- update hero status after digging on the Adventure Map
+- fix player names overlapping in Oracle and Thieves' Guild dialogs
+- fix dialog frames not being consistent for the same size windows
+- speed up monochrome cursors loading
+- fix rendering issue in Kingdom Overview dialog while dismissing a hero
+- fix castle and hero lists' updates after dismissing a hero in Kingdom Overview dialog
+- fix invalid attack positions from moat during battle
+- add support for right SHIFT, CTRL and ALT hotkeys
+- AI takes into account the spell immunity when calculating the effectiveness of mass damage spells
+- update Hungarian translation
+- fix incorrect AI estimation for moves during battle when a battlefield contains objects
+- update Vietnamese translation
+- fix several issues with loading ICN resources
+- add support for the future new heroes
+- fix the logic of purchasing a boat in a shipyard
+- increase the priority of those enemy units that have not yet got their turn, for proper AI decision making
+- add hero action button image
+- fix spelling in campaign text
+- display 0 shots during battle for archers with no shots left
+- fix random generator in normal and auto-combat modes
+- fix castle dialog rendering issues
+- adjust welcome window text at the first game launch
+- teach AI to use the marketplace to accelerate the development of their castles
+- update German translation
+- implement erase tool in the Editor
+- fix recruit dialog's MIN/MAX buttons when switching between creature upgrades
+- update Swedish translation
+- show proper Quick Info window for a hero during battle
+- fix troops' sprites overlapping in quick info
+- prioritize hiring those heroes whose portraits are not used by scenario specific heroes
+
+version 1.0.9 (11 October 2023)
+- add "tent visited" info to barrier quick info dialog
+- update Vietnamese translation
+- rework Hot-Keys dialog
+- fix combat victory window creature position
+- Town Gate and Town Portal spells: use depersonalized wording
+- add an ability to place heroes in the Editor
+- add an ability to place Random Monsters in the Editor
+- fix rendering of very long scenario names in the campaign briefing dialog
+- disable the not implemented Random Map option in the Editor
+- update German translation
+- make a long press on the "continue movement" button to reset a hero's path
+- use the "continue movement" button to interact with an object a hero is standing on
+- make Grass the default terrain for new maps in the Editor
+- restrict heroes' meetings and army merging on Easy difficulty
+- AI should avoid splitting troops on Easy difficulty
+- add functionality to place monsters in the Editor
+- add a mirror image check during spell evaluation
+- teach battle AI to use shield spells
+- implement streams' placing in the Editor
+- adjust AI combat spell heuristics
+- fix rendering of long text in the Hero screen status bar
+- update Ukrainian translation
+- implement roads' placing in the Editor
+- fix the AI first strike logic
+- update Hungarian translation
+- fix battle AI protecting paralyzed archers
+- properly display player's name in the New Game window
+- fix memorizing the position in the map list when changing the map size filter
+- adjust the position of luck and morale icons in the hero info window
+- update the followers window to support text mode
+- fix the logic of ALWAYS_RETALIATE regarding paralyzed units
+- add historical changes support for the Editor
+- add the ability to confirm actions in battle for touch devices
+- update Russian translation
+- fix Editor Main Menu hotkeys
+- update Swedish translation
+- speed up overall rendering for cycling animation
+- do not render text beyond the info and status bars during battles
+- rework game settings on the Adventure Map
+- remove double spaces in translatable texts
+- update Bulgarian translation
+- update Slovak translation
+- update Czech translations
+- update Danish translation
+- use Home and End hotkeys to navigate among items within a list
+- always use the nearest cell to attack the nearby unit if a monster is under the Berserker spell
+- fix an assertion when a hero starts moving and a player immediately mouse left clicks on the Adventure Map
+- improve path calculations by AIWorldPathfinder in planning mode
+- Wand of Negation should grant immunity against the Mass Dispel spell
+
+version 1.0.8 (11 September 2023)
+- fix number placeholders not being replaced in campaign spell bonus texts
+- fix spell rendering issues when words are divided in the middle
+- fix ? symbols appearing in single-line texts
+- generate vertical high scores buttons
+- display missing resource dialog for at least 5 seconds
+- show only skills that the hero does not already have in battle only skill selection list
+- show highscores after multiplayer game
+- improve the logic of kiting enemies with archers
+- update Vietnamese translation
+- update Hungarian Translation
+- adjust the description of the Eagle Eye skill
+- fix an empty gap in between lines in buttons font
+- update Russian translation
+- translate disabled buttons and reset them when changing languages
+- make vertical buttons translatable
+- implement terrain transitions in Editor
+- rework the Save/Load game dialog to allow variable dialog size and support Evil interface
+- change Army Order to Turn Order
+- Add Czech to original resource exception
+- do not close File options menu on cancelling load game dialog
+- fix foreign pixels on snow battlefield objects
+- do not try to scout the area if the hero is in jail and gets an artifact assigned using the map editor
+- update Slovak translation
+- cancel Hut of Magi reveal area animation when a player clicks any button
+- show the "You have been eliminated from the game" message in the multiplayer game
+- add small skill icons for Xanadu visit dialog
+- fix invalid logic for some objects on water
+- update Polish translation
+- speed up map, translation and save files loading
+- fix missing hero and town name in dialogs for non-English languages
+- fix Load/Save file title position and color
+- change Shipyard construction message
+- expand clickable area for settings in the Main Menu
+- shift text in Surrender window
+- show ... in Load/Save File dialog for long names
+- fix monster name position in monster info dialog
+- speed up rendering for specific buttons
+- fix multiple rendering issues in the Kingdom Overview dialog
+- adjust text for Quick Info dialogs
+- improve fading animation using Redmean color distance calculation
+- limit Dimension Door spell usage for AI heroes on lower difficulties
+- center text in hero battle info window
+- add A and O with diaereses to CP1252 button font
+- fix size of the button letter Æ
+- improve Mage guild status message for learnt spells
+- add "New Month!" title for new month
+- add "Victory!" title to victory dialog
+- update Danish translation
+- update Ukrainian translation
+- allow early exit from puzzle map during reveal animation
+- remember map filter selection until you quit the game
+- improve the distance estimation when an AI-controlled hero passes through objects on the map
+- update Swedish translation
+- AI heroes should decline battles if passing by
+- implement basic terrain draw in Map Editor
+
+version 1.0.7 (15 August 2023)
+- properly update uncovered fog with all hero actions
+- fix an issue when AI hero "jumps back" during the fog discovery
+- AI heroes should not know what exactly a Treasure or Sea Chest contains
+- do not play simultaneous walk/fly sounds for battle speed 9 and 10
+- do not handle an event on the map twice
+- fix AI estimation of the castle garrison strength for priority tasks
+- rework "select from list" dialogs and also make all elements within dialogs right clickable
+- battle AI should switch to offense mode instead of passing turns
+- update Russian translation
+- add the ability to export and import save files in Android Toolset application
+- make many in-game buttons translatable
+- fix Army info button in level up dialog
+- update Ukrainian translation
+- update German translation
+- add Summon Boat spell support for AI
+- rephrase various game dialogs
+- add a dialog to confirm auto combat
+- add "Quit" title to quit dialog
+- fix Zounds grammar
+- update Norwegian Translation
+- the Shield spell should not affect the damage of the castle towers
+- apply AI growth bonus only on first AI player turn
+- show "cast down" animation for heroes on the battlefield
+- apply Cure & Mass Cure spells only if the target unit is either damaged or has negative magical effects
+- fix hero last frame delay after the spell casting animation
+- speed up several spell animations during battle
+- fix missing first animation frame of heroes on the battlefield
+- change heroes animation speed on the battlefield
+- fix puzzle screen exit button theme
+- reduce CPU usage while rendering castle's Well dialog
+- fix campaign buttons' rendering issues
+- make campaign buttons translatable
+- update Slovak translation
+- update Danish translation
+- update Swedish translation
+- disable Campaign button if no campaign resources are present
+- improve AI pathfinding logic regarding protected and guarded tiles
+- avoid engine execution with corrupted video files
+- add ability to select instrument brush and brush size in Editor UI
+- make thieves guild adapt background to chosen interface
+- fix a possible crash in Android toolset application
+
+version 1.0.6 (15 July 2023)
+- allow to lower the campaign difficulty during playthrough
+- update Russian translation
+- reduce CPU usage while rendering High Score dialog
+- add some missing horizontal buttons to translations
+- fix missing redraw in Battle Only dialog after cancelling hero selection
+- fix last hotkey not showing up in the hotkey dialog
+- add Dismiss hotkey to hero screen
+- create basic Map Editor GUI
+- update Polish translation
+- add checks for object reachability when calculating their value for AI heroes
+- fix AI logic for visiting Shrines and Arena
+- correct spell value estimation for AI heroes
+- fix a case when a dead AI hero was trying to reinforce army in a castle
+- update priorities for AI heroes based on battle outcome and fog uncover events
+- rework the spell generation in castles' Mage Guilds
+- update Spanish translation
+- speed up Armageddon spell rendering
+- fix invalid pixels in multiple images from the original resources
+- speed up resource loading
+- update Slovak translation
+- do Main Menu fade-in before showing first game run
+- fix the fade effect on the "View World" screen
+- properly restore environment sounds and terrain music after opening a castle dialog from the Kingdom Overview screen
+- fix cases when false symbols appear after the blinking cursor in text input dialog
+- rework game credits to keep aspect ratio
+- add extra windows and greying out conditions for Summon Boat spell
+- fix several button text placements and button press rendering
+
+version 1.0.5 (14 June 2023)
+- improve AI castle defensive strategy on Adventure Map
+- fix rating in campaign congratulations text in win video
+- update Danish translation
+- adjust battlefield Idle and Flag animation speed and avoid setting 0 animation delay for battlefield actions
+- show the currently selected bonus in the campaign scenario UI if the campaign scenario is already in progress
+- update Polish translation
+- add shadows for the Virtual Keyboard buttons
+- fix okay button not being redrawn in battle options dialog
+- improve army distribution in castles for AI players
+- make the text input cursor blink and add the ability to set the cursor position anywhere in the edited string
+- move jobless AI heroes into castles on a last day of a week
+- fix monster upgrade logic when AI was wasting resources for nothing
+- do not check whether a hero can cast a spell if spellcasting is prohibited in principle
+- fix AI heroes behavior ignoring empty castles with commanders
+- speed up AI decision making on Adventure Map
+- fix Magellan's Maps visit by AI heroes when discovered objects were not being added for exploration
+- fix missing logic for AI heroes to meet each other in the middle of a turn
+- reduce unit growth bonus for AI
+- do not play the same kill/wince sounds simultaneously
+- allow AI heroes to retreat when the kingdom has full house of heroes and when there are enough resources on the next turn
+- fix a crash when AI heroes capture a dwelling protected by monsters
+- add Editor Main Menu (only for development builds)
+- fix the Skeleton passability
+- fix the logic for defeated heroes in campaign scenarios
+- fix the logic of recognizing objects guarded by neighboring monsters
+- update hero's path after inspecting a castle
+- add Evil interface version of Monster recruitment dialog
+- update Bulgarian translation
+- add screen fade effect for transiting between game sections
+- add a check to avoid a crash for corrupted game resources
+- fix the rendering of the number of units during the castle siege
+- update Russian translation
+- speed up battlefield rendering
+- fix incorrect spell efficiency display for resurrection spells
+- set music type to MIDI if no MUSIC directory exist
+- fix cases with dropping audio volume when MUSIC directory is not present
+- fix crashes for Android devices due to using a buggy third-party package
+- fix cases when AI ignores some objects during path evaluation
+- use 22050 sound sample rate for PS Vita to fix high CPU load
+- add diacritic signs to CP-1250 button font
+- update Slovak translation
+- update Ukrainian translation
+- fix Android version for Android 7 or lower devices 
+- do not reset castle or heroes scrollbars when hero moves
+
+version 1.0.4 (13 May 2023)
+- add Polish and Russian languages support for Virtual Keyboard
+- fix absence of delay after animating creature wince and before making next move
+- make haunt, set elemental guardian, identify hero and visions spells gray out when cannot be used
+- do not stop hero's movement after the first Dimension Door jump
+- do not show that enemy town or castle has no garrison if kingdom has no Thieves' Guilds
+- fix idle animation lag while casting any spell
+- fix creature idle animation freeze during Blind / Paralyze spell casting
+- fix an issue that caused an AI-controlled hero standing next to Stone Liths to block the path of another AI-controlled hero standing on these Stone Liths
+- add checks to detect corrupted data resources
+- improve the resource value estimation algorithm for AI
+- fix logic and reward of Daemon Cave object for AI
+- add an ability to cancel waiting for the end of the pre-battle sound
+- update Polish translation
+- create small and large obstacles on the battlefield at the same time
+- do not make an empty text line at the end of phrase and fix text rendering in a wider area than given maximum width
+- fix Battlefield animations freeze while waiting for Good Luck sound to end
+- add popup windows for monster dialog buttons
+- fill main menu with background when we do not stretch the main menu main image
+- update Russian translation
+- fix not returning to load menu while switching between campaign scenarios
+- fix Shipwreck Survivor bonuses
+- fix AI pathfinding when Spell Scroll was considered as an artifact which requires to defeat an army
+- rework logic for all Adventure Map objects' metadata
+- fix adventure map fog reveal on campaign scenario restart and when loading a Hot Seat save made in the first game day
+- adjust spell info message when hero has zero (0) mana
+- fix calculation of castle towers strength for AI
+- improve dialog titles related to losing the game
+- update Bulgarian translation
+- strategic AI economy update
+- AI should check for castles and funds before retreat
+- fix software cursor freezes during certain fading animations
+- rework the search algorithm for available scaled resolutions
+- show map ratings in victory video, add subtitles and color fading animation
+- add extra checks to prevent loading renamed MX2 maps on demo version
+- add "End Turn" title to dialog when heroes can move and you are ending your turn
+- catapult and castle towers should still act, even if there are no troops in the respective armies capable of taking any action
+- update Vietnamese translation
+- fix the behavior of Berserk and Hypnotize spells
+- add language support for highscores
+- expand wide screen support
+- properly handle absolute and relative paths in the CDDrive registry key for Windows scripts
+- update Danish translation
+- update Swedish translation
+- reset battlefield grid cursor position after using the spell book
+- fix a crash on deleting last save file
+- update Czech translation
+- update Slovak translation
+- update Ukrainian translation
+- fix recurring global events
+- redraw the status window after the amount of kingdom resources has changed at the beginning of the day
+- do not render hero/boat over the bottom map border
+- add "New week!" title to dialog showing start of a new week
+
+version 1.0.3 (11 April 2023)
+- update German translation
+- update Norwegian translation
+- preparations for Google Play Market release
+- add missing frame for hero information dialog when it is opened from hero meeting dialog
+- improve the destination indication for Teleport spell
+- translate more UI buttons within the game
+- fix endless jumping AI hero behavior while using Dimension Door spell
+- add Virtual Keyboard open button to Save Game and Player Name dialogs
+- add values to Morale and Luck stats within artifact description
+- show approximate information about the mine guardians to a non-owner player
+- adjust number of resources subtracted in event messages
+- fix projectile render position when hitting the target creature
+- reduce AI obsession with Wells
+- optimize object priority logic for AI heroes to prioritize more important locations
+- remove path icon after a hero/boat makes a turn, not before
+- show mirrored monster image in army order
+- make hotkey names translatable
+- improve AI fog discovery logic
+- fix a case when a hero has the same secondary skill but different levels of it set by an author of a map
+- add gold missing in Statue and Dungeon building description
+- add Vietnamese translation
+- fix the number of regenerated spell points with the Mysticism skill
+- focus on the AI hero before he disappears due to boarding a boat or using a Dimension Door or Town Portal spell
+- add legacy game detection on Windows x64
+- fix clicks in Android MIDI music
+- speed up Adventure Map rendering
+- fix AI hero animation being interrupted while moving inside a fog for the current player
+- fix Alchemist Lab flag and Ghosts from Abandoned Mine rendering while rest of the object is not visible on the screen
+- fix boat's shadow being rendered over a boat while sailing diagonally
+- adjust recruitment window position on castle well and kingdom overview
+- apply the commanding hero/captain bonuses to the castle towers
+- fix the number of raised skeletons by Necromancy after battle
+- update Polish translation
+- fix incorrect number of Ghosts present in Abandoned and Haunted Mines
+- add Slovak translation
+- properly handle the situation when wandering monsters and an AI hero eliminate each other
+- update battle log with special abilities of Vampire Lords and Ghosts
+- update Belarusian translation
+- add numeric speed of monsters in information window
+- fix quick info for non-action objects when their action tile is under fog
+- block Chain Lightning if first target unit resists the spell
+- fix cases when Road sprite is drawn over a hero
+- fix Hero shadow rendering on Adventure Map
+- update Russian translation
+- show Spell Points for spells in Magic Book popup dialogs
+- fix necromancy and calculation of casualties with mirrors
+- properly track the Mirror Image spell duration
+- update documentation about Android
+- update Czech translation
+- update Swedish translation
+
+version 1.0.2 (12 March 2023)
+- fix display of Haunted Mines on mini-map and in View World
+- update the Norwegian translation
+- allow resurrected units to act on the current turn if they have not yet had their turn
+- add missing part of Captain's Quarter in Sorceress Town
+- allow to resurrect Elementals
+- fix the battle casualty report when non-true Resurrect spell was used during battle
+- redraw hero icons to display movement bar change before action dialog box is shown
+- fight the guardians on dwellings on Adventure Map only once per game
+- change the logic of reinforcement of the guest hero's army during the castle defence
+- do not show Dragon City on mini-map
+- summon boat spell will only summon friendly boats
+- allow the player to refuse to level up in the Tree of Knowledge even if this level up is for free
+- add virtual keyboard support for touch devices
+- grey out Summon Boat, Town Gate and Town Portal spells if they cannot be used
+- clean up AI priority tasks if attacker was killed
+- update sounds used while visiting dwellings on Adventure Map
+- add logic of AI heroes using town portal
+- add missing symbols to button font
+- update Polish translation
+- fix high CPU usage during battle while using highest animation speeds
+- fix battle AI tactics estimation
+- fix pathfinding not being updated after revealing the fog on visiting Magellan's Map
+- animate lighthouse in lighthouse dialog
+- fix the experience calculation for AI-controlled heroes while visiting Tree of Knowledge
+- add a frame for a hero portrait on the quick info dialog
+- add missing experience being displayed in the Tree of Knowledge window
+- fix music effects while visiting an empty object on Adventure Map
+- display the world date for save files
+- rework AI hero task priority logic
+- fix invalid popup window being displayed while clicking on an empty hero list area within Adventure Map
+- add Graphics option icon
+- fix corner cases of fog rendering
+- fix invalid calculation of AI path leading to a crash
+- show sleeping hero icon for hero's portrait within castle dialog
+- speed up rendering on Adventure Map
+- properly restore the screen after closing the hero dialog during combat
+- render background between HEROES and TOWNS/CASTLES buttons in Kingdom Overview window
+- fix possible random crashes during the gameplay
+- fix Iron and Steel Golems animation issues
+- show kingdom income when gold per day income is clicked within Kingdom Overview window
+- fix a crash while visiting a castle after an ally captured it
+- speed up file searching on Windows
+- fix the spell id calculation for a spell scroll while loading a map
+- fix puzzle map window position
+- fix View World default adventure map position
+- memorize zoom level of the View World screen
+- fix inability to move monsters after Good Morale event
+- fix unintended ability to upgrade troops during battle
+- fix huge CPU usage in hero window during battle
+- redevelop standard window generation logic
+- update Bulgarian translation
+- fix volcano sounds
+- update Russian translation (main menu and dialog buttons)
+- fix issue with the puzzle rendering
+- fix musical effects for various objects
+- fix stereo audio playing in SMK files
+- add letter "Ў" and "’" sign to Cyrillic (cp1251) button font
+- add lighthouse information popup in kingdom overview
+- fix an invalid option for scenario 1 of Roland Campaign
+- optimize mini-map rendering
+- update Czech translation
+- add proper hotkeys option icon
+- fix title in German translation
+- optimize View World rendering
+- add tooltip damage info for single target attack spells during battle
+
+version 1.0.1 (08 February 2023)
+- add the ambient sound for Abandoned Mine
+- add support for scaled resolutions
+- instantly update status bar in battle for hero's dialog options
+- fix invalid Kingdom income calculation
+- fix incorrect status bar update call
+- update Czech translation
+- add German and Russian translations of Android Toolset
+- Android Save File Manager: implement filtering of save files by type
+- fix scroll bar bottom position when dragging and fix high FPS rate when dragging scroll bar by mouse
+- make a narrower button font for cp-1251 (Cyrillic) characters
+- fix Druid projectile start position for shooting up
+- add PS Vita fixes and gamepad mapping improvements
+- add Danish translation
+- fix shooters projectile position during battle
+- fix high CPU load on Adventure map when Hero speed is set to Jump
+- Android toolset: add the ability to browse & delete save files
+- fix loss of the first frame in the after attack unit animation
+- update spell points for campaign heroes at the start of a scenario
+- uncover the fog during the hero's instantaneous movement only if the hero is actually moving
+- do not allow to dig for Ultimate Artifact second time
+- show spell effect animation so as not to cover the front troops
+- fix screen restoration after closing monster info dialog
+- fix the AI resurrect spell logic
+- fix the Dimension Door shadow on resolutions 640+x480 & 640x480+, temporarily hide auxiliary panels in "no interface" mode
+- rework pathfinding algorithm during battle to fix non-optimal paths for monsters
+- add Mossy Rock object which appears only on Swamp terrain while in the original game this object has no name
+- optimize Adventure Map rendering
+- do not do redundant redraws when dragging Adventure Map with the mouse
+- fix walking animations of certain monsters
+- fix the bridge operation when a wide friendly unit steps on it from the moat
+- fix creature wince animation for low morale and Lich cloud cases during battle
+- optimize Holy Shout spell effect rendering during battle
+- allow wide units to take a step back during battle
+- fix certain Peasant Huts being displayed as Thatched Huts with no ambient sounds on Adventure Map
+- update Polish translation
+- avoid excessing CPU usage for multiple windows in the game
+- set audio frequency to 44100 on Windows to avoid cracking sounds during playback
+- add fh2 toolset application on Android to help with setting up the main application
+- update French translation
+- reduce CPU usage in Select Language dialog
+- fix a case when external music was not being played on Ubuntu
+- fix incorrect logic for monster placement on Adventure Map
+- update German translation
+- do not lowercase creature name (or other string) when it is put first in phrase
+- fix forced Idle animation after switching to Static animation
+- fix screen flickering in SDL2
+- optimize Death Wave spell effect rendering during battle
+- automatically assemble artifacts sets if their parts were captured in the battle
+- fix controller support for PS Vita
+- add a full stop, A and E characters with accents for CP1252 button font
+
+version 1.0.0 (21 December 2022)
+- add Ubuntu ARM support
+- update Polish translation
+- update the French translation
+- fix incorrect resource placements on certain maps
+- adjust "Battlefield Casualties" vertical position
+- fix bridge logic after morale event
+- enable the instant battle by default
+- optimize rendering in multiple places
+- update the Norwegian translation
+- add global hotkey to toggle the text support mode
+- make the regular small buttons translatable
+- make Trade button in Marketplace window disabled by default
+- add popup windows for monster recruit dialog
+- fix animation of slowed flying creatures
+- fix multiple hero related awards for campaigns
+- fix Death Wave, Holy Shout and Holy Word spell animations
+- do not mirror corpses of defeated troops during battle
+- fix rendering an extra empty line for specific texts
+- fix monster idling animation during battle
+- use logarithmic scale of sound volume
+- enable touch support for all devices
+- make separate hotkeys to cast battle & adventure spells
+- add the "Quit game" hotkey
+- handle hotkeys in the Adventure Map's File dialog
+- optimize defensive strategy for AI castles
+- fix black area not being rendering during video playback
+- reduce priority for bottles in sea for AI
+- make File Dialog and Adventure Dialog buttons translatable
+- do not stop object animation during AI turn
+- update Russian translation
+- fix text rendering for game option's names of certain translations
+- fix incorrect battlefield image restoration in the place of the previous damage popup
+- adjust several button font characters
+- rework the hotkeys concerning the hero movement
+- make the Main Menu's dialog buttons translatable for specific languages
+- display the amount of gold in the diplomacy dialog
+- show object animation during Hut of Magi visit
+- fix Dwarves death animation
+- fix very slow hero movement animation when moving a cursor with software cursor rendering
+- fix translated Cancel button in monster recruit dialog being switched to English
+- fix animation of bridge destruction during battle
+- fix the smoke animation when demolishing a castle building during battle
+- improve Adventure Map rendering performance
+- fix multiline word splitting for short phrases with a long first word
+- fix position of left barbarian's captain quarters part
+- reset the cursor position at the start of 'human turn'
+- add an option to toggle screen scaling type
+- recreate the original rainbow animation during battle
+- fix Scenario Info window elements
+- improve hexagon shading during battle
+- add Danish language option and font
+- improve rendering speed with software cursor rendering
+- fix French and Italian characters not being shown with their assets
+- set the minimum supported version to Android 5.1
+- introduce AI Scout role
+- fix fullscreen mode with DPI higher than 100% on Windows
+- fix multi-monitor fullscreen support on Windows
+- update Bulgarian Translation
+- add Android installation and usage documentation
+- fix the scenario info dialog position
+- generate resizable buttons for both interfaces
+- fix inability to toggle V-Sync option dynamically
+- do not show resolution dialog on handheld devices on the first startup
+- add mouse right click simulation on touchscreen devices
+- fix cursor being too small for certain resolutions
+- disable Adventure Map scrolling for handheld devices by default
+- change battlefield hexagon generation to match the original
+- make fullscreen mode as a default state for Android devices
+- implement all troops transfer between armies within castle dialog
+- scroll Adventure Map with mouse left button pressed
+- use parabolic catapult projectile flight trajectory
+- update credits page
+- always show the Ultimate Artifact behind one of the last four central pieces of the puzzle
+- update captain's mana on map load and when building the Captain's Quarters
+- remove and integrate the rest of experimental options
+- always center text when a maximum width is provided
+- fix UI elements for the unhired hero popup window
+- update Ballista and Turrets damage information when they are destroyed
+- correctly reflect the change of fullscreen mode in the graphics settings dialog when it was toggled using a hotkey
+
+version 0.9.21 (12 November 2022)
+- fix audio playback issues on Windows OSes
+- do not show any hero status for AI heroes
+- add hotkeys for moving armies between heroes
+- update the Norwegian translation
+- fix monster upgrade cost formula
+- reset AI hero meeting flag every time if hero's strength has changed
+- add missing alliance conditions for the Succession Wars campaign last scenarios
+- add small optimizations for the pathfinding algorithm
+- fix incorrect evaluation of army strength where hero's abilities should not be taken into account
+- fix handicap income calculation
+- add right click quick info in more dialogs for hero and castle captain
+- fix possible assertion hit for campaign scenario info dialog
+- Luck / Morale related objects are now reset after meeting / battle for AI heroes
+- add a separate graphics options window
+- make more contrast for player objects on the minimap
+- do not override hero or castle selection focus on a game load
+- change language selection window to support many languages
+- improve the combat log's use of plural forms
+- draw the correct arrows for the paths on the adventure map
+- rework the troops arrangement mechanics for the castle defense
+- fix catapult's boulder animation
+- update position for text in difficulty selection dialog
+- add CP1252 French quotation marks
+- clear the kingdom's visited objects according to their lifetime, even if this kingdom has already been vanquished
+- update AI logic for monster distribution and recruitment
+- do not increase the number of upgraded creatures on Week Of/Month Of basic creatures
+- generate new MAX/MIN buttons for other languages
+- add Czech language option in game and add fonts
+- fix the troop splitting logic
+- include project's resource files into Android packages
+- translate language names in native language
+- add proper CP1250 font
+- update French translation
+- do not waste time to get useless monsters for an AI army
+- add audio support for Android devices
+- take Magic Book into account while visiting a castle by an AI hero
+- avoid using armies with 1 monster for AI heroes
+- lock the screen orientation to landscape for Android devices
+- fix campaign score sorting issue
+- fix an issue when kingdom overview scrollbar does not not remember last position
+- fix terrain colors on the minimap
+- memorize selected Scenario in Scenario Selection dialog
+- do not overwrite default platform's soundfonts if none is included into the package
+- update Hungarian translation
+- add Hungarian language option and font replacements
+- fix the shade used for mountains and trees
+- fix UI elements position in Select Scenario dialog
+- fix hero's fight cursor offset
+- fix heroes position on battle screen
+- add Android compilation
+- update Russian translation
+- redraw the castle's resource panel when a hero purchases the spellbook
+- add Dutch font and language option
+- update language dependent resources while changing language
+- update Bulgarian Translation
+- fix the Week Of / Month Of logic
+- update Belarusian translation
+- fix button font generation for original buttons
+
+version 0.9.20 (10 October 2022)
+- add Russian and French button translations
+- update the Norwegian translation
+- recalculate the hero's path when the hero was selected with the mouse
+- fix stopped music in events of quickly closing dialogs with internal music
+- add proper logic for artifact exchange between AI heroes
+- add Dutch translation
+- do not let the archers perform a double attack if they are out of ammo
+- add Hotkey support for restarting Campaign's Scenario
+- AI heroes now use spells from scrolls
+- fix neutral town unit growth
+- display detailed information about the composition of alliances in the scenario info window
+- add date to logging for the future bug fixing
+- add turkish translation
+- make sure that there is a place for the Ultimate Artifact in the artifact bag before trying to dig it out
+- do not ask player's name if the score is too low for High score board
+- add Romanian translation
+- hide console window for Windows OSes and add log file for this platform
+- add Romanian font and language option
+- update Polish translation
+- add Turkish language option and CP1254 font
+- add proper icons for Petrification spell
+- speed up Adventure Map rendering
+- take into consideration a case with full artifact bag while checking AI hero's path
+- generate button fonts for different code pages
+- apply usual rules for unit growth in neutral towns/castles with custom troops
+- decrease monster growth bonus for AI
+- fix incorrect usage of Dimension Door by AI heroes
+- make logging for monster movement in battle more user-friendly
+- add UI improvements of the Settings dialog
+- fix logic of processing cells containing units available for possible AI unit attack
+- fix incorrect object evaluation for AI heroes on boats
+- add a feature to give human player control to AI (debug build only)
+- make creature names lowercased for certain dialogs
+- generate new Gift button
+- generate full button English alphabet and new Battle Only button
+- fix switching of terrain music in case of hero loss
+- update Bulgarian translation
+- add Handicap feature for single and multiplayer games
+- fix a case when a hidden scrollbar during battle is visible for one frame
+- fix sound volume for objects while using external music type
+- include rating calculation for Campaign's high score
+- fix incorrectly rendered monochrome cursor for campaign selection window
+- update French translation
+
+version 0.9.19 (11 September 2022)
+- add popup dialogs for Well's buttons
+- generate MIN button based on newly added font
+- fix constantly moving AI heroes when they have nothing to do
+- update Polish translation
+- implement some improvements when exchanging an army between heroes
+- show intro videos like in the original game
+- fix messages displayed for captains during battle
+- update Bulgarian translation
+- correct start resources for AI players
+- add a popup dialog for Days spent info within campaign dialog
+- make Artifact evaluation for AI more granular
+- add Difficulty selection for Campaigns
+- add popup dialogs for mage guild and scenario info windows
+- fix rendering of Mine Guardians
+- do not show monsters and campfires on Puzzle screen
+- fix moving AI hero rendering
+- implement instant finishing of battles
+- update Norwegian translation
+- fix incorrect rendering of some icons in The Price of Loyalty campaign windows
+- make "Show terrain penalty" option the default
+- fix double income from captured objects
+- fix the distribution of Mutant Zombies in the Graveyard
+- fix the battle order after bad morale events
+- always use the current color of a unit when toggling auto battle (take the Hypnotize spell into account)
+- speed up file search on case-insensitive file systems
+- optimize Mini-map rendering
+- do not show boats on puzzle image
+- fix a possible crash in UI window
+- fix castle rendering on Mini-map
+- fix Ultimate Artifact placement conditions
+- fix rendering of towns for View Towns spell
+- fix tall object rendering
+
+version 0.9.18 (10 August 2022)
+- speed up rendering of Mini Map area
+- fix missing shadows from path arrows when they are on the edge of screen
+- render correct digging holes for terrains
+- add monster fading animation when both wandering monsters and hero are dying after a battle
+- fix incorrect boat fading animation
+- do not show digging holes on Puzzle Map
+- fix out of view rendering of boats and heroes
+- fix Ultimate Artifact digging conditions
+- fix the logic of joining monsters for free and for money
+- do not draw objects over the map edge if they are in fog
+- fix cases of boats being shifted when a hero boards it
+- fix wrong rendering priority of Hero and Jail
+- do not render shadow of a tall monster over another monster nearby
+- properly render trees and Sawmill
+- fix Fountain being displayed over a moving hero, not under
+- fix certain shadows of objects being too dark
+- fix cases when hero's flag was not being displayed properly when a hero stands near a tall object
+- fix cases when some parts of heroes being displayed over other objects
+- fix monsters being displayed over mountains
+- draw a flag over Magic Garden object
+- draw Adventure Map decors in the same way as in the original game
+- fix flag rendering priority from Windmill
+- fix incorrect moving boat rendering in relation to other boats
+- fix boat being cut near Magellan Maps object
+- fix incorrect boat rendering priority
+- fix wasteland terrain object displayed over hero's sprite
+- fix Mine's flag being displayed over a hero
+- fix cases when a moving hero being drawn over other heroes
+- fix cases when some parts of a ship can be seen through terrain objects
+- fix cases when hero overlaps ship while passing nearby
+- hero does not step on route arrows anymore
+- fix the pre-battle arrangement of neutral troops
+- add separate sound font for SDL 2 builds
+- fix paused music being played with old music volume while restarting it
+- fix hero starting experience values
+- fix amount of experience from Tree of Knowledge
+- fix missing retaliation delay after last animation frame
+- fix music being too quiet while fast switching between music types (Windows OS)
+- fix crashes on Windows 8 using MIDI music
+- fix external audio not always returning to on after turning volume to zero (Windows OS)
+- fix horse's steps being faded while crossing terrain border using MIDI sound (Windows OS)
+- fix sound volume being lower during combat (Windows OS)
+- fix no sounds situation when music is off even when sounds are not (Windows OS)
+- show correct hero's level and experience on level up
+- fix incorrect castle's area leading to wrong castle's info
+- add missing window frame for hero's dialog during level up
+- fix number of ghosts and splitting for Shipwreck, Haunt and Abandoned Mine cases
+- update Bulgarian Translation
+- update treasure chest AI decision logic
+- fix a case when a hero got 2 Magic Books
+- update Russian and Hungarian translations
+- add support for loading of MIDI sound fonts
+- show upgraded monster images in Adventure Map objects upon a successful upgrade
+- fix redrawing of the status window in cases when the hero's army or the castle garrison change without changing focus
+- make best AI fighter as a champion
+- update Polish translation
+
+version 0.9.17 (11 July 2022)
+- fix possible crashes during sound playback
+- always ask about rewriting an existing save file
+- allow to remap Hotkeys within the game
+- fix distance evaluation during Scouting
+- fix invalid logic when neutral monsters whose number was set in the Editor did not grow at all
+- add The Price of Loyalty team to credits
+- show a window stating about missing video files for campaigns
+- fix the class of a hero named Joseph
+- fix extra shadow being drawn for Hero Screen dialog on high resolutions
+- align File Options dialog position
+- fix Campaign Window button flickering
+- fix missing column of pixels in Map Scenario Info window
+- update French translation
+- allow different translations of "Red Tower"
+- implement AI courier hero role for better logistics
+- fix situation when MIDI music still continues to play during fast switching between music types
+- fix case when Adventure Map sounds are still being played while opening Main Menu
+- AI should keep some creatures in reserve for castle defence
+- update Ukrainian translation
+- update Norwegian translation
+- increase Genie special ability to 20% like it is done in the original game and correct log messages during battle
+- remember the last open page in Spell Book during battle
+- fix possible synchronization issues for audio playback
+- enhance AI logic towards defending its castles
+- improve usage of spell on Adventure Map by AI
+- fix displaying of negative resources in dialog
+- fix situations when AI was hiring too many heroes
+- respect the Ultimate Artifact's radius specified by the map creator
+- update Polish translation
+- fix the castle's well build logic for AI
+- align hero's button in level-up dialog
+- fix scenarios when ambient sounds from Adventure Map objects are still played while opening a castle's window
+- fix cases when Random Monsters appear from a different level due to invalid format of an object on the map
+- update Mine's sprite properly after defeating Ghosts in Abandoned Mine
+- fix multiple issues related to hero's info popup window and updating his position on a mini-map
+- update sounds and music before a hero making an action
+- add an environmental sound for Freeman's Foundry
+- add initial implementation of true "Evil" interface in the game
+- add missing Ultimate Artifact successful digging sound
+- do not play pre-battle sound if sounds are off
+- fix potential thread-access issues for Nintendo Switch
+- fix possible inter-thread race for Adventure Map Status window
+- fix a delay in game while crossing a terrain and playing MIDI music
+
+version 0.9.16 (12 June 2022)
+- add Flatpak support
+- add Belarusian translation
+- swap spell icons for Death Wave and Death Ripple
+- make the "no interface" mode more usable
+- add music resume ability for MP3, OGG and FLAC formats
+- update translation guide
+- replace "C with cedilla" with "latin C" in the French translation
+- do not auto-save at the end of a turn if the player has been vanquished on that turn
+- fix Puzzle window exit button rendering
+- add sound for rocks in water with seagulls
+- fix Sorceress captain purchase building rendering
+- fix issues with Romanian translation
+- properly deal with human-only colors in single player mode
+- fix the invalid behavior of "no interface" mode
+- introduce 3D audio option
+- change adventure map environment sounds for every step hero moves
+- fix boats being considered as free tiles
+- if attacker is able to attack multiple targets at once and has a built-in spell, then this spell should be applied to any (but only one) of the targets
+- fix some typos in translation texts
+- take into account AI hero's role during meeting
+- fix false highscore entry while cancelling to continue a campaign
+- highlight latest highscore after completion scenario/campaign
+- show evil resolution icon for Evil interface
+- add truncated shadow to Scenario Information window
+- generate missing parts of Red Tower sprite
+- fix incorrect tiles being marked as road
+- fix multiple cases while using Mirror Image and Summon Elemental spells
+- fix the victory/defeat verification logic
+- update error message if hero tries to open a spell book and does not have one
+- improve status text if only one troop is selected
+- fix inability to add new entries with similar high scores
+- add Campaign high scores
+- fix dwelling popup window on adventure map
+- make AI to be aware about map conditions
+- fix incorrect hero icon in adventure interface
+- do not show languages with empty translations
+- add Swedish language option and font support
+- update Ukrainian translation
+- well MAX buy: add condition for not enough room, make recruitment happen in guest hero's army too, more text flexibility
+- add Portuguese language option and initial font generation
+- speed up AI turn
+- impose a limit of turns for an attacking AI-controlled hero
+- cache AI hero's and neutral monsters' strength during AI turn
+- add initial Spanish language support
+- make castle's flags for Knight and Wizard factions appear in a correct color
+- add window header for campaign awards and bonuses
+- update German translation
+- fix plural forms translation for some languages
+- fix character filtering when generating the save file name
+- update Polish translation
+- fix Red Tower rendering with Rainbow
+- expand Hotkey usage on adventure map
+- fix German font support
+
+version 0.9.15 (07 May 2022)
+- add HotKey window and expand the list of system options
+- do not allow higher-level Mage Guilds to be built if the previous-level Mage Guild has not been built yet
+- Battle Only mode: always assign a random spell to the Spell Scroll
+- add initial support for Romanian language
+- add more conditions to define a blocking AI hero
+- fix incorrect video playback on Descendants campaign, scenario 5
+- change some descriptions of campaign awards and bonuses
+- do not auto save after the completion of the last scenario in a campaign
+- add images and full description of bonuses and awards by right mouse click
+- fix some incorrect campaign bonuses
+- display None if no awards available for the current scenario
+- add hot keys to select bonuses
+- fix rendering of campaign UI window as it was very slow on response on changing bonuses
+- fix missing kingdom income value for scenarios with additional bonus resources
+- game type interface for campaign window must be unique and should not depend on overall game interface
+- allow already selected scenario to appear in ALL scenarios list
+- improved Week of the creature window
+- changed town portal's text and condition to be similar to town gate
+- update Russian translation
+- properly extract animations from the GOG distribution of HoMM2 for Windows
+- update French translation
+- improve search for video files
+- add text truncation method to be used in campaign's choices and awards
+- encourage AI to explore more
+- redesign Hot Key event file handling
+- add double-lined headers to adventure map options
+- add Belarusian, Bulgarian and Ukrainian languages support
+- populate resolution list based till the lowest resolution
+- fix 1000 and 100000 short values display
+- update hero quick info popup dialog
+- disable Town Portal dialog OK button by default
+- changed AI's turn to be repeated multiple times for heroes
+- generate French 'MIN' button
+- generate French 'GIFT' button
+- add Translation Context for Secondary Skill Campaign Bonuses
+- add Ogre Alliance and Dwarfbane full strings for translation
+- fix the positioning of the damage info popup
+- update Norwegian translation
+- fix calculation of morale & luck modifiers for in-castle army without a commander
+- properly calculate the number of travel days to the destination tile for a hero
+- AI should replenish lost spell points more frequently
+- do not allow a hero to have multiple spell books in the "Battle Only" mode
+- fix rendering of the Arm of the Martyr's shadow
+- AI uses View All spell to scout fog
+- hero should have at least 69MP to cast Dimension Door, Town Gate and Town Portal spells
+- fix spacing of player squares in Select Recipients window and properly center resource icons for "Your Funds" and "Planned Gift" horizontally
+- fix French small font Cedilla c rendering
+- update Polish translation
+- reserve half of AI spell points for Dimension Door spell
+- hero should be able to cast spells that consume movement points if he is able to move from his current tile
+- fix MP3 support in Windows SDL1 packages
+- reset the mixer volume before playing video soundtracks
+- expand Test Support mode to cover all campaign related actions
+- add Black-White cursor support
+- add music control options to the configuration dialog
+- fix failing music file search
+- properly work with guardians on the objects that can be captured
+- fix call to get secondary skill name leading to a crash
+- fix multiple issues related to the interface settings
+- allow to change the auto battle settings if player's army doesn't have a commander
+- fix a crash when a hero tries to get a second magic book
+- always grab the mouse in fullscreen mode to properly support devices with notch
+
+version 0.9.14 (09 April 2022)
+- generate Italian "Battle Only" button
+- fix line breaking in welcome message for various languages
+- update and improve Italian translation
+- generate Polish "Battle Only" button
+- fix switching fullscreen mode in Mac OS for certain resolutions
+- generate French "Battle Only" button
+- fix a crash due to an assertion failure when the shooter hits back at a unit under Berserk spell
+- fix scrolling in full-screen mode in case of an aspect ratio mismatch
+- fix rare cases for incorrect letters being generated while switching languages
+- add Norwegian language option and font generation
+- update French translation
+- add initial implementation of Dimension Door spell usage for AI
+- fix Gold Watch artifact invalid bonus
+- rework artifact logic with proper separation and calculations of artifact's bonuses and curses
+- play only one sound while getting ar artifact within an event
+- speed up castle and hero icons on adventure map
+- add "Battle Only" button generation for German version of the game
+- fix Mage Guild bottom status bar rendering
+- fix incorrect artifact discovery description
+- add in-game Italian language option and diacritics
+- fix army order option related crash
+- fix High Score Music after winning scenario
+- adjust AI spell estimates
+- fix rendering of bottom bar in Well dialog
+- update Polish translation
+- remove unnecessary call to play VICTORY music during Campaign intro
+- fix the calculation of the cost of surrender
+- fix Town Gate spell logic
+- prioritize AI castles further from enemy territory
+- take the weekly growth into account when calculating monthly population growth bonuses and fines
+- update minimap colors
+- optimize AI fighter hero priorities
+- add native macOS application generation
+- build player influence map to inform AI kingdom development decisions
+- speed up data reading from AGG files
+- update Norwegian translation
+- add a popup window for battle log
+- add a mandatory requirement of h2d file being present
+- fix incorrect logic for palette application function
+- fix position of armies for quick info window for both castle and enemy hero
+- set the direction for attacking and defending units in battle in a more OG-like way
+- fix incorrect popup monster window in Well
+- greatly speedup heavy video loading
+- do not render extra frame while playing an audio only video file
+- properly center the first sentence in the battle surrender dialog
+- dynamically update Game Language dialog
+- fix translation and UI in Tavern dialog
+- add MP3 file support
+- increase the number of sound channels to 32
+- allow a hero to surrender to the captain during the siege
+- fix rare case of Shipwreck having no battle
+- display experience amount for Tree of Knowledge
+- fix Witch's Hut message body
+- for Anduran assembly window show artifact name as a title
+- for hero level up window with one secondary skill make the skill right clickable
+- for hero level up window with no secondary skill display the primary skill icon
+- add search for FLAC files if OGG files aren't found
+- add popup dialogs for Arena's skill choices
+
+version 0.9.13 (07 March 2022)
+- show captain quick info dialog in Kingdom Overview
+- add popup windows for campaign awards and bonuses
+- remove Map loading screen
+- add popup windows for campaign scenario dialog buttons
+- remember map size selection in New Game dialog
+- allow selecting options while restarting a campaign scenario
+- display the correct size of player-owned objects on mini-map
+- add base support for text mode
+- fix Sirens logic, AI interaction and UI
+- show missing last frame of wince animation
+- add dynamic generation of scrollbar slider
+- fix Sirens action dialogs
+- add missing artifact discovery event description
+- fix some French translations
+- fix directory and file detection on Windows
+- Kingdom Income window was changed to have Kingdom Income title and Kingdom Income per day to be more obvious for a player
+- events on land and sea now show artifact and resources in one window
+- most of objects related dialogs contain right mouse clickable icons
+- Pyramid visit outcome shows the correct horizontal position of icons and all icons are right mouse clickable
+- fix Artifact frame drawings
+- fix text if translation for a specific language was not found
+- update AI hero recruitment logic
+- allow a short name for all campaign bonus artifacts and spells
+- AI should save current unit if retreating
+- add Czech language support
+- fix monster strength heuristic regression
+- make AI more aggressive in losing situation
+- fix the logic of protecting tiles by neutral monsters
+- change music and surrounding sounds while jumping through Stone Liths
+- fix possible AI pathfinding issues while loading another scenario
+- fix battle grid and ballista info area
+- add popup dialogs for right mouse click in resolution dialog
+- fix hero name not being updated while switching languages
+- fix possible errors for translation related code
+- force to use only the original palette from the game
+- fix lowercase conversion of translations
+- AI archers should not ignore blinded units during battle
+- add missing take-off and landing sounds for Vampire and Vampire Lord
+- reset environment sounds and music theme at the beginning and at the end of the human turn only
+- fix player's allies configuration for 'Defeat the other side' victory condition
+- fix sounds of Lean-To and Skeleton objects
+- rename "Lean To" -> "Lean-To"
+- allow AI fog discovery only for teleport endpoints with reachability information
+- fix missing sounds for some objects on map
+- do not play castle's music if a terrain does not have its own music
+- fix missing sound of player's turn in Hot Seat mode
+- adjust monthly monster spawn
+- fix neutral monster growth formula
+- fix necromancer build order in castles for AI
+- allow a boat to move near the coast above the center of a town
+
+version 0.9.12 (07 February 2022)
+- add a confirmation window for restarting a campaign scenario
+- fix wrong scenario order in "Voyage Home" campaign
+- add Betrayal missing for Roland and Archibald campaigns
+- fix logic for switching on and off Auto battle option
+- fix normal and retaliation attack of monsters with multi-cell attack abilities
+- fix missing logging during certain spell casts in battle
+- implement a heuristic for hiring heroes that does not allow to offer the same heroes for hire in several kingdoms at the same time, if there are enough free heroes
+- use 'r' key instead of Escape to Retreat during battle
+- fix Hydra behavior under Berserk or Hypnotize spell effect
+- add highlighting of cells attacked by a unit capable of attacking all neighboring cells
+- fix a penetrating attack made by a wide unit from the tail cell
+- fix attack cursor display during battle
+- fix cases when no monsters were spawned at the beginning of a month
+- display ? symbol instead of empty space for unrecognized symbols
+- fix crashes while rendering non-English text
+- fix rare cases of a screen being black on a startup of the application
+- make language area and campaign choice selection to cover text too
+- fix campaign text translation
+- modify army order setting
+- add German font generation
+- fix multiple issues related the hero recruitment process
+- update Russian translation
+- show monster info on right click in castle's well
+- fix cases when the last AI hero was blocking an entrance to Stone Liths
+- fix small font positioning for Polish GoG version
+- fix most of existing cases with passabilities
+- fix the display of properties for maps from the list in scenario selection dialog
+- update German translation
+- fix translation of saved default player names
+- improve the AI fog discovery logic
+- AI properly uses Whirlpools for path calculation
+- fix cases when a hero was able to create a path over another hero
+- display dead monster information during battle
+- fix Mass Dispel usage during battle
+- update Polish translation
+- fix Russian small k per in both fonts
+- AI heroes properly calculate paths through water
+- add translation context for color and syntax flexibility to Traveller's Tent and Barrier
+- fix Knowledge spite rendering for Arena
+- fix sounds after battle cases
+- fix missing Russian letters on Switch
+- changed captain's name spelling
+- adds missing "pourcent" in description of Golden Bow
+- fix cases when a hero was able to walk on water
+- update French translation
+- show in-game only players for Gift marketplace option
+- fix glowing red pixel in Warlock's Red Tower
+- improve AI behavior during castle defence
+- fix CPU player icon's extra color column
+- show proper language name for mismatched by language save files
+- add a spell title when no enough SP window appears
+- fix a possible crash in French letters generation
+- fix usage of plural/singular translations for map's objects
+- update the logic of re-calculating the paths of heroes on the adventure map
+- add support of Buka version of Anim2 directory for video playback
+- always enable autosave
+- generate proper Russian E with 2 dots on top
+- allow translation of "Cost per troop:" text
+- update UI elements in marketplace window
+- fix a crash during AI turn when AI army has an invalid monster slot
+
+version 0.9.11 (23 December 2021)
+- add popup dialog for map information
+- fix hero's path not being updated properly after new monster month event
+- show available game languages in vertical order rather than horizontal
+- fix handling of national symbols in the paths to music files on Windows
+- improve AI behavior during castle defence
+- fix pressed buttons' background
+- fix incorrect output on console window for Windows users with non-English system language
+- add support of Russian language by default
+- update Polish translation
+- generate correct letters for French language
+- update Settings description to cover all actions
+- fix heroes meeting swap arrows
+- update PS Vita controls
+- fix crash for some systems after changing game resolution
+- add hotkey for settings in Main Menu
+- do not reset the hero's path in Sleeper mode, reset the Sleeper mode only with the beginning of the hero's movement
+- fix River being considered as a Road
+- allow to select player class using mouse wheel
+- add additional spell info for spells owned by a hero
+- fix button rendering artifacts after changing resolution
+- fix crash on Windows for some Archibald scenarios
+- always mark the entrance to the castle/town as a road, do not automatically mark the tile south of the entrance as a road
+
+version 0.9.10 (05 December 2021)
+- update background music on the fly while changing it within settings
+- fix horizontal position of town name and town icon in town construction dialog
+- improve marketplace gift button placement
+- fix vertical text position in skill icon
+- fix Summon Boat logic
+- add video playback in the Price of Loyalty campaign selection window
+- play sound for visiting Observation Tower
+- fix vertical position of building construction name
+- add missing button shadows in dialogs
+- add popup window to OK button in game settings
+- play campaign music in campaign scenario selection screen
+- fix Enter button pressed state being passed from gift dialog
+- show credits at the end of campaign
+- fix passability for Dimension Door spell
+- add V-Sync option for SDL2
+- update troops split logic change
+- properly draw battle grid
+- use the OK button instead of YES button for the Tavern window
+- add Champion image for Stables object
+- play sounds from closest surrounding objects first
+- make consistent campaign info dialog
+- add default castle's name if none is specified by editor
+- show heroes on minimap
+- update Norwegian translation
+- show available creature count for the Price of Loyalty monster objects
+- fix Witch's Hut name
+- add Italian translation
+- properly handle the day-week-month routine
+- add titles for most of dialogs from map's objects
+- always mark Artesian Spring as visited, even if the hero was not able to drink from it
+- fix movement penalty calculation algorithm
+- implement last move logic for hero movement on the map
+- update hero movement points UI upon visiting multiple objects on the map
+- fix rendering for difficulty text in scenario info dialog
+- fix AI obsession with whirlpools and being always in sea
+- load palette from AGG file
+- fix monster recruit window position for multiple places
+- fix logic for Slow and Haste spell AI usage during battle
+- add random sign messages
+- fix maximum music and sound volume
+- use correct message in marketplace for first exchange when not enough resources
+- speed up for multiple image readings and for unit rendering during battle
+- allow to change Battle Speed using mouse wheel
+- update UI elements in Well's dialog
+- if a hero on the map has the custom empty army (OG editor bug/feature), give him a minimum army (one unit of level 1)
+- add translations for Battle Only mode texts
+- set correct starting army in Archibald 7 scenario
+- fix cases when AI creature doesn't move during battle
+- fix sound effects when receiving artifacts from world map
+- add hotkey to Okay button in Campaign select window
+- fix results on instant battle when Resurrect spell was being used
+- fix cases when opposing heroes still exist on the map after defeat
+- improve AI usage of Disrupting Ray spell during battle
+- add runtime language generation
+- fix terrain music being played during battle
+- fix water object passabilities
+- allow to use mouse wheel to change system options
+- set correct building requirements for Upgraded Jousting Arena and Upgraded Cathedral
+- update messages during battle
+- shorten artifacts names to be fit for campaign UI
+- always highlight the cell under the cursor in combat if the Shadow Cursor is enabled, even if this cell is not reachable by the current unit
+
+version 0.9.9 (05 November 2021)
+- do not leak the hotkey state from the experimental settings dialog to the scenario info dialog
+- fix Stonehenge gold cost
+- fix Stonehenge building requirements
+- add buttons in castle construction window
+- fix rendering of Captain's Quarters in Warlock castle
+- fix Marketplace messaging
+- fix MIDI Expansion music option being always reset upon restarting the game
+- fix incorrect sounds while playing MIDI music in certain platforms
+- add credits to the original HoMM2 team
+- correct original Waterfall images to remove Cave
+- use original alignment for Rating, Map Size in gameinfo window
+- fix interaction passability with water objects
+- change Shipwreck, Graveyard and Derelict Ship messages
+- add the Resources Settings page to the Windows installer
+- fix passability for Reefs
+- fix invalid Stonelithts after Barrier removal
+- fix passabilities for diagonal moves
+- clear fog for allies upon visiting Magellan's maps
+- fix Archibald scenario 7 description
+- fix bad pixels on multiple images
+- verify Victory/Loss conditions after a static hero action
+- modify Magellan's maps logic and UI
+- fix monster count in Dragon City for Archibald scenario 7
+- update Victory message for Archibald scenario 7
+- fix possible crash for Russian version of the game
+- fix incorrect map description length
+- fix spell points in Battle Only mode
+- apply Bane and Alliance condition only for Human heroes
+- add extra empty line in New Month window
+- disable bonus choice for campaign scenario info window during scenario play
+- add Norwegian Translation
+- fix the position of campaign days spent text
+- close certain dialogs containing only one Exit button with Enter key
+- add Barbarian Captain Quarter's missing part
+- add hotkeys for selection of SW/PoL campaign
+- generate the default High Score values
+- fix "show damage" feature for blessed/cursed troops
+- fix high scores word
+- fix AI lust for Magellan Maps object
+- hide the OKAY button in campaign info window
+- handle default exit hotkey in Campaign scenario select / info
+- add Sphinx handling by AI
+- remove incorrect status message for hero portrait in hero screen
+- fix map size button states on hotkey press
+- restore environment music & ambient sounds after exiting from the campaign info screen to the adventure map
+- do not allow to use lower than original resolutions
+- freed from Jail AI hero starts movement at the same turn
+- add AI interaction with Alchemist Tower
+- fix incorrect visiting status of Magic Well, Stables, Artesian Spring and Bad Luck objects for AI
+- fix invalid assessment of Monster upgrade objects for AI
+- fix cases when AI hero ignores some objects while defeating an army just on the way to them
+- fix losing hero artifacts upon flee or surrender
+- enable a pressed state for View Intro button post-launch in Campaign screen
+- fix bonus artifact names in campaign screen
+- return to the Main Menu after cancelling campaign scenario
+- fix AI heroes being stuck on teleports
+- fix button rendering in Restart battle dialog
+- update Portuguese translation
+- fix inability to dig on a tile where monster was located
+- fix inability to apply Hypnotize spell on Dwarves
+- fix shooting penalty detection
+- add extra popup windows for UI elements in castle dialog
+- fix passability with shadow sprites
+- AI to use Hydra ability in battle
+- reinforce a AI hero standing in a castle at the start of turn
+- update status bar in castle screen dialog even during construction animation
+- fix incorrect active area of certain buildings in castle screen dialog due to invalid Z levels
+- hide cursor while opening a dwelling info in castle screen dialog by right mouse click
+- add Italian language support
+- update Polish translation
+- properly show the attack cursor when the attack square is located at the top of the castle sprite
+- fix infinite loop for AI trying to use Stoneliths
+
+version 0.9.8 (05 October 2021)
+- fix a case when a hero loses his artifacts after retreat in multiplayer mode
+- fix monster position on World Map
+- correct resource position in castle window
+- new week status is not changed while reloading the same save file
+- add headers for all Daemon Cave dialogs
+- fix rewards in the Daemon Cave
+- fix Waterwheel incorrect visited status
+- fix spell points reduction while visiting a well with more than maximum spell points
+- add confirmation message in Alchemist Tower
+- add cell highlighting for monsters with double cell attack ability
+- add correct evaluation of an AI hero recruitment and meeting
+- fix artifact selection area
+- add a title to all artifact related windows
+- grey out experimental disabled option
+- show map type icons in New Map lists
+- do not place wandering troops on coast tile if there are no other coast tiles nearby
+- develop a castle during AI hero purchase
+- fix Altars' passabilities
+- fix AI hero being stuck on Stoneliths
+- fix passabilities of action objects
+- add Windows scripts to automatically copy & extract all necessary assets from original HoMM2 distributions
+- fix unresponsive application during AI turn while attacking an object with guards
+- fix active building area in castle construction window
+- AI can now visit Pyramids
+- fix scrollbar rendering in select lists
+- replace scrollbar in Experimental Settings dialog
+- unselect initial town in the Town Portal spell list
+- fix troop position in the Pyramid
+- fix bridge animation during battle
+- fix deterministic battle outcome
+- fix an empty list of heroes in the Kingdom Overview after the dismissal or loss of a hero
+- fix passability for tall objects
+- fix Roland campaign awards after ending scenarios 7 and 8
+- set 15 character limit when inputting player name in High Scores
+- correct battle speed change for monsters
+- fix incorrect level of Lightning Rod artifact
+- correct castle building' active area
+- fix passabilities related to cracks
+- align UI elements on artifact combat outcome dialog
+- add Spell description window in monster info dialog
+- fix scrollbar position after dismissing a hero
+- add logic for ENTER and SPACE keys for a hero on World Map
+- add hotkey for View World dialog
+- fix some cases with Tree passabilities
+- update Polish translation
+- fix post battle crash
+- fix incorrect rendering for game settings window with evil interface
+- fix appearance of sounds of the sea when a hero stands close to map's edge
+- display a message about Ultimate Artifact after the battle
+- fix adventure border rendering on higher resolutions
+- fix incrementing days spent value after reloading a campaign save
+- lock mouse within the window in multi-monitor setup
+- fix passability of mines
+- fix an ability to attack a monster through a barrier
+- allow hero to traverse Stone Liths and Whirlpools even if he has no movement points left
+- fix black edges in View World
+- fix passability for tiles with shadows only
+
+version 0.9.7 (05 September 2021)
+- add popup dialogs for buttons in High Scores and save files manipulation windows
+- fix Faerie Ring passability
+- boat boarding animation speed doesn't depend on hero speed
+- add base support of German translation
+- fix medium size hero portraits
+- fix incorrect object info when a hero stands on it
+- remove flags from most of the captured objects for a lost player
+- fix alignment of scenario info window
+- fix boat froth drawing conditions
+- fix Battle Garb of Anduran missing assembly for The Price of Loyalty campaign
+- add monsters into High Score dialog
+- add short save file description window by right clicking
+- add base roles for AI heroes
+- restart of the battle should lead to the same results
+- fix logic in moral indicator
+- AI can capture Haunted mines
+- fix scrollbar position in Kingdom Overview dialog
+- allow guardian heroes upgrade their troops
+- add object count for weekly object income message
+- open game settings window while clicking on the main menu door
+- fix object passability nearby Hut of Magi
+- modify Necromancer Captain Quarters look
+- fix Radar appearance while right clicking on hero/castle
+- do not show file options window upon file saving
+- save Kingdom Overview UI selection in save files
+- add missing hotkey for Kingdom Overview
+- fix missing mine being drawn in View Mines
+- fix incorrect fading of some objects on World Map
+- fix AI behaviour during siege
+- fix cases of incorrect monster stack splitting logic
+- handle Escape/Enter keys in various settings dialogs
+- use distinct image for the "Swap heroes" button
+- properly restore captain's spell points after quick battle
+- remember UI position in Kingdom Overview dialog
+- add strict ordering of save files ignoring capitalization of letters
+- add popup dialogs in Kingdom Overview UI dialog
+- fix missing game resolutions on some machines
+- fix incorrect rendering on specific fog tile
+- display same name maps in the list of available maps
+- improve pathfinding algorithm for AI
+- place Ultimate artifact not always in the center of puzzle image
+- fix max ballista shots during battle
+- update French translation
+- add missing Farm sprite in Knight castle
+- update every scrollbar logic in the game
+- fix a crash while shooting from castle's tower during castle siege
+- fix Holy Shout being applied on Dwarves
+- properly handle cross-moat attacks during castle siege
+- do not let the player get a random artifact that allows him to win the game
+- allow player to immediately edit save file name without clicking on the input field
+- add few performance optimization in music and audio
+- update Polish translation
+- not visited obelisk remains not visited after the Ultimate Artifact has been found
+- fix polish translation encoding
+- game settings dialog: reset current language to English if game resources do not support other languages
+
+version 0.9.6 (06 August 2021)
+- update status window if troops have fallen overboard
+- add direct preview of changes in system options dialog
+- update Polish translation
+- display the position of a hero or a castle on radar while right clicking on them
+- add titles to some dialogs
+- add translation support for missing places
+- fix monster joining logic with and without diplomacy
+- add Nintendo Switch build
+- make captured object event messages to contain yellow titles
+- fix a crash while AI uses Summon Elemental spell during battle
+- fix incorrect Alliance conditions for certain maps
+- fix a case when a hero in castle's tavern always changes after reloading a save file
+- fix incorrect icons for scenario information dialog
+- update skill order for new heroes
+- add normal Game settings dialog
+- fix inability to attack during battle
+- do not play ambient sounds during AI turn
+- add monster names, abilities and hero skills to translations
+- fix AI archer avoiding hand battle logic
+- fix UI defects in Kingdom castle view dialog
+- properly update resource and artifact sprites on World map
+- fix infinite loop after chain lightning spell
+- do not draw flags for puzzle image
+- highlight cells from where a monster will attack
+- restore background music after playing short-term music effects
+- add language selection window
+- fix Town's fog area unveiling
+- implement regular win/loss conditions for multiplayer mode
+- update View World while resizing the application
+- fix English phrasing and punctuation
+- fix simultaneous activation of buttons in hero meeting screen
+- add Town Screen and Well hotkeys
+- fix incorrect logic nearby castles when an attacking hero was actually defending the castle
+- improve win/loss checks of scenarios
+- make AI to use Lich's ability properly
+- update Russian and French translations
+- make fog discovery by AI more efficient
+- fix missing monster spell casting during battles
+- center fast separation buttons in Monster separation dialog
+- remove required spell points from scrolls in Mage Guilds
+- fix Next Hero selection logic
+- fix Wizards campaign scenario 3 with custom Ultimate Artifact
+- add 500 experience for conquering a town regardless of defending hero existence
+- change battlefield pathfinding algorithm to more stable version avoiding AI skipping some moves
+- align text evenly inside secondary skill window
+- display translated text in campaign dialog
+- fix a crash during Summon Boat spell usage
+- if the hero's army does not have any of the original troops left alive at the end of the battle, then the hero should lose
+- fix typo in Fizbin Medal
+- fix small font for Russian localization
+- fix town/castle passability for some cases
+- fix incorrect mouse cursor appearance during AI turn after a battle with Necromancy outcome
+- fix attacking monster sprite on World map
+- AI should check if an object is guarded while unveiling fog
+- add Alchemist Tower to the list of objects to be avoided by AI
+- fix a case when AI heroes did not ever capture empty castles
+
+version 0.9.5 (04 July 2021)
+- do not hire AI heroes if no tasks exist for them
+- make AI be more aggressive if no tasks exist for them
+- all scrollbars support continuous scrolling
+- fix placement of creatures during Month of Monster event
+- add an option to restart Campaign scenario
+- do not show x marker for fully built castle icon
+- fix boat summoning logic in relation to some objects on a world map
+- do not show other types of save files on while saving or loading a save file on Windows
+- improve Sorceress castle building logic for AI
+- make AI to visit Lighthouse
+- fix displayed object info in popup dialogs
+- fix places where a hero could teleport for Dimension Door spell
+- fix passabilities of objects on World Map
+- fix multiple issues with castle music
+- fix disembarkation on coast during diagonal move
+- indicate the number of Ghost guarding Haunted and Abandoned Mines
+- add extra conditions for object visiting by AI
+- make AI to use Hut of Magi and Jail objects
+- AI heroes do not block way for other heroes anymore
+- use spacebar only for activating object
+- fix missing UI update in hero meeting dialog while moving artifacts within internal hero's dialog
+- speed up campaign game menu opening time
+- fix incorrect object rendering order on World Map
+- after loading a map and starting a new game the same map will be selected in the list of maps
+- improve AI logic to capture defendless castles
+- fix black screen for loading a campaign map without files
+- allow AI hero to revisit a castle more than once
+- fix a case of splitting monster stack for 2 monsters in stack
+- add monster descriptions
+- allow to visit Artesian Spring once a week
+- allow right click on captured artifact after battle
+- fix summoning boat logic in relation to AI
+- improve fog revealing algorithm for AI
+- fix Stables movement bonus
+- fix AI heroes interaction between each other (reset meeting flag if a hero updates an army)
+- AI heroes do not visit signs anymore
+- AI do not visit shrines for useless spells
+- fix AI spellcasting and army estimates
+- do not remove Sphere of Negation artifact while visiting Alchemist's Tower
+- fix the status of visited objects for a play with ally
+- make proper rendering of some of disabled buttons
+- fix AI behavior to visit Magellan Maps only once
+- center quickinfo dialog under mouse cursor
+- add more gamepad key mapping for PlayStation Vita
+- fix the displayed text in the army bar while splitting monster stack
+- do not let nearby monsters automatically attack hero if he moved to this location using Stone Lith, Whirlpool or Dimension Door
+- fix incorrect text position insertion while creating a save file
+- fix title background for recruit dialog
+- fix hero's mobility indicator for small number of move points
+- in scenario with random players random opponents are generated so that all races are present and different when possible
+- add new UI text rendering classes
+- fix issue when abandoned mine becomes OBJ_ZERO when captured by AI-controlled hero
+- fix missing road identification on broken by editor maps
+- make per-user config file as default option
+- allow attacking another hero located on a Temple
+- fix attacking monster sprite behavior
+- fix number of choices when splitting a troop into multiple troops
+- fix incorrect trading rate during battle
+- fix missing shadow removal of objects under a boat
+- show Dwarf's resistance message in the log only after spell completion
+- correct campaign bonuses' names
+- fix case when boat could be positioned over another boat over whirlpool
+- fix case of triggering Genie's special ability for a stack of 1 monster
+- fix the Price of Loyalty campaign missing rendering
+
+version 0.9.4 (04 June 2021)
+- add Windows executable installers
+- use user profile directories to store files to allow multi-user access to the game
+- fix incorrect text splitting in some rare cases
+- fix crash in Roland campaign, scenario 10
+- add missing popup dialogs for system options and buttons
+- fix inaccurate object sorting by distance
+- fix multiple issues with AI and spell logic using distance evaluation
+- read campaign files in non-case sensitive manner
+- make fog uncovering task for AI more efficient
+- fix AI obsession over Observation Towers
+- fix missing path drawing while a hero moving through Whirlpool
+- mark resource generator objects as visited for allies
+- fix incorrect game ending during time loss condition
+- show extended shadow for 2-hex monsters in battle
+- do not show gray flag over Haunted mine
+- add configuration option for first game run
+- support PoL heroes and artifacts in "battle only" mode
+- fix inaccessible beach tiles
+- add hiding and showing cursor logic for SDL2
+- fix shadows for random resources and artifacts
+- draw correct castle icon in popup window
+- fix incorrect hero position facing left
+- remove unneeded AI hero animation under fog
+- do not clear morale modifiers too early for Tavern case
+- highlight the door in Main Menu for mouse over event
+- speed up and fix many places with cursor rendering
+- recruit an AI hero if none exists
+- fix cheating AI behavior for dwellings with defenders
+- add an option to replay Intro video for campaign
+- force display rendering on app activation
+- fix Stables, Alchemist's Tower and Water Wheel passabilities
+- fix puzzle drawings
+- avoid using useless spell during battle for AI
+- return to load screen after cancelling loaded campaign scenario
+- play hero's vanishing sound after AI vs human battle
+- make Ultimate Crown as artifact for campaign scenarios
+- fix incorrect hero receiving a bonus spell for campaign scenario
+- fix monster recruitment logic when a hero present in a castle
+- fix well's max button hiring logic
+- add an option to open Hero Screen within battle
+- fix move points and spell points replenishment logic for heroes from hero pool
+- set proper difficulty level for campaign scenarios
+- directly show next campaign scenario for end of scenario save
+- modernize and secure demo version installation scripts
+- add video playback for campaign scenarios
+- do not reset hero mana points to maximum in the beginning of a new week if they are above maximum
+- fix Roland, chapter 9 map conditions
+- fix Tower shooting logic during castle's siege
+- build Mage Guild before Special building for AI
+- do not count monsters under fog for Visions spell
+- mute sound by setting music and effects volume to zero instead of pausing them
+- speed up AI hero movement
+- add an option to hide AI movements
+- do not draw objects under the fog if they are far from a revealed area
+- add base code for the Price of Loyalty campaign support
+- add dismiss and upgrade hotkeys in unit dialog info
+- add shadow for Spell Book
+- unveil the fog at the start of hero's movement
+- fix extra place with hero's double shadow at adventure world
+- add extended cursor icons from 4+ to 7+
+- fix UI defect of selected creature appearing after closing meeting dialog
+- fix incorrect rendering of View World image
+- add Lose Sorceress Village Condition for The Succession Wars campaign
+- fix flags in Oracle/Thieves' Guild dialog
+- fix sound mute in background on MacOS with SDL1
+- add Home and End button support for save naming
+- fix elements layout for Oracle/Thieves dialogs
+- generate obstacles on battlefield based on the battle tile index
+- use non-plural name for 1 creature while viewing with Crystal Ball
+- add correct support of The Price of Loyalty add-on maps
+- fix double clicking between dialog in castle's window
+- speed up MIDI loading
+- fix bug with mouse cursor not visible after left-clicking on hero's secondary skill in Kingdom Overview
+- fix the "world: use unique artifacts for resource affecting" option
+- reduce CPU usage for video playback and puzzle revealing
+- fix Mix-up in Roland's Campaign Scenarios
+- fix issue when troop info window was not showing after moving a single unit between army bars using drag & drop method
+- simulate level-ups for campaign-specific heroes that start at a higher level
+- reset current music from the previous turn in the beginning of a new human turn
+- upgrade Rendering engine
+- fix broken behavior of scrollbars
+- do not offer to exchange artifact with spell book
+- disable controllers on non-console platforms
+
+version 0.9.3 (04 May 2021)
+- add additional info to oracle dialog
+- check that unit is (im)movable after each unit action
+- save completed Campaign scenario to file
+- drop support of saves older than 0.9 version
+- remove incorrect battle background for Graveyard
+- fix catapult miss animation: show this animation near the actual target object
+- fix magic book behavior in inventory
+- fix spell indicator for hero's icon
+- add special Victory conditions for campaign scenarios
+- add initial support for Campaign Awards
+- allow switching heroes in hero dialog if it was opened from meeting dialog
+- fix issues with battles logs and sounds while Dwarves resist spell
+- fix inability to Teleport monster in battle for certain cases
+- add missing "Not enough gold (xxxx)" text in joining window with Diplomacy
+- do not generate Puzzle image on map loading
+- do not take Mage Guild level into account when calculating count of archers in castle towers
+- fix shadows for all monster mini sprites
+- allow the hero to retreat if, while in the castle, he attacks the hero outside the castle
+- show Mage Guild building always in center
+- add titles to Arena, Alchemist Tower and Stables dialogs
+- add World animation during Dimension door spell
+- show correct message for hero's option dialog buttons
+- fix bridge operation for flying units in instant battle
+- add letters for World View and View spells
+- properly handle filenames with dots
+- fix Main Menu UI redraw
+- do not run animation of lowering the bridge on bridge destruction if bridge is already lowered
+- fix the display of the army in the castle quick info window
+- display correct message when capturing abandoned mine
+- align columns and flags at oracle dialog
+- fix cursor during video playback
+- do not allow the player to scroll world map while hero is moving
+- add initial support of other languages: German, Polish, French and Russian
+- fix information displayed in castle quick info window
+- fix sphinx riddle dialogs
+- add swap buttons in hero meeting dialog
+- correct spells order in Magic Book
+- enable triggering of positive morale event after soft wait
+- fix saving scroll speed in the game config file
+- fix Artesian Springs logic
+- fix inability to use Stone Liths
+- fix incorrect heroes for surrender conditions
+- fix gold and experience dialog for the demon cave
+- remove exclamation mark in Hero info window for "Blood" morale
+- fix double shadow from heroes
+- preserve the order of catapult shots
+- highlight Lich's shot area
+- implement correct post-battle necromancy window
+- rename Coast to Beach
+- fix large object coverage in battles
+- add message when visiting Oracle
+- update hero's path while selecting next hero by an option button
+- fix Dragon City guardians
+- load correct video files to be played
+- implement the "faster monster of opposite army goes first" logic in the battle mode
+- fix excessive FPS issue in dialog of joining the army
+- fix game score calculation
+- reset the spell on tile when AI-controlled hero has successfully captured an object
+- immediately hide hero's path before executing the animation of the Dimension Door spell
+- fix Necromancy incorrect percentage output
+- fix ultimate artifact digging logic
+- speed up images loading from resource files
+- fix fading animation synchronization
+- fix a case of inability to confirm end turn while cursor is over options buttons
+
+version 0.9.2 (04 April 2021)
+- fix full artifact bag message
+- add missing dot to sentences in few windows
+- display Lighthouse count in Kingdom Overview
+- add proper large obstacle generation for battlefields
+- fast AI units should try to get the first strike
+- fix Sphinx missing rewards
+- reset paralyze state when receiving spell damage
+- randomize attack position of AI monsters
+- fix missing hero paths after loading a save
+- fix incorrect window resolution in fullscreen mode for SDL 2
+- fix Choose Your Lord video sound
+- improve castle garrison estimation for AI
+- remove the mobility index sprite info from the hero Quick Info dialog
+- prohibit the guardian hero from casting adventure spells
+- fix merging of the castle guardian army
+- fix AI defensive unit behavior
+- add AI estimation of hero spell strength
+- force units into empty slots first during merge
+- do not always offer recruitment of heroes from the player's initial class, make recruitment more random
+- allow player to control the hero during the turn of a hypnotized enemy unit
+- archers should not lose shots when attacking in melee
+- check that the hero is able to move before focusing him and starting his movement
+- respect initial order of units (from top to bottom) when determining the order of unit moves in battle
+- add PlayStation Vita support
+- fix creature recruit window UI
+- fix rendering of Arm of the Martyr
+- fix blind spell logic
+- do not give additional 500 experience to the hero who won the battle if the opposing hero surrenders or flees
+- fix hypnotize spell behavior and the spell description
+- update positions of monster sprites and numbers on army status panel
+- fix possibly incorrect arrow direction from shooters
+- fix scrollbar position in multiple places
+- standartize icon position in town's dialog
+- fix Max/Min button position in monster recruit dialog
+- show the surrender dialog even if there is not enough gold to surrender
+- do not apply morale penalty to a hero if he wins a battle in a Graveyard, Shipwreck or Derelict Ship
+- add cross army drag split
+- reset player focus if focused hero or castle was removed
+- allow to switch players for multiplayer map selection
+- allow to use mouse wheel anywhere for split troop dialog
+- fix logic of placing monsters for a New Month
+- fix Kingdom Overview selection drawings
+- fix boat drawing issues
+- do not hide mouse cursor if the Skill Info dialog called from the Level Up dialog contains OK button
+- fix incorrect drawings for battle OKAY button
+- fix rendering of the Castle Captain's spell points bar
+- fix missing sounds within System dialog
+- fix interaction with the castle bridge for flying units
+- use rule of 9 for Ultimate Artifact placement
+- fix last focus option
+- fix incorrect cursor icon over ally's castle
+- add initial implementation of View spells
+- show normal monster names in Visions spell
+- show full 1-pixel black border for Show Interface option
+- show more detailed morale and luck description
+- AI predicts double cell attacks in combat
+- reset blind spell upon taking any damage
+- allow to place units in moat in front of the bridge
+- align spells in the magic book
+- add manual replay of battle if instant battle outcome is negative
+- sounds off when minimizing game window
+- fix playing background music during video playback on SDL1
+- change damage description log message for some mass spells
+- add executable file description and icon on Windows
+- fix pathfinding backwards move and penalty in battle
+- fix City of the dead incorrect monster info
+- update no data error message
+- do not allow to manage monsters in unhired hero dialog
+- AI supports additional harmful combat spells
+- do not open the hero screen in readonly mode if it was opened from the meeting screen, just disable the DISMISS button instead
+- do not show external music option with an absent folder
+- wait for user input at the end of winning video
+- fix double exit dialog appearance
+- fix missing cursor in Army Bar for SDL 1
+- ranged AI troops should move when blocked by a strong unit
+- if the unit attacks twice, apply the second attack to the same cell as the first attack
+- fix double hex attack target for AI troops
+- show the build window with the OKAY button disabled if there is not enough resources to build this building
+- AI uses mass damage spells in combat
+- improvements for AI wide unit pathfinding
+- fix the pathfinding near monsters: do not allow the hero to pass through the monster
+- fix MIN and MAX button drawings
+- do not give an extra day of life to a player without castles
+- preserve unit direction in battle if it moves strictly vertically
+- do not allow the visiting hero to learn Library spells if the Library hasn't been built yet
+- fix inability to reorganize troops in Kingdom View dialog
+
+version 0.9.1 (04 March 2021)
+- add "Artifacts" category in Oracle Screen
+- add barrier fading animation
+- improve AI retreat condition
+- fix Split-related issues and implement some new techniques
+- disable retreat for auto battle mode
+- fix object's visited info and grammar
+- fix issues with path finding during combat to avoid being stopped by moat
+- fix incorrect names of Ballista and Turret during battle
+- add missing shadow for arrow cursor on SDL2
+- fix ACCEPT button font for Good Interface
+- fix AI wide units pathfinding and moat logic
+- allow to modify a hero during level up
+- fix summon boat logic
+- fix monster movement nearby moat
+- AI does not chase faster units during battle
+- fix hero shadow drawing on world map
+- fix missing animation frame for wince
+- fix object fading animation on world map
+- fix missing last lost hero condition reset
+- fix simultaneous animation of boat while during another building construction
+- change logic in monster hiring window
+- fix save loading crash for broken saves
+- add middle resolution status support
+- do not show waiting cursor for an exhausted hero
+- fix post Daemon Cave missing music
+- fix well's max button drawing
+- fix incorrect castle focus while visiting by a hero
+- fix fog drawings
+- reduce income window area in towns
+- fix autosave option logic
+- fix overlapped battleground objects
+- remember scenario difficulty while restarting or choosing a new scenario
+- fix multiple game freezes with MIDI music playback
+- add resizable window support on SDL2
+- make deterministic bonus for hero level-up
+- fix wrong controller pointer speed option name and touch coordinates translation
+- add auto battle resolve mode to the game
+- add logic to support video frame rescaling
+- optimize screen resolution logic
+- fix garrison strength estimation by AI
+- fix magic gardens priority if object capture is enabled
+- optimize AI's troop placement before the battle
+- use same colour for all battlegrounds
+- change text in map size hint, to be displayed in more pleasant manner
+- load game button from UI should lead to common load game logic
+- initial implementation of "View World"
+- fix application crash for drawings
+- change building status message for Dwellings
+- fix crash when entering ally castle
+- add Campaign continuation initial support
+- speed up rendering of World Map
+- fix spell book status on hovering
+- save fullscreen mode in configuration file while switching between modes
+- AI should avoid spellcasting if has advantage in battle
+- fix rendering with mouse emulation
+- fix extensive memory usage by dialog windows
+
+version 0.9.0 (04 February 2021)
+- make AI to buy magic books in castles
+- fix infinite AI turns
+- optimize AI hero movements
+- do not visit useless objects by AI heroes
+- fix AI castle defence mechanics
+- restore cursor theme after HeroDialog or CastleDialog
+- do not show marketplace icon for joining creature dialog is no markets exist
+- allow to retreat for a hero with no castles
+- add more logic for AI jumping into whirlpools
+- do not block shooters with overpowered AI army
+- fix overlapped flag in Knight's castle
+- disable actions while buying a hero or during construction
+- change the text for the number of secondary skills in level up window
+- play music after showing New Week/Month dialog
+- reset hero direction when recruiting
+- align dates by left in the load file dialog
+- cap Necromancy bonus to 100% instead of 90%
+- fix multiple bugs in Kingdom View
+- fix Transcribe Spell Description Text
+- cancel spell selection with ESC button in combat
+- add a separate option for displaying terrain penalty
+- fix missing music for Load Game option
+- fix Scouting skill bugs and make crystal ball work
+- do not play dwarves' resist sound during mass spells
+- fix Berserk spell logic
+- fix Chain lightning spell logic
+- fix castle flag drawing for nearby hero
+- add empty line for visited info
+- allow Anti-magic spell on mirror-master creature
+- do not draw wall for destroyed bridge
+- fix pathfinding issues and missing path display
+- fix Kingdom overview crash
+- do no freeze building animation during construction or hero's hiring
+- show Spade of Necromancy artifact bonus in Necromancy Skill window
+- display troop counter only for static animations
+- show pointer cursor most of the time during combat
+- fix castle's object positions
+- display correct text when right-clicking on map tile
+- fix path selection for AI hero in patrol
+- fix town portal buttons in Good interface
+- add new standard window with shadow
+- fix events when AI was choosing to disembark on empty tiles
+- change highlighted cursor area for spells during battle
+- implement Alt hotkey to unite stacks of same type
+- implement CTRL split even with selected troop
+- add touchpad support
+- fix joining creature logic with the lack of gold
+- quick Info dialogs have fixed position when clicked from right bar
+- add a check for special objects that you can't move through
+- after AI loses to either castle or other player, center the view on them
+- fix animation order of creatures during combat
+- do not close File Save window while cancelling file overriding
+- fix marketplace button drawings in Surrender window
+- fix castle's battlefield drawings
+- hide Marketplace button for Surrender window
+- always draw troop counter at the top of monster sprites
+- fix a log message when a tower kills one creature
+- display battle grid for whole battlefield
+- fix object drawings on battlefield
+- Bone Dragon morale malus shows in battle and in dialog window
+- add PNG image saving support for SDL2
+- add palette support for SDL2
+- fix morale and luck sprites positioning in meeting screen
+- fix mouse cursor switching while navigating on hero or castle panel
+- always display the correct monster combat speed
+- fix Player Rankings message bar
+- add game controller support
+- add Gold version support for video playback
+- fix Earthquake spell animation
+- fix enemy castle capture action
+- speed up interface drawings for World map
+- fix Hydra's movement during battle
+- set correct size for spell point and experience point zone in hero window
+- fix income info clickable area at castle options window
+- add spells into Hero's book at the start of a map
+- add initial Nintendo Switch support
+- fix Battle Only mode UI
+- fix logic in mouse button press
+- make interface itemsbar adjustment while fixing some split logic
+- add FPS display support
+- fix clickable area for Heroes and Castles in their lists
+- differentiate save files based on game type
+- fix a crash while trying to get settings path on SDL 2
+- fix path calculation for 2-hex creatures in battle
+- add software emulation support for cursor
+
+version 0.8.4 (23 December 2020)
+- speed up sprites allocation and deallocation (noticeable for low-profile devices)
+- add extra info in first game message about F4 key
+- fix moral and luck indicator messages
+- fix elements' layout at monster info dialog
+- disable monster attack using Dimension Door
+- remove click area around "exit" button in castle dialog
+- make elements gray for inactive game settings
+- fix cursor disappearance during resource collection on SDL 1
+- fix Summon Boat animation
+- fix Summon boat logic
+- fix popup message for Abandoned Mine
+- fix Select button movement in Scenario window
+- fix position of monsters in battle
+- modify monster upgrade window for 3 monsters
+- make proper calculation of movement points
+- fix Hide interface reset issue
+- show correct artifact transfer dialog after battle
+- fix impassable barrier
+- fix meeting hero update after exiting hero's dialog
+- adjust troop separation dialog position
+- fix incorrect hero values for Kingdom Overview screen
+- fix a crash in multiplayer game selection
+- fix Transcribing spell scrolls logic and UI
+- change info bar text at bottom of screen when mouse cursor positioned under spell book
+- fix starting unit values
+- implement smooth slider
+- add an option to reveal secondary skill info by right click
+- implement Stack split hotkeys (Ctrl and Shift)
+- fix Resurrect logic
+- ignore fog for dimension door
+- disable gift button for a single player
+- fix empty castle capture behavior
+- fix interaction with skeleton on map
+- persist random race for new games
+- fix road penalty text
+- fix incorrect town frames for evil town portal UI
+- speed up generation of few images
+- fix UI defect after closing hero meeting dialog
+- fix UI defect after using town portal spell
+- modify a message of joining 1 creature due to diplomacy
+- do not show income popup window for exit button in castle screen
+- change Tavern dialog caption color to yellow
+- fix rendering and mouse behavior for SDL2
+- fix elements layout for surrendering dialog
+- fix shadow under battle summary dialog
+- fix surrendering cost calculation
+- fix Wagon sounds
+- fix castle and hero interaction with mouse in Kingdom Overview
+- play sound only after a battle with a monster to grab an artifact
+- change window title font color to yellow
+- fix Pyramid bad luck position
+- correct few sprites of mini-monsters
+- add a popup message for View Hero button
+- remove spaces for Level messages
+- clear message log for retreat case
+- add missing Info word for artifact status bar
+- add popup messages for next/previous pages in spell book
+- use keypad Enter as a normal one
+- add magic book image to popup window for no gold case
+- add evil UI elements for "Town portal" spell window
+- show proper information about enemy based on Thieves Guild count
+- fix layout for campaign selection window
+- fix wrong title and wrong text for Freeman's Foundry window
+- fix battle log text layout
+- use Delete key to erase a part of save filename
+- fix post game conditions
+- do not reset army while moving a hero to castle
+- start battle instantly if sounds are off
+- add captain portraits in Kingdom Overview
+- correctly reduce hero army after whirlpool
+- fix Mine info dialog near hero
+- reset Adventure Options buttons when cursor move out
+- draw shadow for empty boat
+- do not show army formation with no captain
+- fix stack overflow when using spells
+- fix disappearing hero while attacking monsters standing on a barrier
+- select a hero with move points when the focus is on a castle
+- increase Meteor Shower spell animation
+- fix spell order in magic book
+- change Artesian spring logic
+- fix Alchemist Tower artifact manipulation logic
+- assemble Battle Garb of Anduran artifact for hero meeting
+- place a hero into castle at the start of game
+- change map size popup window text
+- fix primary skill frame color in hero meeting dialog
+- add a title for joining army dialog
+- fix battle false hex shadow
+- fix drawings for meeting hero dialog
+- fix map loading message typo
+- update hero availability pool after hero purchase
+- show hero's name in magic book related windows
+- fix scenario selection stuck condition
+- fix portraits/hero information display in battle only mode
+- fix normal moral icon image
+- fix enemy army threat check for AI
+- fix changing boat direction by AI at boarding
+- fix Sorceress castle background image
+- fix missing spell point digits
+
+version 0.8.3 (04 November 2020)
+- protect higher value (based on buildings built) AI castles first
+- recruit AI heroes in castles other than the first one in the list
+- improve castle build order for AI (priority on gold income buildings)
+- improve castle monster recruitment
+- fix slowed flying creature movement
+- remember boat direction when a hero boarding it
+- update Town Portal dialog
+- fix "jump" flying animation when unit has to turn for attack
+- make one rumour per week in Taverns
+- fix a case of second attack on blinded creature
+- fix Monster Info dialog in evil interface
+- fix few castle icon sprites
+- speed up video loading
+- play sound on shipwreck pickup
+- fix Freeman Foundry UI
+- fix War Troll's stone sprite
+- fix Cavalry sprite
+- fix mage guild dialog message
+- change troop logic exchange during hero meeting
+- fix boat summoning animation
+- AI heroes are able to exchange armies and artifacts
+- add road connection drawings for Barbarian castle
+- fix castle defense trigger condition
+- do not show teleport animation in some AI cases
+- center Good and Evil interface windows
+- teach AI units to block enemy archers
+- show boat froth sprite when stationary
+- fix mine guardians sprites
+- fix battle only mode
+- improve army merge logic
+- fix lighthouse missing movement bonus
+- fix boat and hero positions
+- speed up drawings for World Map
+- fix pass image position on the world map
+- give at least 1 skeleton via necromancy after victory
+- fix Hero screen status bar message position
+- fix Hero meeting screen title position
+- change Pyramid Bad Luck message
+- fix Hero's portrait position in hiring window
+- fix town population status text position
+- fix boat animation and castle building rendering
+- fix troop counter window position
+- fix adjacent monsters when removing one
+- add after play animation
+- fix redraw order for unit count
+- use hero spell power when applying Earthquake
+- fix Lighthouse fog clearance
+- change Hut of the Magi behavior
+- add game resolution popup window
+- fix spelling in castle dialog
+- always show building requirements even if the building is already built
+- fix Knowledge message in Arena
+- five every magic guild a guaranteed damage and non-damage spell
+- fix OK button in joining army window
+- adjust few elements in resolution window
+- fix battle option text overlapping
+- adjust post battle shadowing
+- change main menu popup window descriptions
+- add a support of hero AI patrol mode set in scenario
+- make autosave with capital letters
+- disable spell animation after mine was cleared
+- save boat direction when disembarking
+- set parts of wide objects as visited
+- allow AI player to start it's move with action
+- use original difficulty bonuses for the game
+- check armies for validity before starting the battle
+- remove mud pool from cover object list
+- fix non-necro undead units decreasing morale in an all-undead army
+- remember Ghost number after the battle
+- AI is able to collect/capture multiple objects on the same move
+- adjust heuristics to make sure AI doesn't miss important objects
+- fix a bug where AI was able to buy boats in a castle without shipyard
+- fix the artifact spell damage modifiers
+- display a proper message for Sea Bottle
+- make AI more aggressive when dealing with archers during battle
+- replace "Ship Wreck" word with "Shipwreck"
+- set random starting experience for starting heroes
+- play flotsam disappearing sound after closing the UI window
+- fix income window drawings
+- when retreating, give the hero its default army instead of 1 T1 unit
+- stop battle after AI kills the last creature
+- use word 'one' instead of '1' in battle log
+- fix Thieves Guild background
+- fix visibility of AI hero moving close to fog
+- limit Player name text within given input box
+- show skip turn message during AI turns
+- allow to cast a spell with no move points
+- fix incorrect resurrected troops after battle
+- honor player count for Hot Seat mode
+- fix system options UI dialog
+- remove scrollbars from interface in battle only mode
+- add fading animation for defeated AI hero
+- fix time loss conditions in Info window
+- fix displaying of remaining move points
+- fix multiple text issues
+- modify messages for splitting army window
+- fix the clipped boat sprite
+
+version 0.8.2 (04 October 2020)
+- make correct spawn of neutral monsters and their growth
+- display correct window while right clicking on a monster in Kingdom Overview
+- add a transition while boarding and off-boarding boats
+- make hero animation movement smooth
+- fix price of loyalty artifact selection
+- fix tents/barriers from Price of Loyalty
+- fix monster placement at the beginning of months
+- fix missing dialog box in some rare cases
+- do not show journal scrollbar when it's not open
+- fix second attack for blinded creatures
+- fix typo in description of "Knowledge" skill at hero screen
+- replace the original project AI with an enhanced version of AI (making it not that stupid)
+- save neutral army monsters after battle
+- always reduce moral for visited Graveyard and Ship Wreck
+- allow heroes to move last step with remaining move points
+- update village's shadow after a castle was built
+- fix drawing castle's shadows under roads
+- fix missing objects on puzzle map
+- fix empty puzzle map
+- fix Ultimate image on puzzle map
+- fix puzzle map color scheme
+- fix treasure location map doesn't update after visiting obelisk
+- fix amount of creatures position in monster information dialog
+- fix object and shadow drawings on the World Map
+- fix few hero's names
+- draw all dead troops on the battlefield
+- allow to open hero's dialog during heroes meeting
+- fix dialog frame generation
+- fix bookmark positions in Spell Book
+- fix text position in creature recruit window
+- add Information window by right click on buttons in File dialog
+- add the word "Skill" for "Attack Skill" and "Defense Skill" in monster window
+- fix font generation and its position
+- fix popup windows for Spell Book
+- fix cursor for Adandoned mine protected by monsters
+- fix scrollbar in Settings window
+- extend campaign support
+- add proper AI base code for battle
+- change hero's description in tavern
+- use single OKAY button for Config window
+- don't shift High Score background for high resolutions
+- shift second hero's portrait in town
+- change unit movement speed in battle under spells
+- add dynamic color for item selection
+- add a popup window for clicking on Income in castle construction screen
+- remember move points of surrendered/retreated hero
+- fix bottom-to-top scrolling issue by keyboard key
+- reset dismissed hero's army
+- focus on a new hired hero in a castle
+- check magic resistance against Chain Lighting spell
+- fix multiple UI issues in Hero's Screen
+- add proper credits
+- center Hero's Options dialog
+- display spell points in magic book from bottom to top
+- display Liches for the City of the Dead
+- fix hero button position for joining window
+- fix a crash for Mirror image creature
+- reset music after exiting a castle
+- fix Daemon Cave incorrect window
+- fix Blind spell name
+- fix victory message in battle
+- fix File Options window position
+- fix text color for joining window
+- fix monster info shadow position
+- remove extra wince animation for cold ray spell
+- fix some icon positions in hero's dialog
+- center spell point text in hero's dialog
+- add word 'player' for defeated player window
+- fix creature shadow contour issue
+- add button choice support for campaign
+- fix cycling colors for mirrored Genie
+- add external music support by default
+- fix "battle: show damage info" option
+- fix Bloodlust animation
+- speed up calculations for path finding algorithm
+- fix caption issue with map's objects
+- fix missing resolutions and black screen for SDL 1
+- add a dot at the end of multiple messages
+- fix few Phoenix frames
+- make scrollbar more user friendly in battle log
+- fix game info buttons
+- disable Next Hero button if none of heroes can move
+- fix multiplayer player count window position
+- fix graphical issues in big text font
+- fix creature animation going out of window
+- fix few scenario information window UI issues
+- optimize video playback
+- fix map size button state selection
+- fix New Game window UI elements
+- fix a crash while downgrading resolution in 8-bit mode
+- remove "castle: allow recruits special/expansion heroes" option
+- fix sky view status
+- fix generated window position
+- make Exit button disabled for popup windows in castle
+- fix Resurrection animation frame and moving dead units
+
+version 0.8.1 (04 September 2020)
+- play video intro at the opening
+- set focus on a hero while opening spell book
+- set minimum Spell Power to be always 1
+- fix castle mini status icon
+- fix drawings of Mage Guilds in castles
+- remove multiple redundant / useless configuration settings
+- fix message dialog shadow
+- add proper support of configuration file
+- fix shift after opening and closing system options dialog
+- fix Gift button for evil interface
+- fix drawings of letters
+- fix Resurrect spell animation
+- add a support of disabled buttons
+- fix Air elemental drawings
+- remove "Manage creatures" button's shadow
+- add missing glowing effects of units in UI
+- fix screen dimming effects
+- change missing file message
+- fix Armageddon animation
+- update interface after exiting hero dialog
+- fix incorrect map extension crash
+- show diplomacy window always and fix marketplace button
+- add dot at the end of player's turn text
+- always center scenario window position
+- fix map difficulty text and its position
+- use proper config background window image
+- reset interface while changing its type
+- add game scenario dialog shadow
+- do not refocus after exiting castle's window
+- make Disabled Campaign button in High Score board
+- disable Campaign button if no files present
+- fix abandoned mine cursor
+- fix Sphinx message
+- modify Graveyard robber message
+- polish "battle only" button
+- show upgrade button if there's not enough money
+- fix lighthouse spelling
+- fix Dismiss button position in Hero's dialog
+- add missing title for graveyard message
+- fix graveyard message
+- fix marketplace text
+- show a dialog if a hero has no space for Spell Book
+- don't display artifact dialog for unknown artifact
+- fix an ability to skip button state by using a keyboard
+- apply Chain Lightning damage on allies as well
+- skip turn of resurrected troop
+- fix EXIT button position in creature window
+- fix AI turn crash
+- remove black background over army counter
+- don't show start and end position for monster log movement
+- add logic to handle inability to buy monsters in well
+- don't draw tent images in the castle window avoiding weird animation during castle construction
+- remove move penalty for visiting whirlpool/teleport
+- fix descriptions for Thief's Guild and for Pathfinding skill
+- fix logic of Town Gate spell
+- fix wrong OKAY button in System Options for Evil interface
+- skip heroes who do not have move points for move or sleep
+
+version 0.8 (26 July 2020)
+- add in-game option to change resolution
+- add fade-in / fade-out animation for AI heroes
+- fix logic when all stone liths were connected to each other even with different types
+- fix logic for stone liths in regard to allies
+- fix flickering of status bar in castle
+- fix attack cursor while pointing a monster
+- fix wolf's low attack animation
+- fix monster attack and fade animation on the World Map
+- add boat building animation
+- adjust hero battle dialog to align text
+- display boat froth sprite only if away from the coast
+- use correct sprite for castle's exit button
+- do not play sounds in castle's window when restoring the application
+- fix cursor for empty enemy castle
+- fix incorrect popping window in tavern
+- fix delayed mouse click on a cell during battle
+- fix hero's level up window with single secondary skill
+- fix system menu OKAY button
+- add SMK video file support
+- reset sound only if battle is shown
+- add support for ogg music from GOG version
+- fix castle drawings on the World Map
+- add Holy Shout spell blur effect
+- fix pathfinding calculations
+- increase the amount of sound channels to 16
+- add death wave/ripple spell effect animation
+- fix Hypnotize and Berserk spell behaviors
+- correct battle hero animation
+- update elemental storm spell
+- "Summon boat" spell should not be used on a board
+- do not focus screen on a hero after adjusting scroll speed
+- fix Shipwreck empty battle
+- use only screen supported resolutions for the game
+- update focus logic for AI moving out of the fog
+- change mass spell icons
+- add frame border to highscore screen
+- reuse SDL2 texture for drawing speedup
+- adjust arena object dialog
+- set monster to static state after receiving a hit
+- fix mage guild window background
+- fix hero's status bar item locations
+- fix going out the battle window animation
+- shift battle log window by 1 pixel up
+- add a partial drawing support for disabled buttons
+- add Chain Lightning spell animation
+- add color cycling for active monster aura
+- fix incorrect hero's interaction with objects during movement
+- adjust flags animation with battle speed
+- make hero's movement smoother
+- show a proper status window message depending on resolution
+- fix last unit being hit 1 frame missing animation
+- remove Skill word from level up window text
+- add full animation in castles
+- update cursor while pointing over empty interface area
+- make "Next hero" button disable when no heroes exist
+- fix extra shifting upon landing for flying monsters
+- adjust music fade in effect and better sound selection
+- add monster animation on the World Map
+- fix fullscreen behavior in SDL 2
+- fix World Map drawings and screen jumping during hero movement
+- fix display drawing during mouse movement in SDL 2
+- fix ship shifting upon boarding it
+- add keyboard support for navigation in spell book
+- display different message in Mage Guild if no hero is in castle
+- fix text positioning in status bar
+- add lightning spell animation
+- do not run idle monster animation at every human's turn
+- fix marketplace window UI issues
+- fix creature contour drawing
+- add keyboard support for navigating between castles and heroes
+- add hero's flag animation in a world map
+- draw post attack animation in parallel so that battle animation does not look slow
+- add a flag to castle's captain
+- fix cursor offsets so that the cursor does not jump while changing its type
+- fix incorrect drawings for many interactive dialogs
+- make yellow frame for not available building info
+- fix hero hiring animation position
+- fix incorrect mouse cursor type during hero's movement by keyboard
+- add magic resist sound
+- add missing Skill word for Attack and Defense
+- fix fog drawings
+- multiple tweaks for AI
+- fix Spell Power naming in its icon and description
+- add animation of many objects on World Map
+- fix Mirror Image clone placement
+- add smooth screen scrolling during hero's movement
+- fix screen shifting when a hero initiates movement without movement points
+- complete hero's movement cell if an user clicks by mouse during hero's movement
+- add Stunning animation
+- fix Resurrect spell animation and logic
+- fix Armageddon and Earthquake animations
+- show gray text for spells which need more than current hero spell amount
+- set correct yellow and white font
+- fix BloodLust spell animation
+- fix incorrect stunning state rendering
+- add mirror image effect
+- fix puzzle view on high resolutions
+- remove Visual Studio 2015 Redistributable package dependency for 64-bit application on Windows
+- add F4 fullscreen hotkey support
+- set correct animation for Holy Word and Holy Shout spells
+- fix join/flee condition
+- fix castle siege logic
+- add an improved battle obstacle selection
+- fix multiple places with shadows while using alpha blending in SDL 1
+- hide World Map for next turn in hot seat mode
+- add an ability to use scroll by mouse in SDL 2
+- fix transparency on World Map and during Battle
+- fix message content and scrollbar for Town Portal spell
+- fix a crash during hero's dismiss
+- fix retaliation condition logic
+- fix a crash while checking hero with focused castle
+- change monster value heuristics for battle and strategic decisions
+- fix Mutant Zombie HP value
+- add color cycling for glowing effects on monsters during battle
+- show adventure map quick info by right click for dimension door spell
+- make hero's path visible after using a portal
+- add a log message for flying monsters
+- fix teleport and luck animation
+- fix ripple effect for disrupting ray and cold ray
+- update focus after hero's dismiss
+- add a condition to check down bridge for unit defense calculation
+- set World Map border size depending on resolution
+- add flag animation of neutral captain in a castle/town
+- do not move to current hero after closing hero's stats window
+- make interface background more uniform on high resolutions
+- add exit button during Dimension Door spell
+- update sounds and music upon teleport spell usage
+- add bad luck animation
+- fix blurred buttons in Adventure Panel
+- fix teleport delay in animation
+- sort spell icons by their duration in monster statistics window
+- fix defense formula for monster during battle
+- fix application exiting behavior (add support for Alt+F4 in Windows for SDL 2)
+- ignore bad spell status for Archmage attack
+- set correct post battle video sequence
+- fix hero fading animation
+- add min and max buttons for troop separation dialog
+- speed up rendering
+- fix hero's flag position in battle
+- fix inability to cast another spell upon cancellation teleport spell
+- play resource collection and sound after reading a dialog
+- fix monster frame jumps from multiple spells
+- fix medusa's stunning effect icon
+- fix Lich animation
+- fix monster count window position during battle
+- fix Archmage dispel post attack effect
+- fix Tower and Magic Arrow animation
+- fix the logic for Summon Boat spell
+- fix Identify Hero spell behavior
+- fix 0 monster count for Visions spell
+- add correct battle speed adjustment formula
+- show disable Dismiss button for a hero in a castle
+- fix idling condition check
+- add correct attacks and timing for monster animation during battle
+- give a control to an opponent over hypnotized monster
+- do not shift application window while loading a map for SDL 2
+- fix Haunt spell incorrect behavior
+- add shadows to most of dialogs
+- play animation of treasure chest after the collection
+- fix incorrect position of a stunned monster
+- remove red cross over town's icon
+- fix new dwelling building animation
+- fix an ability to continue movement after Town portal spell
+- fix quick info window position at world map
+- show reflected monster animation in a dialog for right-side monsters
+- do not auto disable dimension door spell nearby world map edges
+- remove tiny ship icon from hero's status
+- do not move a hero over a portal above another hero
+- add hero movement interruption by left click
+- use shadowing for end movement cell during battle
+- fix inability to move artifacts
+- show a message if not enough points for digging
+- fix monster attack at the start of a new game
+- add fading animation after battle
+- limit Dimension Door spell range
+- fix invisible hero's path after Dimension Door spell
+- fix landing from a ship event to attack a monster after landing
+- fix incorrectly mixed spells for hero's book
+- fix Mass Cure spell icon
+- fix spell icon size and position for monster's info
+- fix cursor behavior beyond world edge
+- set correct position of monster in dwelling info
+- fix minimap colors
+- add an option to switch music type in settings
+- fix incorrect map object naming
+- fix hero, castle and status army info
+- add support for swapping palettes
+- fix hero movement at low speeds
+- fix display info of resources with scouting
+- fix spell sorting crash and mage guild positioning
+- add an optional aspect ratio correction in full-screen mode
+- fix a crash for unhired hero
+- fix alignment of text in monster info dialog
+- fix shifted monster position in recruit window
+- fix negative resources in kingdom possession
+- rework of midi music and sounds
+- fix current unit animation freezing state during battle
+- draw main menu as a background for High Score window
+- fix a case when not destroyed castle gate remains opened after a troop from a castle crossed the bridge during battle
+- fix Phoenixes naming
+- fix EXIT button position in castle options
+- set a correct position for buttons in Configuration dialog
+- fix Genie special ability
+- fix surrender action during battle
+- fix UI value input selectors
+- fix hero animation in battle
+- fix hero position in battle
+- add monster animation in army's info dialog
+- add monster movement animation in Well
+- use BIN file information for correct monster animation
+- fix unit damage formula
+- fix morale and luck events
+- add *nix case insensitive file access
+- make Army Order window during battle optional
+- fix flying monster animation offset
+- fix a crash for hot seat game start
+- add quit dialog popup window and change File Options dialog behavior
+- fix incorrect position of recruit Creature Info window in higher than default resolutions
+- add scalable Sprites support
+- do not show text for hidden Dismiss button
+- fix multiple memory leaks
+- add double quotes to surrender dialog
+
+version 0.7 (18 April 2020)
+- add an edge of the World Map
+- complete hero movement cell if a player stops it by any keyboard button
+- add hotkey 'N' to start a new game within the World Map like in the original game
+- fix crashes in multiple maps during map loading or during AI turns
+- fix game freezes during animation of resources collection
+- make human turn always first
+- do not show file save loading dialog if no saves exist
+- fix 'Adventure Options' button is being blurred after pressing it once on MacOS
+- cancel a dialog by pressing close window button
+- do not allow to move artifacts for not hired heroes in a castle
+- allow file selection by double-clicking on a list entry
+- fix MAX button state for monster change in recruitment window
+- update a cursor while stopping hero's movement
+- add monster animation in castle's well
+- set correct animation speed
+- fix scrolling behavior and add diagonal scrolling
+- display recruit monster window even for 0 creatures within castle's well
+- fix castle well UI elements
+- show hero movement arrow icons with proper colors
+- fix resizing of mini-map in fixed interface mode
+- do not show Necromancy window for 0 obtained skeletons
+- show an empty area instead of tavern building in Necromancer castle
+- fix a state of no information displayed in Signs
+- fix a crash after loading a save and starting any new game after
+- fix a crash during loading empty or newly saved configuration file
+- add initial campaign support (very early beta)
+- fix crystal resource position
+- fix hero path cursor display
+- add missing option's titles in Battle Option dialog
+- fix a popup messages for different types of resources at the World Map
+- fix application title disappearing after loading any map on SDL 2
+- fix disabled black surrender button in hero's options in SDL 2 mode
+- move creature window info to the top of the castle screen
+- make "Buy from well" as a default option
+- remove speed 0 for battle and the World Map
+- fix spell book is being displayed in semi transparent way
+- hero path is recalculated each time when an user chooses the hero
+- show creature information in recruitment building
+- fix incorrectly displayed shadows on the World Map for SDL 2
+- change AI behaviour for castle building strategy
+- fix positions of labels in in-game settings
+- remove 'Dismiss' button for a hero who is not hired yet in a castle
+- fix incorrectly shown message of found resources in the World Map bottom-right window
+- fix battle grid
+- add missing text in battle options dialog
+- fix World Map UI is being drawn inside castle options
+- fix shadow display in a battle
+- disable Spell button for castles
+- change font color for a creature's name
+- fix observation tower coverage area
+- hide dismiss button for monsters if a hero has only one stack of them
+- fix incorrect message for Shipyard by right click
+- fix missing battle hexagonal net was not appearing if enabled until next battle
+- display a warning message about missing files from the original game
+- disable Continue Movement button for a hero which does not have chosen path
+- required building names are displayed on a separate line each
+- fix no building image for already built building for right mouse click
+- fix incorrect image for Captains Quarters
+- renamed 'Free Heroes II' to 'fheroes2'
+- show disabled "Continue Movement" button for castle
+- fix number of monsters being displayed in a black box
+- add a script to download a demo version of the original game
+- set default display size to 640x480 pixels
+- add Windows build
+
+30th August 2019
+- move the repository to https://github.com/ihhub/fheroes2

@@ -1,0 +1,99 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" (C) Copyright 2022 - 2025 fheroes2 team <fhomm2@gmail.com>
+.\"
+.TH fheroes2 6 "April 2025"
+.\" Please adjust this date whenever revising the manpage.
+.SH NAME
+fheroes2 \- free remake of the Heroes of Might and Magic II game engine
+.SH SYNOPSIS
+.B fheroes2
+.SH DESCRIPTION
+\fBfheroes2\fP is a free implementation of the Heroes of Might and Magic II game engine,
+a classic turn-based strategy game, with significant improvements in gameplay, graphics
+and logic (including support for high-resolution graphics, improved AI,
+numerous fixes and UI improvements).
+.PP
+To play the game, the assets from the demo version or the full version of the original
+Heroes of Might and Magic II game are needed.
+.SH GAME DATA PATHS 
+.SS The engine assets are searched for in the following directories:
+#_SG
+.TP
+.B @FHEROES2_DATA@
+System-wide data directory that can be accessed by all users.
+#_EG
+.TP
+.B $FHEROES2_DATA
+This environment variable may contain the path to a custom assets directory.
+.TP
+.B Game engine executable directory
+Directory containing the executable file used to run the engine.
+.TP
+.B @data@
+Per-user data directory.
+This path can be overridden by \fIXDG_DATA_HOME\fP environment variable.
+.PP
+.SS The structure of engine assets is as follows:
+.TP
+.B anim/*.smk
+.TQ
+.B anim2/*.smk
+.TQ
+.B heroes2/anim/*.smk
+Video files of the original game.
+.TP
+.B data/*.agg
+Assets of the original game (required).
+.TP
+.B files/data/*.h2d
+Additional non-original assets from the fheroes2 project. These assets are inextricably linked
+to a specific version of the engine, and must be updated when the engine version changes.
+.TP
+.B files/lang/*.mo
+Translations of the fheroes2 project into different languages.
+.TP
+.B files/soundfonts/*.sf2
+.TQ
+.B files/soundfonts/*.sf3
+Additional SoundFont files for the MIDI synthesizer.
+.TP
+.B files/timidity/timidity.cfg
+Configuration file for the TiMidity MIDI synthesizer.
+.TP
+.B files/timidity/instruments/*.pat
+GUS patches (samples of musical instruments) for the TiMidity MIDI synthesizer.
+.TP
+.B maps/*.fh2m
+Map files in the fheroes2 format.
+.TP
+.B maps/*.h2c
+.TQ
+.B maps/*.hxc
+Campaign map files.
+.TP
+.B maps/*.mp2
+.TQ
+.B maps/*.mx2
+Map files in the original game format.
+.TP
+.B music/*.flac
+.TQ
+.B music/*.mp3
+.TQ
+.B music/*.ogg
+Music tracks ripped from the original game CD. These tracks should be named as \fIhomm2_XX.ext\fP
+or \fITrackXX.ext\fP where \fIXX\fP is a track number and \fIext\fP is an extension. Numeration
+starts from \fI01\fP for the \fIhomm2_\fP prefix and from \fI02\fP for the \fITrack\fP prefix.
+.SH ENVIRONMENT
+.TP
+.B FHEROES2_DATA
+See the section \fBGAME DATA PATHS\fP above.
+.SH FILES
+.TP
+.B @config@
+This directory contains per-user configuration files.
+\fIfheroes2.cfg\fP is for game options and \fIfheroes2.key\fP is for hotkeys.
+This path can be overridden by the \fIXDG_CONFIG_HOME\fP environment variable.
+.TP
+.B @data@/files/save
+This directory contains per-user save files.
