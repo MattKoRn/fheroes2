@@ -716,6 +716,7 @@ namespace
         }
 
         PersistentCreatureRoster reserve{};
+        PersistentCreatureRoster remainingRoster = data.creatureRoster;
         std::vector<size_t> monsterIds;
         monsterIds.reserve( data.creatureRoster.size() );
         for ( size_t i = 0; i < data.creatureRoster.size(); ++i ) {
@@ -734,7 +735,7 @@ namespace
         if ( !monsterIds.empty() ) {
             const size_t seedMonsterId = monsterIds.front();
             const Monster seedMonster( static_cast<int>( seedMonsterId ) );
-            uint64_t & seedCount = data.creatureRoster[seedMonsterId];
+            uint64_t & seedCount = remainingRoster[seedMonsterId];
 
             for ( Heroes * hero : kingdom.GetHeroes() ) {
                 if ( hero == nullptr || seedCount == 0 ) {
@@ -748,7 +749,7 @@ namespace
         }
 
         for ( const size_t monsterId : monsterIds ) {
-            uint64_t remaining = data.creatureRoster[monsterId];
+            uint64_t remaining = remainingRoster[monsterId];
             const Monster monster( static_cast<int>( monsterId ) );
 
             for ( Army * army : targetArmies ) {
@@ -2635,6 +2636,12 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
 
         // Don't carry the current player color to the next turn.
         conf.SetCurrentColor( PlayerColor::NONE );
+    }
+
+    // Capture the final surviving roster as well. This matters when a victory/defeat or
+    // menu transition ends the map before another normal end-of-turn snapshot can happen.
+    if ( !isAutoPlaytest && persistentResourcePlayerColor != PlayerColor::NONE ) {
+        persistOfflineProgressSnapshot( world.GetKingdom( persistentResourcePlayerColor ) );
     }
 
     // If we are here, the res value should never be fheroes2::GameMode::END_TURN
