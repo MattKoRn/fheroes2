@@ -115,6 +115,7 @@ namespace
         std::array<int64_t, 7> carry{};
         uint32_t homecomingStreak{ 0 };
         uint64_t totalOfflineSeconds{ 0 };
+        uint64_t offlineRenown{ 0 };
     };
 
     struct OfflineEvent
@@ -138,6 +139,17 @@ namespace
         int milestonePercent{ 0 };
         int milestoneResource{ Resource::UNKNOWN };
         int32_t milestoneBonus{ 0 };
+        bool rareDiscovery{ false };
+        int rareDiscoveryId{ -1 };
+        int rareDiscoveryResource{ Resource::UNKNOWN };
+        int32_t rareDiscoveryBonus{ 0 };
+        uint64_t renownEarned{ 0 };
+        uint64_t renownTotal{ 0 };
+        int rankBefore{ 0 };
+        int rankAfter{ 0 };
+        int rankUpPercent{ 0 };
+        int rankUpResource{ Resource::UNKNOWN };
+        int32_t rankUpBonus{ 0 };
         bool showPopup{ false };
     };
 
@@ -170,6 +182,7 @@ namespace
         bool hasCarry = false;
         bool hasStreak = false;
         bool hasTotalOfflineSeconds = false;
+        bool hasOfflineRenown = false;
 
         const auto readFunds = [&input]( Funds & funds ) {
             for ( const FundsMember member : offlineFundMembers ) {
@@ -217,6 +230,10 @@ namespace
                 input >> data.totalOfflineSeconds;
                 hasTotalOfflineSeconds = true;
             }
+            else if ( key == "offline_renown" ) {
+                input >> data.offlineRenown;
+                hasOfflineRenown = true;
+            }
             else {
                 std::string ignoredLine;
                 std::getline( input, ignoredLine );
@@ -227,8 +244,9 @@ namespace
             }
         }
 
-        const bool hasVersionSpecificFields = version == 1 || ( version == 2 && hasStreak && hasTotalOfflineSeconds );
-        return ( version == 1 || version == 2 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
+        const bool hasVersionSpecificFields = version == 1 || ( version == 2 && hasStreak && hasTotalOfflineSeconds )
+                                              || ( version == 3 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown );
+        return ( version >= 1 && version <= 3 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
     }
 
     void saveOfflineProgressData( const OfflineProgressData & data )
@@ -249,7 +267,7 @@ namespace
             output << '\n';
         };
 
-        output << "version 2\n";
+        output << "version 3\n";
         output << "last_seen_unix " << data.lastSeenUnix << '\n';
         output << "resources ";
         writeFunds( data.resources );
@@ -265,6 +283,7 @@ namespace
         output << '\n';
         output << "homecoming_streak " << data.homecomingStreak << '\n';
         output << "total_offline_seconds " << data.totalOfflineSeconds << '\n';
+        output << "offline_renown " << data.offlineRenown << '\n';
     }
 
     void setKingdomFundsExact( Kingdom & kingdom, const Funds & target )
@@ -486,6 +505,175 @@ namespace
         data.resources.*member += summary.milestoneBonus;
     }
 
+    int getOfflineRank( const uint64_t renown )
+    {
+        constexpr std::array<uint64_t, 7> thresholds{ 0, 25, 75, 150, 300, 600, 1200 };
+
+        int rank = 0;
+        for ( size_t i = 1; i < thresholds.size(); ++i ) {
+            if ( renown < thresholds[i] ) {
+                break;
+            }
+            rank = static_cast<int>( i );
+        }
+
+        return rank;
+    }
+
+    uint64_t getOfflineRankThreshold( const int rank )
+    {
+        constexpr std::array<uint64_t, 7> thresholds{ 0, 25, 75, 150, 300, 600, 1200 };
+        assert( rank >= 0 && static_cast<size_t>( rank ) < thresholds.size() );
+
+        return thresholds[rank];
+    }
+
+    std::string getOfflineRankName( const int rank )
+    {
+        switch ( rank ) {
+        case 0:
+            return _( "Camp Steward" );
+        case 1:
+            return _( "Road Warden" );
+        case 2:
+            return _( "Caravan Master" );
+        case 3:
+            return _( "Royal Quartermaster" );
+        case 4:
+            return _( "Keeper of the Coffers" );
+        case 5:
+            return _( "High Steward" );
+        case 6:
+            return _( "Legend of the Realm" );
+        default:
+            return _( "Camp Steward" );
+        }
+    }
+
+    void applyOfflineRareDiscovery( OfflineProgressSummary & summary, OfflineProgressData & data, const int64_t previousLastSeenUnix )
+    {
+        if ( summary.elapsedSeconds < offlineSecondsPerDay || summary.productionRewards.GetValidItemsCount() == 0 ) {
+            return;
+        }
+
+        const uint64_t seed = getOfflineEventSeed( previousLastSeenUnix, summary.elapsedSeconds );
+        const bool guaranteedDiscovery = summary.elapsedSeconds >= 30 * offlineSecondsPerDay;
+        if ( !guaranteedDiscovery && ( ( seed >> 32 ) % 4 ) != 0 ) {
+            return;
+        }
+
+        std::array<size_t, 7> eligibleIndices{};
+        size_t eligibleCount = 0;
+
+        constexpr std::array<size_t, 4> rareResourceIndices{ 1, 3, 4, 5 };
+        for ( const size_t index : rareResourceIndices ) {
+            if ( summary.productionRewards.*offlineFundMembers[index] > 0 ) {
+                eligibleIndices[eligibleCount] = index;
+                ++eligibleCount;
+            }
+        }
+
+        if ( eligibleCount == 0 ) {
+            for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
+                if ( summary.productionRewards.*offlineFundMembers[i] > 0 ) {
+                    eligibleIndices[eligibleCount] = i;
+                    ++eligibleCount;
+                }
+            }
+        }
+
+        if ( eligibleCount == 0 ) {
+            return;
+        }
+
+        const size_t selectedIndex = eligibleIndices[( seed >> 40 ) % eligibleCount];
+        const FundsMember member = offlineFundMembers[selectedIndex];
+        const int discoveryPercent = guaranteedDiscovery ? 35 : 20;
+        const int64_t baseReward = summary.productionRewards.*member;
+        const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
+        const int64_t calculatedBonus = std::max<int64_t>( 1, ( baseReward * discoveryPercent ) / 100 );
+        const int64_t grantedBonus = std::min<int64_t>( calculatedBonus, capacity );
+
+        if ( grantedBonus <= 0 ) {
+            return;
+        }
+
+        summary.rareDiscovery = true;
+        summary.rareDiscoveryId = static_cast<int>( ( seed >> 48 ) % 4 );
+        summary.rareDiscoveryResource = offlineResourceTypes[selectedIndex];
+        summary.rareDiscoveryBonus = static_cast<int32_t>( grantedBonus );
+        summary.bonusRewards.*member += summary.rareDiscoveryBonus;
+        summary.rewards.*member += summary.rareDiscoveryBonus;
+        data.resources.*member += summary.rareDiscoveryBonus;
+    }
+
+    void applyOfflineRenownProgress( OfflineProgressSummary & summary, OfflineProgressData & data )
+    {
+        summary.rankBefore = getOfflineRank( data.offlineRenown );
+        summary.rankAfter = summary.rankBefore;
+        summary.renownTotal = data.offlineRenown;
+
+        if ( summary.elapsedSeconds < 30 * 60 || summary.productionRewards.GetValidItemsCount() == 0 ) {
+            return;
+        }
+
+        const uint64_t elapsedHours = std::max<uint64_t>( 1, static_cast<uint64_t>( summary.elapsedSeconds ) / ( 60 * 60 ) );
+        uint64_t earned = elapsedHours + static_cast<uint64_t>( summary.homecomingTier * 2 ) + static_cast<uint64_t>( summary.eventCount * 2 );
+
+        if ( summary.milestoneBonus > 0 ) {
+            earned += 5;
+        }
+        if ( summary.rareDiscovery ) {
+            earned += 10;
+        }
+
+        summary.renownEarned = earned;
+
+        if ( std::numeric_limits<uint64_t>::max() - data.offlineRenown < earned ) {
+            data.offlineRenown = std::numeric_limits<uint64_t>::max();
+        }
+        else {
+            data.offlineRenown += earned;
+        }
+
+        summary.renownTotal = data.offlineRenown;
+        summary.rankAfter = getOfflineRank( data.offlineRenown );
+
+        if ( summary.rankAfter <= summary.rankBefore ) {
+            return;
+        }
+
+        size_t bestIndex = offlineFundMembers.size();
+        int32_t bestProduction = 0;
+        for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
+            const int32_t production = summary.productionRewards.*offlineFundMembers[i];
+            if ( production > bestProduction ) {
+                bestProduction = production;
+                bestIndex = i;
+            }
+        }
+
+        if ( bestIndex == offlineFundMembers.size() ) {
+            return;
+        }
+
+        summary.rankUpPercent = 10 + summary.rankAfter * 5;
+        const FundsMember member = offlineFundMembers[bestIndex];
+        const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
+        const int64_t calculatedBonus = std::max<int64_t>( 1, ( static_cast<int64_t>( bestProduction ) * summary.rankUpPercent ) / 100 );
+        const int64_t grantedBonus = std::min<int64_t>( calculatedBonus, capacity );
+
+        if ( grantedBonus <= 0 ) {
+            return;
+        }
+
+        summary.rankUpResource = offlineResourceTypes[bestIndex];
+        summary.rankUpBonus = static_cast<int32_t>( grantedBonus );
+        summary.bonusRewards.*member += summary.rankUpBonus;
+        summary.rewards.*member += summary.rankUpBonus;
+        data.resources.*member += summary.rankUpBonus;
+    }
+
     OfflineProgressSummary applyOfflineProgress( Kingdom & kingdom )
     {
         OfflineProgressData data;
@@ -539,6 +727,8 @@ namespace
 
         applyOfflineHomecomingBonus( summary, data, data.lastSeenUnix );
         applyOfflineStreakProgress( summary, data );
+        applyOfflineRareDiscovery( summary, data, data.lastSeenUnix );
+        applyOfflineRenownProgress( summary, data );
 
         setKingdomFundsExact( kingdom, data.resources );
 
@@ -608,6 +798,22 @@ namespace
             return _( "A grateful village sent tribute to your banners." );
         case 7:
             return _( "Your patrols recovered supplies from a deserted encampment." );
+        default:
+            return {};
+        }
+    }
+
+    std::string getRareDiscoveryText( const int discoveryId )
+    {
+        switch ( discoveryId ) {
+        case 0:
+            return _( "Rare discovery: scouts uncovered a sealed royal strongbox." );
+        case 1:
+            return _( "Rare discovery: an old prospector revealed a forgotten mother lode." );
+        case 2:
+            return _( "Rare discovery: a lost caravan was found intact beyond the old road." );
+        case 3:
+            return _( "Rare discovery: villagers opened a hidden wartime storehouse in your honor." );
         default:
             return {};
         }
@@ -757,6 +963,47 @@ namespace
             StringReplace( milestoneText, "%{resource}", Resource::String( summary.milestoneResource ) );
             message += "\n";
             message += milestoneText;
+        }
+
+        if ( summary.rareDiscovery && summary.rareDiscoveryBonus > 0 ) {
+            message += "\n";
+            message += getRareDiscoveryText( summary.rareDiscoveryId );
+
+            std::string discoveryLoot = _( " Discovery cache: +%{amount} %{resource}!" );
+            StringReplace( discoveryLoot, "%{amount}", std::to_string( summary.rareDiscoveryBonus ) );
+            StringReplace( discoveryLoot, "%{resource}", Resource::String( summary.rareDiscoveryResource ) );
+            message += discoveryLoot;
+        }
+
+        if ( summary.renownEarned > 0 ) {
+            std::string renownText = _( "Offline Renown: +%{earned} (total %{total})." );
+            StringReplace( renownText, "%{earned}", std::to_string( summary.renownEarned ) );
+            StringReplace( renownText, "%{total}", std::to_string( summary.renownTotal ) );
+            message += "\n";
+            message += renownText;
+        }
+
+        std::string rankText = _( "Kingdom title: %{rank}." );
+        StringReplace( rankText, "%{rank}", getOfflineRankName( summary.rankAfter ) );
+        message += "\n";
+        message += rankText;
+
+        if ( summary.rankUpBonus > 0 ) {
+            std::string rankUpText = _( "New title unlocked: %{rank}! Rank-up cache: +%{amount} %{resource}." );
+            StringReplace( rankUpText, "%{rank}", getOfflineRankName( summary.rankAfter ) );
+            StringReplace( rankUpText, "%{amount}", std::to_string( summary.rankUpBonus ) );
+            StringReplace( rankUpText, "%{resource}", Resource::String( summary.rankUpResource ) );
+            message += "\n";
+            message += rankUpText;
+        }
+
+        if ( summary.rankAfter < 6 ) {
+            const uint64_t nextThreshold = getOfflineRankThreshold( summary.rankAfter + 1 );
+            const uint64_t remainingRenown = nextThreshold > summary.renownTotal ? nextThreshold - summary.renownTotal : 0;
+            std::string nextRankText = _( "Next title in %{renown} Renown." );
+            StringReplace( nextRankText, "%{renown}", std::to_string( remainingRenown ) );
+            message += "\n";
+            message += nextRankText;
         }
 
         const auto [bestResource, bestReward] = getBestOfflineHaul( summary.rewards );

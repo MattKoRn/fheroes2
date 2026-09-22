@@ -33,4 +33,8 @@ Meaningful absences also earn a **Homecoming Reward**. Starting at 30 minutes aw
 
 Returns of at least six hours with actual production also build a persistent **Homecoming Streak**. Every 3rd qualifying return triggers a Guild Festival (+15% of the best-produced resource), every 5th triggers a Royal Jubilee (+25%), and every 10th triggers a Legendary Jubilee (+50%). The popup also tracks cumulative lifetime time spent offline. Shorter returns do not break the streak.
 
-The state file is upgraded to version 2 to store the streak and lifetime offline seconds. Version-1 files migrate automatically; exact resources, uncapped elapsed time, base offline-income calculation, and fractional carry remain compatible.
+The offline system also has persistent **Offline Renown**. Meaningful returns earn Renown from time away, chest tier, expedition activity, streak milestones, and rare discoveries. Renown unlocks the titles Camp Steward, Road Warden, Caravan Master, Royal Quartermaster, Keeper of the Coffers, High Steward, and Legend of the Realm. Reaching a new title grants a one-time rank-up cache based on that session's strongest production.
+
+Expeditions lasting at least one day can also produce a deterministic **Rare Discovery**. These favor rare resources that actually produced income and grant a 20% discovery cache; absences of 30 days or more guarantee a discovery and raise the discovery cache to 35%. The session seed fixes the result, so reloads cannot reroll it.
+
+The state file is upgraded to version 3 to store Renown in addition to the streak and lifetime offline seconds. Version-1 and version-2 files migrate automatically; exact resources, uncapped elapsed time, base offline-income calculation, and fractional carry remain compatible.
