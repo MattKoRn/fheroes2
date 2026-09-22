@@ -685,24 +685,6 @@ namespace
         return baseTargets[contractId] + std::min<uint64_t>( 24, static_cast<uint64_t>( contractsCompleted ) * 2 );
     }
 
-    std::string getOfflineContractName( const int contractId )
-    {
-        switch ( contractId ) {
-        case 0:
-            return _( "Keep the Beacons Lit" );
-        case 1:
-            return _( "Supply the Guilds" );
-        case 2:
-            return _( "Caravan Charter" );
-        case 3:
-            return _( "Prospector's Commission" );
-        case 4:
-            return _( "Royal Logistics" );
-        default:
-            return _( "Kingdom Contract" );
-        }
-    }
-
     void initializeOfflineContract( OfflineProgressData & data )
     {
         if ( data.contractId >= 0 && data.contractId < 5 && data.contractTarget > 0 ) {
@@ -1048,36 +1030,6 @@ namespace
         }
     }
 
-    std::string getHomecomingMilestoneName( const int milestonePercent )
-    {
-        switch ( milestonePercent ) {
-        case 15:
-            return _( "Guild Festival" );
-        case 25:
-            return _( "Royal Jubilee" );
-        case 50:
-            return _( "Legendary Jubilee" );
-        default:
-            return {};
-        }
-    }
-
-    std::pair<int, int32_t> getBestOfflineHaul( const Funds & rewards )
-    {
-        int bestResource = Resource::UNKNOWN;
-        int32_t bestReward = 0;
-
-        for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
-            const int32_t reward = rewards.*offlineFundMembers[i];
-            if ( reward > bestReward ) {
-                bestReward = reward;
-                bestResource = offlineResourceTypes[i];
-            }
-        }
-
-        return { bestResource, bestReward };
-    }
-
     void showOfflineProgressPopup( const OfflineProgressSummary & summary )
     {
         if ( !summary.showPopup ) {
@@ -1120,7 +1072,7 @@ namespace
         message += income;
 
         if ( summary.homecomingTier > 0 && summary.eventCount > 0 ) {
-            std::string homecoming = _( "Homecoming: %{chest} +%{percent}%%, %{events} events." );
+            std::string homecoming = _( "Homecoming: %{chest} +%{percent}%, %{events} events." );
             StringReplace( homecoming, "%{chest}", getHomecomingChestName( summary.homecomingTier ) );
             StringReplace( homecoming, "%{percent}", std::to_string( getHomecomingBonusPercent( summary.homecomingTier ) ) );
             StringReplace( homecoming, "%{events}", std::to_string( summary.eventCount ) );
