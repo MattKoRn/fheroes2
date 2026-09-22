@@ -113,6 +113,15 @@ namespace
         Funds resources;
         Funds dailyIncome;
         std::array<int64_t, 7> carry{};
+        uint32_t homecomingStreak{ 0 };
+        uint64_t totalOfflineSeconds{ 0 };
+    };
+
+    struct OfflineEvent
+    {
+        int eventId{ -1 };
+        int resource{ Resource::UNKNOWN };
+        int32_t bonus{ 0 };
     };
 
     struct OfflineProgressSummary
@@ -122,9 +131,13 @@ namespace
         Funds bonusRewards;
         Funds rewards;
         int homecomingTier{ 0 };
-        int eventId{ -1 };
-        int eventResource{ Resource::UNKNOWN };
-        int32_t eventBonus{ 0 };
+        uint32_t homecomingStreak{ 0 };
+        uint64_t totalOfflineSeconds{ 0 };
+        std::array<OfflineEvent, 3> events{};
+        size_t eventCount{ 0 };
+        int milestonePercent{ 0 };
+        int milestoneResource{ Resource::UNKNOWN };
+        int32_t milestoneBonus{ 0 };
         bool showPopup{ false };
     };
 
@@ -155,6 +168,8 @@ namespace
         bool hasResources = false;
         bool hasIncome = false;
         bool hasCarry = false;
+        bool hasStreak = false;
+        bool hasTotalOfflineSeconds = false;
 
         const auto readFunds = [&input]( Funds & funds ) {
             for ( const FundsMember member : offlineFundMembers ) {
@@ -194,6 +209,14 @@ namespace
                     value = std::clamp<int64_t>( value, 0, offlineSecondsPerDay - 1 );
                 }
             }
+            else if ( key == "homecoming_streak" ) {
+                input >> data.homecomingStreak;
+                hasStreak = true;
+            }
+            else if ( key == "total_offline_seconds" ) {
+                input >> data.totalOfflineSeconds;
+                hasTotalOfflineSeconds = true;
+            }
             else {
                 std::string ignoredLine;
                 std::getline( input, ignoredLine );
@@ -204,7 +227,8 @@ namespace
             }
         }
 
-        return version == 1 && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
+        const bool hasVersionSpecificFields = version == 1 || ( version == 2 && hasStreak && hasTotalOfflineSeconds );
+        return ( version == 1 || version == 2 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
     }
 
     void saveOfflineProgressData( const OfflineProgressData & data )
@@ -225,7 +249,7 @@ namespace
             output << '\n';
         };
 
-        output << "version 1\n";
+        output << "version 2\n";
         output << "last_seen_unix " << data.lastSeenUnix << '\n';
         output << "resources ";
         writeFunds( data.resources );
@@ -239,6 +263,8 @@ namespace
             output << data.carry[i];
         }
         output << '\n';
+        output << "homecoming_streak " << data.homecomingStreak << '\n';
+        output << "total_offline_seconds " << data.totalOfflineSeconds << '\n';
     }
 
     void setKingdomFundsExact( Kingdom & kingdom, const Funds & target )
@@ -351,23 +377,113 @@ namespace
             return;
         }
 
+        const size_t desiredEventCount = summary.homecomingTier >= 4 ? 3 : ( summary.homecomingTier >= 3 ? 2 : 1 );
+        const size_t eventCount = std::min( desiredEventCount, eligibleResourceCount );
         const uint64_t seed = getOfflineEventSeed( previousLastSeenUnix, summary.elapsedSeconds );
-        summary.eventId = static_cast<int>( seed % 5 );
 
-        const size_t selectedIndex = eligibleResourceIndices[( seed / 5 ) % eligibleResourceCount];
-        const FundsMember selectedMember = offlineFundMembers[selectedIndex];
-        summary.eventResource = offlineResourceTypes[selectedIndex];
+        for ( size_t eventIndex = 0; eventIndex < eventCount; ++eventIndex ) {
+            const uint64_t eventSeed = seed + 0x9E3779B97F4A7C15ULL * ( eventIndex + 1 );
+            const size_t choice = static_cast<size_t>( eventSeed % eligibleResourceCount );
+            const size_t selectedIndex = eligibleResourceIndices[choice];
 
-        const int64_t baseReward = summary.productionRewards.*selectedMember;
-        const int64_t currentResource = data.resources.*selectedMember;
-        const int64_t capacity = std::numeric_limits<int32_t>::max() - currentResource;
-        const int64_t calculatedBonus = std::max<int64_t>( 1, ( baseReward * bonusPercent ) / 100 );
+            eligibleResourceIndices[choice] = eligibleResourceIndices[eligibleResourceCount - 1];
+            --eligibleResourceCount;
+
+            const FundsMember selectedMember = offlineFundMembers[selectedIndex];
+            const int eventPercent = bonusPercent / static_cast<int>( eventCount )
+                                     + ( eventIndex < static_cast<size_t>( bonusPercent % static_cast<int>( eventCount ) ) ? 1 : 0 );
+
+            const int64_t baseReward = summary.productionRewards.*selectedMember;
+            const int64_t currentResource = data.resources.*selectedMember;
+            const int64_t capacity = std::numeric_limits<int32_t>::max() - currentResource;
+            const int64_t calculatedBonus = std::max<int64_t>( 1, ( baseReward * eventPercent ) / 100 );
+            const int64_t grantedBonus = std::min<int64_t>( calculatedBonus, capacity );
+
+            if ( grantedBonus <= 0 ) {
+                continue;
+            }
+
+            OfflineEvent & event = summary.events[summary.eventCount];
+            event.eventId = static_cast<int>( ( eventSeed >> 8 ) % 8 );
+            event.resource = offlineResourceTypes[selectedIndex];
+            event.bonus = static_cast<int32_t>( grantedBonus );
+            ++summary.eventCount;
+
+            summary.bonusRewards.*selectedMember += event.bonus;
+            summary.rewards.*selectedMember += event.bonus;
+            data.resources.*selectedMember += event.bonus;
+        }
+    }
+
+    int getHomecomingMilestonePercent( const uint32_t streak )
+    {
+        if ( streak > 0 && streak % 10 == 0 ) {
+            return 50;
+        }
+        if ( streak > 0 && streak % 5 == 0 ) {
+            return 25;
+        }
+        if ( streak > 0 && streak % 3 == 0 ) {
+            return 15;
+        }
+
+        return 0;
+    }
+
+    void applyOfflineStreakProgress( OfflineProgressSummary & summary, OfflineProgressData & data )
+    {
+        const uint64_t elapsedSeconds = summary.elapsedSeconds > 0 ? static_cast<uint64_t>( summary.elapsedSeconds ) : 0;
+        if ( std::numeric_limits<uint64_t>::max() - data.totalOfflineSeconds < elapsedSeconds ) {
+            data.totalOfflineSeconds = std::numeric_limits<uint64_t>::max();
+        }
+        else {
+            data.totalOfflineSeconds += elapsedSeconds;
+        }
+        summary.totalOfflineSeconds = data.totalOfflineSeconds;
+
+        if ( summary.elapsedSeconds < 6 * 60 * 60 || summary.productionRewards.GetValidItemsCount() == 0 ) {
+            summary.homecomingStreak = data.homecomingStreak;
+            return;
+        }
+
+        if ( data.homecomingStreak < std::numeric_limits<uint32_t>::max() ) {
+            ++data.homecomingStreak;
+        }
+        summary.homecomingStreak = data.homecomingStreak;
+        summary.milestonePercent = getHomecomingMilestonePercent( data.homecomingStreak );
+
+        if ( summary.milestonePercent == 0 ) {
+            return;
+        }
+
+        size_t bestIndex = offlineFundMembers.size();
+        int32_t bestProduction = 0;
+        for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
+            const int32_t production = summary.productionRewards.*offlineFundMembers[i];
+            if ( production > bestProduction ) {
+                bestProduction = production;
+                bestIndex = i;
+            }
+        }
+
+        if ( bestIndex == offlineFundMembers.size() ) {
+            return;
+        }
+
+        const FundsMember member = offlineFundMembers[bestIndex];
+        const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
+        const int64_t calculatedBonus = std::max<int64_t>( 1, ( static_cast<int64_t>( bestProduction ) * summary.milestonePercent ) / 100 );
         const int64_t grantedBonus = std::min<int64_t>( calculatedBonus, capacity );
 
-        summary.eventBonus = static_cast<int32_t>( grantedBonus );
-        summary.bonusRewards.*selectedMember = summary.eventBonus;
-        summary.rewards.*selectedMember += summary.eventBonus;
-        data.resources.*selectedMember += summary.eventBonus;
+        if ( grantedBonus <= 0 ) {
+            return;
+        }
+
+        summary.milestoneResource = offlineResourceTypes[bestIndex];
+        summary.milestoneBonus = static_cast<int32_t>( grantedBonus );
+        summary.bonusRewards.*member += summary.milestoneBonus;
+        summary.rewards.*member += summary.milestoneBonus;
+        data.resources.*member += summary.milestoneBonus;
     }
 
     OfflineProgressSummary applyOfflineProgress( Kingdom & kingdom )
@@ -422,6 +538,7 @@ namespace
         }
 
         applyOfflineHomecomingBonus( summary, data, data.lastSeenUnix );
+        applyOfflineStreakProgress( summary, data );
 
         setKingdomFundsExact( kingdom, data.resources );
 
@@ -485,6 +602,26 @@ namespace
             return _( "The quartermaster won a remarkably favorable bargain." );
         case 4:
             return _( "Workers celebrated a record shift and set aside an extra shipment." );
+        case 5:
+            return _( "Miners opened a forgotten tunnel and found untouched stores." );
+        case 6:
+            return _( "A grateful village sent tribute to your banners." );
+        case 7:
+            return _( "Your patrols recovered supplies from a deserted encampment." );
+        default:
+            return {};
+        }
+    }
+
+    std::string getHomecomingMilestoneName( const int milestonePercent )
+    {
+        switch ( milestonePercent ) {
+        case 15:
+            return _( "Guild Festival" );
+        case 25:
+            return _( "Royal Jubilee" );
+        case 50:
+            return _( "Legendary Jubilee" );
         default:
             return {};
         }
@@ -560,6 +697,16 @@ namespace
         StringReplace( awayTime, "%{seconds}", std::to_string( seconds ) );
         message += awayTime;
 
+        if ( summary.totalOfflineSeconds > 0 ) {
+            const uint64_t lifetimeDays = summary.totalOfflineSeconds / static_cast<uint64_t>( offlineSecondsPerDay );
+            const uint64_t lifetimeHours = ( summary.totalOfflineSeconds % static_cast<uint64_t>( offlineSecondsPerDay ) ) / ( 60 * 60 );
+            std::string lifetime = _( "Kingdom-away lifetime: %{days} days and %{hours} hours." );
+            StringReplace( lifetime, "%{days}", std::to_string( lifetimeDays ) );
+            StringReplace( lifetime, "%{hours}", std::to_string( lifetimeHours ) );
+            message += "\n";
+            message += lifetime;
+        }
+
         message += "\n\n";
         message += getOfflineReturnFlavor( summary.elapsedSeconds, hasRewards );
 
@@ -575,24 +722,41 @@ namespace
         message += "\n\n";
         message += collectionSummary;
 
-        if ( summary.homecomingTier > 0 && summary.eventBonus > 0 ) {
-            std::string homecoming = _( "Homecoming reward: %{chest} (+%{percent}% bonus shipment)." );
+        if ( summary.homecomingTier > 0 && summary.eventCount > 0 ) {
+            std::string homecoming = _( "Homecoming reward: %{chest} (+%{percent}% expedition bonus)." );
             StringReplace( homecoming, "%{chest}", getHomecomingChestName( summary.homecomingTier ) );
             StringReplace( homecoming, "%{percent}", std::to_string( getHomecomingBonusPercent( summary.homecomingTier ) ) );
             message += "\n";
             message += homecoming;
-
-            const std::string eventText = getOfflineEventText( summary.eventId );
-            if ( !eventText.empty() ) {
-                message += "\n";
-                message += eventText;
-            }
-
-            std::string bonusText = _( "Bonus loot: +%{amount} %{resource}." );
-            StringReplace( bonusText, "%{amount}", std::to_string( summary.eventBonus ) );
-            StringReplace( bonusText, "%{resource}", Resource::String( summary.eventResource ) );
             message += "\n";
-            message += bonusText;
+            message += _( "Expedition log:" );
+
+            for ( size_t i = 0; i < summary.eventCount; ++i ) {
+                const OfflineEvent & event = summary.events[i];
+                message += "\n- ";
+                message += getOfflineEventText( event.eventId );
+
+                std::string bonusText = _( " +%{amount} %{resource}." );
+                StringReplace( bonusText, "%{amount}", std::to_string( event.bonus ) );
+                StringReplace( bonusText, "%{resource}", Resource::String( event.resource ) );
+                message += bonusText;
+            }
+        }
+
+        if ( summary.homecomingStreak > 0 ) {
+            std::string streakText = _( "Homecoming streak: %{count} qualifying returns." );
+            StringReplace( streakText, "%{count}", std::to_string( summary.homecomingStreak ) );
+            message += "\n";
+            message += streakText;
+        }
+
+        if ( summary.milestoneBonus > 0 ) {
+            std::string milestoneText = _( "%{milestone}! Streak milestone bonus: +%{amount} %{resource}." );
+            StringReplace( milestoneText, "%{milestone}", getHomecomingMilestoneName( summary.milestonePercent ) );
+            StringReplace( milestoneText, "%{amount}", std::to_string( summary.milestoneBonus ) );
+            StringReplace( milestoneText, "%{resource}", Resource::String( summary.milestoneResource ) );
+            message += "\n";
+            message += milestoneText;
         }
 
         const auto [bestResource, bestReward] = getBestOfflineHaul( summary.rewards );
