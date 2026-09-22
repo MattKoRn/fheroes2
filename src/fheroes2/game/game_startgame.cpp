@@ -228,10 +228,17 @@ namespace
         std::ifstream input( filePath );
         if ( !input ) {
             // A backup can exist if the process was interrupted while replacing the state file.
+            input.clear();
             input.open( filePath + ".bak" );
-            if ( !input ) {
-                return false;
-            }
+        }
+        if ( !input ) {
+            // On the very first transactional save there may be no primary or backup yet. If the
+            // process stops after flushing the temp file but before promoting it, recover from it.
+            input.clear();
+            input.open( filePath + ".tmp" );
+        }
+        if ( !input ) {
+            return false;
         }
 
         int version = 0;
@@ -500,6 +507,11 @@ namespace
         }
 
         output.close();
+        if ( !output ) {
+            ERROR_LOG( "Unable to close temporary offline progress data." )
+            System::Unlink( tempFilePath );
+            return;
+        }
 
         // Replace the live file only after the temporary file is fully written. Keep one backup
         // during the swap so an interrupted rename cannot destroy the last valid snapshot.
