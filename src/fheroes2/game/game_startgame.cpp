@@ -122,6 +122,12 @@ namespace
         uint32_t contractsCompleted{ 0 };
         uint32_t treasureFragments{ 0 };
         uint32_t treasureMapsCompleted{ 0 };
+        uint32_t stateCastles{ 0 };
+        uint32_t stateTowns{ 0 };
+        uint32_t stateHeroes{ 0 };
+        uint32_t stateMines{ 0 };
+        uint32_t stateArtifacts{ 0 };
+        uint32_t stateEfficiencyPercent{ 100 };
     };
 
     struct OfflineEvent
@@ -174,6 +180,12 @@ namespace
         int treasureMapId{ -1 };
         int treasureRewardResource{ Resource::UNKNOWN };
         int32_t treasureRewardBonus{ 0 };
+        uint32_t stateCastles{ 0 };
+        uint32_t stateTowns{ 0 };
+        uint32_t stateHeroes{ 0 };
+        uint32_t stateMines{ 0 };
+        uint32_t stateArtifacts{ 0 };
+        uint32_t stateEfficiencyPercent{ 100 };
         bool showPopup{ false };
     };
 
@@ -213,6 +225,12 @@ namespace
         bool hasContractsCompleted = false;
         bool hasTreasureFragments = false;
         bool hasTreasureMapsCompleted = false;
+        bool hasStateCastles = false;
+        bool hasStateTowns = false;
+        bool hasStateHeroes = false;
+        bool hasStateMines = false;
+        bool hasStateArtifacts = false;
+        bool hasStateEfficiency = false;
 
         const auto readFunds = [&input]( Funds & funds ) {
             for ( const FundsMember member : offlineFundMembers ) {
@@ -288,6 +306,31 @@ namespace
                 input >> data.treasureMapsCompleted;
                 hasTreasureMapsCompleted = true;
             }
+            else if ( key == "state_castles" ) {
+                input >> data.stateCastles;
+                hasStateCastles = true;
+            }
+            else if ( key == "state_towns" ) {
+                input >> data.stateTowns;
+                hasStateTowns = true;
+            }
+            else if ( key == "state_heroes" ) {
+                input >> data.stateHeroes;
+                hasStateHeroes = true;
+            }
+            else if ( key == "state_mines" ) {
+                input >> data.stateMines;
+                hasStateMines = true;
+            }
+            else if ( key == "state_artifacts" ) {
+                input >> data.stateArtifacts;
+                hasStateArtifacts = true;
+            }
+            else if ( key == "state_efficiency_percent" ) {
+                input >> data.stateEfficiencyPercent;
+                data.stateEfficiencyPercent = std::clamp<uint32_t>( data.stateEfficiencyPercent, 100, 150 );
+                hasStateEfficiency = true;
+            }
             else {
                 std::string ignoredLine;
                 std::getline( input, ignoredLine );
@@ -304,8 +347,11 @@ namespace
               || ( version == 4 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
                    && hasContractsCompleted )
               || ( version == 5 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
-                   && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted );
-        return ( version >= 1 && version <= 5 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
+                   && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted )
+              || ( version == 6 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
+                   && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
+                   && hasStateMines && hasStateArtifacts && hasStateEfficiency );
+        return ( version >= 1 && version <= 6 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
     }
 
     void saveOfflineProgressData( const OfflineProgressData & data )
@@ -326,7 +372,7 @@ namespace
             output << '\n';
         };
 
-        output << "version 5\n";
+        output << "version 6\n";
         output << "last_seen_unix " << data.lastSeenUnix << '\n';
         output << "resources ";
         writeFunds( data.resources );
@@ -349,6 +395,12 @@ namespace
         output << "contracts_completed " << data.contractsCompleted << '\n';
         output << "treasure_fragments " << data.treasureFragments << '\n';
         output << "treasure_maps_completed " << data.treasureMapsCompleted << '\n';
+        output << "state_castles " << data.stateCastles << '\n';
+        output << "state_towns " << data.stateTowns << '\n';
+        output << "state_heroes " << data.stateHeroes << '\n';
+        output << "state_mines " << data.stateMines << '\n';
+        output << "state_artifacts " << data.stateArtifacts << '\n';
+        output << "state_efficiency_percent " << data.stateEfficiencyPercent << '\n';
     }
 
     void setKingdomFundsExact( Kingdom & kingdom, const Funds & target )
@@ -386,6 +438,40 @@ namespace
         return PlayerColor::NONE;
     }
 
+    uint32_t getOfflineMineCount( const Kingdom & kingdom )
+    {
+        uint32_t mineCount = 0;
+        for ( const int resourceType : offlineResourceTypes ) {
+            mineCount += world.CountCapturedMines( resourceType, kingdom.GetColor() );
+        }
+
+        return mineCount;
+    }
+
+    uint32_t getOfflineStateEfficiencyPercent( const uint32_t castles, const uint32_t towns, const uint32_t heroes, const uint32_t mines,
+                                               const uint32_t artifacts )
+    {
+        const uint32_t castleBonus = std::min<uint32_t>( 16, castles * 4 );
+        const uint32_t townBonus = std::min<uint32_t>( 8, towns * 2 );
+        const uint32_t heroBonus = std::min<uint32_t>( 12, heroes * 2 );
+        const uint32_t mineBonus = std::min<uint32_t>( 12, mines );
+        const uint32_t artifactBonus = std::min<uint32_t>( 2, artifacts / 5 );
+
+        return std::min<uint32_t>( 150, 100 + castleBonus + townBonus + heroBonus + mineBonus + artifactBonus );
+    }
+
+    void captureOfflineKingdomState( OfflineProgressData & data, const Kingdom & kingdom )
+    {
+        data.dailyIncome = kingdom.GetIncome();
+        data.stateCastles = kingdom.GetCountCastle();
+        data.stateTowns = kingdom.GetCountTown();
+        data.stateHeroes = static_cast<uint32_t>( kingdom.GetHeroes().size() );
+        data.stateMines = getOfflineMineCount( kingdom );
+        data.stateArtifacts = kingdom.GetCountArtifacts();
+        data.stateEfficiencyPercent
+            = getOfflineStateEfficiencyPercent( data.stateCastles, data.stateTowns, data.stateHeroes, data.stateMines, data.stateArtifacts );
+    }
+
     void persistOfflineProgressSnapshot( Kingdom & kingdom )
     {
         OfflineProgressData data;
@@ -393,7 +479,7 @@ namespace
 
         data.lastSeenUnix = getCurrentUnixTime();
         data.resources = kingdom.GetFunds();
-        data.dailyIncome = kingdom.GetIncome();
+        captureOfflineKingdomState( data, kingdom );
 
         saveOfflineProgressData( data );
     }
@@ -962,6 +1048,12 @@ namespace
 
         OfflineProgressSummary summary;
         summary.elapsedSeconds = std::max<int64_t>( 0, now - data.lastSeenUnix );
+        summary.stateCastles = data.stateCastles;
+        summary.stateTowns = data.stateTowns;
+        summary.stateHeroes = data.stateHeroes;
+        summary.stateMines = data.stateMines;
+        summary.stateArtifacts = data.stateArtifacts;
+        summary.stateEfficiencyPercent = std::clamp<uint32_t>( data.stateEfficiencyPercent, 100, 150 );
         summary.showPopup = summary.elapsedSeconds > 0;
 
         const int64_t wholeDays = summary.elapsedSeconds / offlineSecondsPerDay;
@@ -970,7 +1062,8 @@ namespace
         for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
             const FundsMember member = offlineFundMembers[i];
             const int64_t baseResource = data.resources.*member;
-            const int64_t dailyIncome = std::max<int64_t>( 0, data.dailyIncome.*member );
+            const int64_t savedDailyIncome = std::max<int64_t>( 0, data.dailyIncome.*member );
+            const int64_t dailyIncome = savedDailyIncome * summary.stateEfficiencyPercent / 100;
             const int64_t capacity = std::numeric_limits<int32_t>::max() - baseResource;
 
             // Carry is measured in resource-seconds, modulo one real-world day. This preserves
@@ -1004,9 +1097,9 @@ namespace
 
         setKingdomFundsExact( kingdom, data.resources );
 
-        // The next offline interval uses the income available on the map that is now active.
+        // The next offline interval uses the active map and player state at this snapshot.
         data.lastSeenUnix = now;
-        data.dailyIncome = kingdom.GetIncome();
+        captureOfflineKingdomState( data, kingdom );
         saveOfflineProgressData( data );
 
         return summary;
@@ -1070,6 +1163,15 @@ namespace
         StringReplace( income, "%{count}", std::to_string( summary.productionRewards.GetValidItemsCount() ) );
         message += "\n";
         message += income;
+
+        std::string state = _( "State: %{efficiency}% | C%{castles} T%{towns} H%{heroes} M%{mines}." );
+        StringReplace( state, "%{efficiency}", std::to_string( summary.stateEfficiencyPercent ) );
+        StringReplace( state, "%{castles}", std::to_string( summary.stateCastles ) );
+        StringReplace( state, "%{towns}", std::to_string( summary.stateTowns ) );
+        StringReplace( state, "%{heroes}", std::to_string( summary.stateHeroes ) );
+        StringReplace( state, "%{mines}", std::to_string( summary.stateMines ) );
+        message += "\n";
+        message += state;
 
         if ( summary.homecomingTier > 0 && summary.eventCount > 0 ) {
             std::string homecoming = _( "Homecoming: %{chest} +%{percent}%, %{events} events." );

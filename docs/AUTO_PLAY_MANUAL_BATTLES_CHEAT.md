@@ -27,7 +27,7 @@ Offline state is stored in the fheroes2 config directory as:
 
 `offline_progress.dat`
 
-The file stores the last-seen Unix timestamp, exact resource counts, the last known daily income, and per-resource fractional carry. Offline time is not capped. Rewards use the saved daily income prorated by real elapsed time, with fractional carry retained so repeated short offline sessions do not lose progress.
+The file stores the last-seen Unix timestamp, exact resource counts, the last known daily income, per-resource fractional carry, and a snapshot of the player's map position. Offline time is not capped. The base resource mix still comes from the engine's real kingdom income, which already includes owned mines, settlements, hero Estates, resource artifacts, campaign bonuses, and player handicap. That income is then multiplied by a saved **offline state efficiency** based on owned castles, towns, heroes, mines, and artifacts, capped at 150%. Fractional carry is retained so repeated short offline sessions do not lose progress.
 
 When a map starts or a save is loaded, the saved wallet replaces that map/save's resource counts and accrued rewards are applied. The offline popup is deliberately compact and stats-only so it stays inside the game window: it shows time away, lifetime offline time, resource production, homecoming/streak/Renown status, concise bonus lines, contract progress, treasure fragments, and the normal resource reward display. Narrative/story text is not shown.
 
@@ -45,4 +45,4 @@ Offline returns now also feed a persistent **Treasure Hunt**. Productive absence
 
 Completed treasure maps rotate through four reward tiers. Opening one grants a deterministic 35–50% treasure cache on a resource that actually produced income, plus bonus Renown. The session seed fixes the reward so reloads cannot reroll it.
 
-The state file is upgraded to version 5 to store treasure fragments and completed-map count alongside contracts, Renown, streaks, and lifetime offline seconds. Version-1 through version-4 files migrate automatically; exact resources, uncapped elapsed time, base offline-income calculation, and fractional carry remain compatible.
+The state file is upgraded to version 6 to store the map/player-state snapshot alongside treasure fragments, contracts, Renown, streaks, and lifetime offline seconds. Version-1 through version-5 files migrate automatically at 100% state efficiency until the next live kingdom snapshot; exact resources, uncapped elapsed time, and fractional carry remain compatible.
