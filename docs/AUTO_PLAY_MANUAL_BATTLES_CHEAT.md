@@ -10,7 +10,9 @@ While an adventure map is active, press **F8**.
 - Enabling the cheat ends the current human turn so the AI can take over immediately.
 - Whenever your auto-play player enters a battle, the battle screen opens and your troops are controlled manually.
 - Neutral or normal AI opponents remain AI-controlled in battle. If Auto Play-Test puts both map players under auto-control, both player sides are manual in their battle.
-- Press **F8** again to queue a return to normal adventure-map control. The return is committed when the AI finishes the current turn.
+- **Left-click while your auto-controlled hero is moving to pause/stop auto-play.** The current hero stops immediately, no more AI hero or castle tasks are scheduled for your side that turn, and manual control is restored cleanly for your next turn.
+- Press **F8** again to queue the same return to normal adventure-map control without clicking.
+- While F8 auto-play is active, the adventure-map camera follows only your auto-controlled side. Enemy and unrelated AI turns still happen, but they do not steal camera focus.
 - The command is ignored while a battle is already open.
 
 The default hotkey is configurable through the normal fheroes2 hotkey file. Its entry is named **auto-play with manual battles**.

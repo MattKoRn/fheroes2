@@ -83,6 +83,33 @@
 
 namespace
 {
+    bool shouldFollowAIHeroWithCamera( const Heroes & hero )
+    {
+        const Settings & conf = Settings::Get();
+
+        // Auto Play-Test deliberately controls every side, so preserve its existing camera behavior.
+        if ( conf.IsGameType( Game::TYPE_AUTO_PLAYTEST ) ) {
+            return true;
+        }
+
+        bool manualAutoPlayActive = false;
+
+        for ( const Player * player : conf.GetPlayers().getVector() ) {
+            if ( player == nullptr || !player->isAIAutoControlMode() ) {
+                continue;
+            }
+
+            manualAutoPlayActive = true;
+
+            if ( player->GetColor() == hero.GetColor() ) {
+                return true;
+            }
+        }
+
+        // Outside manual F8 auto-play, preserve normal AI visibility and camera behavior.
+        return !manualAutoPlayActive;
+    }
+
     PlayerColorsSet AIGetAllianceColors()
     {
         // accumulate colors
@@ -116,6 +143,10 @@ namespace
     bool AIIsShowAnimationForHero( const Heroes & hero, const PlayerColorsSet colors )
     {
         if ( colors == 0 ) {
+            return false;
+        }
+
+        if ( !shouldFollowAIHeroWithCamera( hero ) ) {
             return false;
         }
 
@@ -2268,6 +2299,9 @@ fheroes2::GameMode AI::HeroesMove( Heroes & hero )
     const Settings & conf = Settings::Get();
     const bool isAutoPlaytest{ conf.IsGameType( Game::TYPE_AUTO_PLAYTEST ) };
 
+    Player * heroPlayer = Players::Get( hero.GetColor() );
+    const bool isManualAutoPlayHero = !isAutoPlaytest && heroPlayer != nullptr && heroPlayer->isAIAutoControlMode();
+
     const PlayerColorsSet colors = AIGetAllianceColors();
     bool recenterNeeded = true;
 
@@ -2286,6 +2320,13 @@ fheroes2::GameMode AI::HeroesMove( Heroes & hero )
     while ( le.HandleEvents( !hideAIMovements && Game::isDelayNeeded( delayTypes ) ) ) {
         if ( isAutoPlaytest && le.isMouseLeftButtonPressed() ) {
             fheroes2::interruptAutoPlaytest();
+        }
+        else if ( isManualAutoPlayHero && le.MouseClickLeft() ) {
+            // Stop the current movement immediately. The AI planner will see the planned
+            // control handoff and unwind the rest of this auto-controlled turn.
+            heroPlayer->setAIAutoControlMode( false );
+            hero.SetMove( false );
+            break;
         }
 
         if ( !hero.isActive() || !hero.isMoveEnabled() ) {

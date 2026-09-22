@@ -206,6 +206,11 @@ public:
         return _isAIAutoControlMode;
     }
 
+    bool isAIAutoControlModePlanned() const
+    {
+        return _isAIAutoControlModePlanned;
+    }
+
     // Sets whether a given human player is controlled by AI. See the implementation for details.
     void setAIAutoControlMode( const bool enable );
 

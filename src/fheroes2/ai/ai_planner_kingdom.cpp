@@ -857,6 +857,12 @@ fheroes2::GameMode AI::Planner::KingdomTurn( Kingdom & kingdom )
             return gameState;
         }
 
+        const Player * turnPlayer = Players::Get( myColor );
+        if ( turnPlayer != nullptr && turnPlayer->isAIAutoControlMode() && !turnPlayer->isAIAutoControlModePlanned() ) {
+            status.resetAITurnProgress();
+            return fheroes2::GameMode::END_TURN;
+        }
+
         if ( purchaseNewHeroes( sortedCastleList, castlesInDanger, availableHeroCount, moreTaskForHeroes ) ) {
             assert( !heroes.empty() && heroes.back() != nullptr );
 

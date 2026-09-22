@@ -3109,6 +3109,12 @@ fheroes2::GameMode AI::Planner::HeroesTurn( VecHeroes & heroes, uint32_t & curre
     uint32_t turnProgressScale = 4 * ( endProgressValue - startProgressValue );
 
     while ( !availableHeroes.empty() ) {
+        const Player * turnPlayer = Players::Get( availableHeroes.front()->GetColor() );
+        if ( turnPlayer != nullptr && turnPlayer->isAIAutoControlMode() && !turnPlayer->isAIAutoControlModePlanned() ) {
+            moreTasksAvailable = false;
+            break;
+        }
+
         const AIWorldPathfinderStateRestorer pathfinderStateRestorer( _pathfinder );
 
         Heroes * bestHero = availableHeroes.front();
