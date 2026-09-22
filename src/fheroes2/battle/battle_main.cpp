@@ -69,8 +69,10 @@ namespace
             : _enabled( enabled )
             , _originalBattleSpeed( Settings::Get().BattleSpeed() )
         {
-            if ( _enabled && _originalBattleSpeed != defaultBattleSpeed ) {
-                Settings::Get().SetBattleSpeed( defaultBattleSpeed );
+            constexpr int autoPlayBattleSpeed = defaultBattleSpeed + 1;
+
+            if ( _enabled && _originalBattleSpeed != autoPlayBattleSpeed ) {
+                Settings::Get().SetBattleSpeed( autoPlayBattleSpeed );
                 Game::UpdateGameSpeed();
             }
         }

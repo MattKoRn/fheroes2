@@ -66,4 +66,4 @@ Large creature-count displays now use an algorithmic suffix formatter. Compact a
 
 ## Battle presentation
 
-The battlefield hex grid is forced off in this fork. Movement-area and cursor-shadow visuals remain separate and are not disabled. The engine's default battle animation speed is increased by one step, from 4 to 5; visible auto-play battles use this new default speed.
+The battlefield hex grid is forced off in this fork. Movement-area and cursor-shadow visuals remain separate and are not disabled. The engine's normal default battle animation speed remains 5, while visible auto-play battles run one step faster at speed 6.
