@@ -104,6 +104,9 @@ namespace
     constexpr std::array<FundsMember, 7> offlineFundMembers{ &Funds::wood, &Funds::mercury, &Funds::ore, &Funds::sulfur,
                                                              &Funds::crystal, &Funds::gems, &Funds::gold };
 
+    constexpr std::array<int, 7> offlineResourceTypes{ Resource::WOOD, Resource::MERCURY, Resource::ORE, Resource::SULFUR,
+                                                       Resource::CRYSTAL, Resource::GEMS, Resource::GOLD };
+
     struct OfflineProgressData
     {
         int64_t lastSeenUnix{ 0 };
@@ -339,6 +342,68 @@ namespace
         return summary;
     }
 
+    std::string getOfflineReturnTitle( const int64_t elapsedSeconds )
+    {
+        if ( elapsedSeconds < 15 * 60 ) {
+            return _( "Quick Supply Run" );
+        }
+        if ( elapsedSeconds < 6 * 60 * 60 ) {
+            return _( "Caravan Returns" );
+        }
+        if ( elapsedSeconds < offlineSecondsPerDay ) {
+            return _( "A Productive Absence" );
+        }
+        if ( elapsedSeconds < 7 * offlineSecondsPerDay ) {
+            return _( "The Kingdom Prospered" );
+        }
+        if ( elapsedSeconds < 30 * offlineSecondsPerDay ) {
+            return _( "A Royal Homecoming" );
+        }
+
+        return _( "A Legendary Return" );
+    }
+
+    std::string getOfflineReturnFlavor( const int64_t elapsedSeconds, const bool hasRewards )
+    {
+        if ( !hasRewards ) {
+            return _( "The quartermaster reports that no new income was banked during this absence. Your stored treasury is exactly as you left it." );
+        }
+
+        if ( elapsedSeconds < 15 * 60 ) {
+            return _( "The quartermaster had barely finished counting the ledgers, but the kingdom still squeezed in a little work." );
+        }
+        if ( elapsedSeconds < 6 * 60 * 60 ) {
+            return _( "Sawmills turned, mines echoed, and caravans kept the roads busy while you were away." );
+        }
+        if ( elapsedSeconds < offlineSecondsPerDay ) {
+            return _( "By torchlight and sunrise, your workers kept the kingdom's coffers moving." );
+        }
+        if ( elapsedSeconds < 7 * offlineSecondsPerDay ) {
+            return _( "Several busy days passed. Wagons rolled through the gates and the treasury steadily grew." );
+        }
+        if ( elapsedSeconds < 30 * offlineSecondsPerDay ) {
+            return _( "The realm carried on through many sunrises. Your quartermasters have assembled a sizeable homecoming haul." );
+        }
+
+        return _( "Your return has become an event in its own right. The ledgers are thick, the wagons are full, and the treasury doors have been busy." );
+    }
+
+    std::pair<int, int32_t> getBestOfflineHaul( const Funds & rewards )
+    {
+        int bestResource = Resource::UNKNOWN;
+        int32_t bestReward = 0;
+
+        for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
+            const int32_t reward = rewards.*offlineFundMembers[i];
+            if ( reward > bestReward ) {
+                bestReward = reward;
+                bestResource = offlineResourceTypes[i];
+            }
+        }
+
+        return { bestResource, bestReward };
+    }
+
     void showOfflineProgressPopup( const OfflineProgressSummary & summary )
     {
         if ( !summary.showPopup ) {
@@ -353,22 +418,49 @@ namespace
         const int64_t minutes = seconds / 60;
         seconds %= 60;
 
-        std::string message = _( "You were away for %{days} days, %{hours} hours, %{minutes} minutes and %{seconds} seconds." );
-        StringReplace( message, "%{days}", std::to_string( days ) );
-        StringReplace( message, "%{hours}", std::to_string( hours ) );
-        StringReplace( message, "%{minutes}", std::to_string( minutes ) );
-        StringReplace( message, "%{seconds}", std::to_string( seconds ) );
+        const bool hasRewards = summary.rewards.GetValidItemsCount() != 0;
 
-        if ( summary.rewards.GetValidItemsCount() == 0 ) {
+        std::string title = _( "Kingdom Chronicle: %{return}" );
+        StringReplace( title, "%{return}", getOfflineReturnTitle( summary.elapsedSeconds ) );
+
+        std::string message = _( "Your banners rise again!" );
+        message += "\n\n";
+
+        std::string awayTime = _( "Away: %{days} days, %{hours} hours, %{minutes} minutes and %{seconds} seconds." );
+        StringReplace( awayTime, "%{days}", std::to_string( days ) );
+        StringReplace( awayTime, "%{hours}", std::to_string( hours ) );
+        StringReplace( awayTime, "%{minutes}", std::to_string( minutes ) );
+        StringReplace( awayTime, "%{seconds}", std::to_string( seconds ) );
+        message += awayTime;
+
+        message += "\n\n";
+        message += getOfflineReturnFlavor( summary.elapsedSeconds, hasRewards );
+
+        if ( !hasRewards ) {
             message += "\n\n";
-            message += _( "Rewards: none." );
-            fheroes2::showStandardTextMessage( _( "Offline Progress" ), std::move( message ), Dialog::OK );
+            message += _( "The realm awaits your next command." );
+            fheroes2::showStandardTextMessage( std::move( title ), std::move( message ), Dialog::OK );
             return;
         }
 
+        std::string collectionSummary = _( "Income report: %{count} resource types collected." );
+        StringReplace( collectionSummary, "%{count}", std::to_string( summary.rewards.GetValidItemsCount() ) );
         message += "\n\n";
-        message += _( "Rewards:" );
-        fheroes2::showResourceMessage( fheroes2::Text( _( "Offline Progress" ), fheroes2::FontType::normalYellow() ),
+        message += collectionSummary;
+
+        const auto [bestResource, bestReward] = getBestOfflineHaul( summary.rewards );
+        if ( bestResource != Resource::UNKNOWN && bestReward > 0 ) {
+            std::string bestHaul = _( "Best haul: +%{amount} %{resource}." );
+            StringReplace( bestHaul, "%{amount}", std::to_string( bestReward ) );
+            StringReplace( bestHaul, "%{resource}", Resource::String( bestResource ) );
+            message += "\n";
+            message += bestHaul;
+        }
+
+        message += "\n\n";
+        message += _( "Treasury delivery:" );
+
+        fheroes2::showResourceMessage( fheroes2::Text( std::move( title ), fheroes2::FontType::normalYellow() ),
                                        fheroes2::Text( std::move( message ), fheroes2::FontType::normalWhite() ), Dialog::OK, summary.rewards );
     }
 

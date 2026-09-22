@@ -27,4 +27,4 @@ Offline state is stored in the fheroes2 config directory as:
 
 The file stores the last-seen Unix timestamp, exact resource counts, the last known daily income, and per-resource fractional carry. Offline time is not capped. Rewards use the saved daily income prorated by real elapsed time, with fractional carry retained so repeated short offline sessions do not lose progress.
 
-When a map starts or a save is loaded, the saved wallet replaces that map/save's resource counts, accrued rewards are applied, and a popup reports the exact time away in days, hours, minutes, and seconds plus the rewards.
+When a map starts or a save is loaded, the saved wallet replaces that map/save's resource counts and accrued rewards are applied. The return popup is presented as a **Kingdom Chronicle** with duration-based homecoming titles, themed activity text, the exact time away in days/hours/minutes/seconds, the number of resource types collected, a best-haul highlight, and the normal resource reward display. These presentation changes do not alter the deterministic offline reward calculation or the persistent-wallet file format.
