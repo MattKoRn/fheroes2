@@ -116,6 +116,10 @@ namespace
         uint32_t homecomingStreak{ 0 };
         uint64_t totalOfflineSeconds{ 0 };
         uint64_t offlineRenown{ 0 };
+        int contractId{ -1 };
+        uint64_t contractProgress{ 0 };
+        uint64_t contractTarget{ 0 };
+        uint32_t contractsCompleted{ 0 };
     };
 
     struct OfflineEvent
@@ -150,6 +154,16 @@ namespace
         int rankUpPercent{ 0 };
         int rankUpResource{ Resource::UNKNOWN };
         int32_t rankUpBonus{ 0 };
+        int contractId{ -1 };
+        uint64_t contractProgressBefore{ 0 };
+        uint64_t contractProgressAfter{ 0 };
+        uint64_t contractTarget{ 0 };
+        bool contractCompleted{ false };
+        int contractRewardResource{ Resource::UNKNOWN };
+        int32_t contractRewardBonus{ 0 };
+        uint32_t contractsCompleted{ 0 };
+        int nextContractId{ -1 };
+        uint64_t nextContractTarget{ 0 };
         bool showPopup{ false };
     };
 
@@ -183,6 +197,10 @@ namespace
         bool hasStreak = false;
         bool hasTotalOfflineSeconds = false;
         bool hasOfflineRenown = false;
+        bool hasContractId = false;
+        bool hasContractProgress = false;
+        bool hasContractTarget = false;
+        bool hasContractsCompleted = false;
 
         const auto readFunds = [&input]( Funds & funds ) {
             for ( const FundsMember member : offlineFundMembers ) {
@@ -234,6 +252,22 @@ namespace
                 input >> data.offlineRenown;
                 hasOfflineRenown = true;
             }
+            else if ( key == "contract_id" ) {
+                input >> data.contractId;
+                hasContractId = true;
+            }
+            else if ( key == "contract_progress" ) {
+                input >> data.contractProgress;
+                hasContractProgress = true;
+            }
+            else if ( key == "contract_target" ) {
+                input >> data.contractTarget;
+                hasContractTarget = true;
+            }
+            else if ( key == "contracts_completed" ) {
+                input >> data.contractsCompleted;
+                hasContractsCompleted = true;
+            }
             else {
                 std::string ignoredLine;
                 std::getline( input, ignoredLine );
@@ -244,9 +278,12 @@ namespace
             }
         }
 
-        const bool hasVersionSpecificFields = version == 1 || ( version == 2 && hasStreak && hasTotalOfflineSeconds )
-                                              || ( version == 3 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown );
-        return ( version >= 1 && version <= 3 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
+        const bool hasVersionSpecificFields
+            = version == 1 || ( version == 2 && hasStreak && hasTotalOfflineSeconds )
+              || ( version == 3 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown )
+              || ( version == 4 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
+                   && hasContractsCompleted );
+        return ( version >= 1 && version <= 4 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
     }
 
     void saveOfflineProgressData( const OfflineProgressData & data )
@@ -267,7 +304,7 @@ namespace
             output << '\n';
         };
 
-        output << "version 3\n";
+        output << "version 4\n";
         output << "last_seen_unix " << data.lastSeenUnix << '\n';
         output << "resources ";
         writeFunds( data.resources );
@@ -284,6 +321,10 @@ namespace
         output << "homecoming_streak " << data.homecomingStreak << '\n';
         output << "total_offline_seconds " << data.totalOfflineSeconds << '\n';
         output << "offline_renown " << data.offlineRenown << '\n';
+        output << "contract_id " << data.contractId << '\n';
+        output << "contract_progress " << data.contractProgress << '\n';
+        output << "contract_target " << data.contractTarget << '\n';
+        output << "contracts_completed " << data.contractsCompleted << '\n';
     }
 
     void setKingdomFundsExact( Kingdom & kingdom, const Funds & target )
@@ -607,6 +648,166 @@ namespace
         data.resources.*member += summary.rareDiscoveryBonus;
     }
 
+    int getOfflineContractId( const uint32_t contractsCompleted )
+    {
+        return static_cast<int>( contractsCompleted % 5 );
+    }
+
+    uint64_t getOfflineContractTarget( const int contractId, const uint32_t contractsCompleted )
+    {
+        constexpr std::array<uint64_t, 5> baseTargets{ 12, 18, 20, 16, 24 };
+        assert( contractId >= 0 && static_cast<size_t>( contractId ) < baseTargets.size() );
+
+        return baseTargets[contractId] + std::min<uint64_t>( 24, static_cast<uint64_t>( contractsCompleted ) * 2 );
+    }
+
+    std::string getOfflineContractName( const int contractId )
+    {
+        switch ( contractId ) {
+        case 0:
+            return _( "Keep the Beacons Lit" );
+        case 1:
+            return _( "Supply the Guilds" );
+        case 2:
+            return _( "Caravan Charter" );
+        case 3:
+            return _( "Prospector's Commission" );
+        case 4:
+            return _( "Royal Logistics" );
+        default:
+            return _( "Kingdom Contract" );
+        }
+    }
+
+    std::string getOfflineContractDescription( const int contractId )
+    {
+        switch ( contractId ) {
+        case 0:
+            return _( "Accumulate productive hours while the kingdom works without you." );
+        case 1:
+            return _( "Bring home a broad mix of resources from your offline production." );
+        case 2:
+            return _( "Build progress through stronger homecoming chests and expedition events." );
+        case 3:
+            return _( "Keep rare-resource operations and long expeditions moving." );
+        case 4:
+            return _( "Combine time away, production variety, and expedition activity." );
+        default:
+            return {};
+        }
+    }
+
+    void initializeOfflineContract( OfflineProgressData & data )
+    {
+        if ( data.contractId >= 0 && data.contractId < 5 && data.contractTarget > 0 ) {
+            return;
+        }
+
+        data.contractId = getOfflineContractId( data.contractsCompleted );
+        data.contractProgress = 0;
+        data.contractTarget = getOfflineContractTarget( data.contractId, data.contractsCompleted );
+    }
+
+    uint64_t getOfflineContractSessionProgress( const int contractId, const OfflineProgressSummary & summary )
+    {
+        if ( summary.elapsedSeconds < 30 * 60 || summary.productionRewards.GetValidItemsCount() == 0 ) {
+            return 0;
+        }
+
+        const uint64_t elapsedHours = std::max<uint64_t>( 1, ( static_cast<uint64_t>( summary.elapsedSeconds ) + 60 * 60 - 1 ) / ( 60 * 60 ) );
+        const uint64_t resourceTypes = summary.productionRewards.GetValidItemsCount();
+
+        switch ( contractId ) {
+        case 0:
+            return elapsedHours;
+        case 1:
+            return resourceTypes * 3 + static_cast<uint64_t>( summary.homecomingTier );
+        case 2:
+            return static_cast<uint64_t>( summary.homecomingTier * 3 ) + static_cast<uint64_t>( summary.eventCount * 2 )
+                   + ( summary.rareDiscovery ? 6 : 0 );
+        case 3: {
+            uint64_t rareResourceTypes = 0;
+            constexpr std::array<size_t, 4> rareIndices{ 1, 3, 4, 5 };
+            for ( const size_t index : rareIndices ) {
+                if ( summary.productionRewards.*offlineFundMembers[index] > 0 ) {
+                    ++rareResourceTypes;
+                }
+            }
+            return rareResourceTypes * 3 + ( summary.elapsedSeconds >= offlineSecondsPerDay ? 6 : 0 ) + ( summary.rareDiscovery ? 8 : 0 );
+        }
+        case 4:
+            return std::max<uint64_t>( 1, elapsedHours / 2 ) + resourceTypes * 2 + static_cast<uint64_t>( summary.eventCount * 2 );
+        default:
+            return 0;
+        }
+    }
+
+    void applyOfflineContractProgress( OfflineProgressSummary & summary, OfflineProgressData & data )
+    {
+        initializeOfflineContract( data );
+
+        summary.contractId = data.contractId;
+        summary.contractProgressBefore = data.contractProgress;
+        summary.contractTarget = data.contractTarget;
+        summary.contractsCompleted = data.contractsCompleted;
+
+        const uint64_t gainedProgress = getOfflineContractSessionProgress( data.contractId, summary );
+        if ( gainedProgress > 0 ) {
+            if ( std::numeric_limits<uint64_t>::max() - data.contractProgress < gainedProgress ) {
+                data.contractProgress = std::numeric_limits<uint64_t>::max();
+            }
+            else {
+                data.contractProgress += gainedProgress;
+            }
+        }
+
+        summary.contractProgressAfter = std::min( data.contractProgress, data.contractTarget );
+
+        if ( data.contractProgress < data.contractTarget ) {
+            return;
+        }
+
+        summary.contractCompleted = true;
+
+        size_t bestIndex = offlineFundMembers.size();
+        int32_t bestProduction = 0;
+        for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
+            const int32_t production = summary.productionRewards.*offlineFundMembers[i];
+            if ( production > bestProduction ) {
+                bestProduction = production;
+                bestIndex = i;
+            }
+        }
+
+        if ( data.contractsCompleted < std::numeric_limits<uint32_t>::max() ) {
+            ++data.contractsCompleted;
+        }
+        summary.contractsCompleted = data.contractsCompleted;
+
+        if ( bestIndex != offlineFundMembers.size() ) {
+            const int rewardPercent = 20 + static_cast<int>( ( data.contractsCompleted - 1 ) % 4 ) * 5;
+            const FundsMember member = offlineFundMembers[bestIndex];
+            const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
+            const int64_t calculatedBonus = std::max<int64_t>( 1, ( static_cast<int64_t>( bestProduction ) * rewardPercent ) / 100 );
+            const int64_t grantedBonus = std::min<int64_t>( calculatedBonus, capacity );
+
+            if ( grantedBonus > 0 ) {
+                summary.contractRewardResource = offlineResourceTypes[bestIndex];
+                summary.contractRewardBonus = static_cast<int32_t>( grantedBonus );
+                summary.bonusRewards.*member += summary.contractRewardBonus;
+                summary.rewards.*member += summary.contractRewardBonus;
+                data.resources.*member += summary.contractRewardBonus;
+            }
+        }
+
+        data.contractId = getOfflineContractId( data.contractsCompleted );
+        data.contractProgress = 0;
+        data.contractTarget = getOfflineContractTarget( data.contractId, data.contractsCompleted );
+
+        summary.nextContractId = data.contractId;
+        summary.nextContractTarget = data.contractTarget;
+    }
+
     void applyOfflineRenownProgress( OfflineProgressSummary & summary, OfflineProgressData & data )
     {
         summary.rankBefore = getOfflineRank( data.offlineRenown );
@@ -625,6 +826,9 @@ namespace
         }
         if ( summary.rareDiscovery ) {
             earned += 10;
+        }
+        if ( summary.contractCompleted ) {
+            earned += 8;
         }
 
         summary.renownEarned = earned;
@@ -728,6 +932,7 @@ namespace
         applyOfflineHomecomingBonus( summary, data, data.lastSeenUnix );
         applyOfflineStreakProgress( summary, data );
         applyOfflineRareDiscovery( summary, data, data.lastSeenUnix );
+        applyOfflineContractProgress( summary, data );
         applyOfflineRenownProgress( summary, data );
 
         setKingdomFundsExact( kingdom, data.resources );
@@ -1004,6 +1209,49 @@ namespace
             StringReplace( nextRankText, "%{renown}", std::to_string( remainingRenown ) );
             message += "\n";
             message += nextRankText;
+        }
+
+        if ( summary.contractId >= 0 ) {
+            message += "\n";
+
+            if ( summary.contractCompleted ) {
+                std::string contractComplete = _( "Contract complete: %{contract}!" );
+                StringReplace( contractComplete, "%{contract}", getOfflineContractName( summary.contractId ) );
+                message += contractComplete;
+
+                if ( summary.contractRewardBonus > 0 ) {
+                    std::string contractReward = _( " Contract cache: +%{amount} %{resource}." );
+                    StringReplace( contractReward, "%{amount}", std::to_string( summary.contractRewardBonus ) );
+                    StringReplace( contractReward, "%{resource}", Resource::String( summary.contractRewardResource ) );
+                    message += contractReward;
+                }
+
+                if ( summary.nextContractId >= 0 ) {
+                    std::string nextContract = _( " New contract: %{contract} — %{description} Target: %{target}." );
+                    StringReplace( nextContract, "%{contract}", getOfflineContractName( summary.nextContractId ) );
+                    StringReplace( nextContract, "%{description}", getOfflineContractDescription( summary.nextContractId ) );
+                    StringReplace( nextContract, "%{target}", std::to_string( summary.nextContractTarget ) );
+                    message += "\n";
+                    message += nextContract;
+                }
+            }
+            else {
+                std::string contractProgress = _( "Kingdom contract: %{contract} — %{description} Progress: %{progress}/%{target}." );
+                StringReplace( contractProgress, "%{contract}", getOfflineContractName( summary.contractId ) );
+                StringReplace( contractProgress, "%{description}", getOfflineContractDescription( summary.contractId ) );
+                StringReplace( contractProgress, "%{progress}", std::to_string( summary.contractProgressAfter ) );
+                StringReplace( contractProgress, "%{target}", std::to_string( summary.contractTarget ) );
+                message += contractProgress;
+
+                const uint64_t gained = summary.contractProgressAfter >= summary.contractProgressBefore
+                                            ? summary.contractProgressAfter - summary.contractProgressBefore
+                                            : 0;
+                if ( gained > 0 ) {
+                    std::string gainedText = _( " +%{progress} contract progress this return." );
+                    StringReplace( gainedText, "%{progress}", std::to_string( gained ) );
+                    message += gainedText;
+                }
+            }
         }
 
         const auto [bestResource, bestReward] = getBestOfflineHaul( summary.rewards );
