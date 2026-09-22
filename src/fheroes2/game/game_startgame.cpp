@@ -191,6 +191,10 @@ namespace
         uint32_t supplyRushEarned{ 0 };
         uint32_t supplyRushAfter{ 0 };
         bool supplyRushTriggered{ false };
+        uint32_t recruitedCreatures{ 0 };
+        uint32_t recruitedStacks{ 0 };
+        uint32_t recruitmentSettlements{ 0 };
+        Funds recruitmentSpent;
         bool showPopup{ false };
     };
 
@@ -1097,6 +1101,111 @@ namespace
         data.resources.*member += summary.rankUpBonus;
     }
 
+    void applyOfflineCreatureRecruitment( OfflineProgressSummary & summary, OfflineProgressData & data, Kingdom & kingdom )
+    {
+        if ( summary.elapsedSeconds < 12 * 60 * 60 || summary.productionRewards.GetValidItemsCount() == 0 ) {
+            return;
+        }
+
+        const uint64_t savedSettlementCount = static_cast<uint64_t>( summary.stateCastles ) + summary.stateTowns;
+        if ( savedSettlementCount == 0 ) {
+            return;
+        }
+
+        VecCastles & castles = kingdom.GetCastles();
+        const size_t settlementLimit = std::min<size_t>( castles.size(), static_cast<size_t>( savedSettlementCount ) );
+        if ( settlementLimit == 0 ) {
+            return;
+        }
+
+        // Offline recruitment is automation, not free population: only a conservative portion
+        // of the current treasury may be spent, and only creatures already present in dwellings
+        // can be recruited.
+        Funds remainingBudget = kingdom.GetFunds() / 5;
+
+        constexpr std::array<uint32_t, 6> baseDwellings{ DWELLING_MONSTER1, DWELLING_MONSTER2, DWELLING_MONSTER3,
+                                                         DWELLING_MONSTER4, DWELLING_MONSTER5, DWELLING_MONSTER6 };
+        constexpr std::array<int64_t, 6> tierUnlockSeconds{ 12 * 60 * 60, 18 * 60 * 60, 24 * 60 * 60,
+                                                            36 * 60 * 60, 48 * 60 * 60, 72 * 60 * 60 };
+
+        constexpr int64_t maxRecruitmentWindow = 7 * offlineSecondsPerDay;
+        const int64_t cappedElapsed = std::min<int64_t>( summary.elapsedSeconds, maxRecruitmentWindow );
+        const int64_t effectiveWindow
+            = std::min<int64_t>( maxRecruitmentWindow, cappedElapsed * static_cast<int64_t>( summary.stateEfficiencyPercent ) / 100 );
+
+        for ( size_t castleIndex = 0; castleIndex < settlementLimit; ++castleIndex ) {
+            Castle * castle = castles[castleIndex];
+            if ( castle == nullptr || castle->GetColor() != kingdom.GetColor() ) {
+                continue;
+            }
+
+            bool recruitedAtSettlement = false;
+
+            // Prefer stronger creatures first, while the 20% mobilization budget prevents them
+            // from consuming the player's whole treasury.
+            for ( int tier = Castle::maxNumOfDwellings - 1; tier >= 0; --tier ) {
+                const uint32_t baseDwelling = baseDwellings[static_cast<size_t>( tier )];
+                if ( !castle->isBuild( baseDwelling ) || effectiveWindow < tierUnlockSeconds[static_cast<size_t>( tier )] ) {
+                    continue;
+                }
+
+                const uint32_t actualDwelling = castle->GetActualDwelling( baseDwelling );
+                if ( actualDwelling == BUILD_NOTHING ) {
+                    continue;
+                }
+
+                const Monster monster( castle->GetRace(), actualDwelling );
+                if ( !monster.isValid() ) {
+                    continue;
+                }
+
+                const uint32_t available = castle->getMonstersInDwelling( actualDwelling );
+                if ( available == 0 ) {
+                    continue;
+                }
+
+                // At seven effective offline days, the normal cap is half one week's base growth.
+                // A minimum of one becomes available only after the tier-specific unlock time,
+                // which keeps rare/high-tier creatures much slower than low tiers.
+                const uint64_t growthNumerator = static_cast<uint64_t>( monster.GetGrown() ) * static_cast<uint64_t>( effectiveWindow );
+                uint32_t growthCap = static_cast<uint32_t>( growthNumerator / static_cast<uint64_t>( 14 * offlineSecondsPerDay ) );
+                if ( growthCap == 0 ) {
+                    growthCap = 1;
+                }
+
+                const int affordable = remainingBudget.getLowestQuotient( monster.GetCost() );
+                if ( affordable <= 0 ) {
+                    continue;
+                }
+
+                const uint32_t recruitCount = std::min<uint32_t>( { available, growthCap, static_cast<uint32_t>( affordable ) } );
+                if ( recruitCount == 0 ) {
+                    continue;
+                }
+
+                const Troop troop( monster, recruitCount );
+                const Funds cost = troop.GetTotalCost();
+
+                if ( !castle->RecruitMonster( troop, false ) ) {
+                    continue;
+                }
+
+                remainingBudget -= cost;
+                summary.recruitmentSpent += cost;
+                summary.recruitedCreatures += recruitCount;
+                ++summary.recruitedStacks;
+                recruitedAtSettlement = true;
+            }
+
+            if ( recruitedAtSettlement ) {
+                ++summary.recruitmentSettlements;
+            }
+        }
+
+        // Castle::RecruitMonster() charges the real kingdom wallet, so persist the post-recruitment balance.
+        data.resources = kingdom.GetFunds();
+    }
+
     OfflineProgressSummary applyOfflineProgress( Kingdom & kingdom )
     {
         OfflineProgressData data;
@@ -1164,6 +1273,7 @@ namespace
         applyOfflineRenownProgress( summary, data );
 
         setKingdomFundsExact( kingdom, data.resources );
+        applyOfflineCreatureRecruitment( summary, data, kingdom );
 
         // The next offline interval uses the active map and player state at this snapshot.
         data.lastSeenUnix = now;
@@ -1201,22 +1311,17 @@ namespace
         const int64_t days = seconds / offlineSecondsPerDay;
         seconds %= offlineSecondsPerDay;
         const int64_t hours = seconds / ( 60 * 60 );
-        seconds %= 60 * 60;
-        const int64_t minutes = seconds / 60;
+        const int64_t minutes = ( seconds % ( 60 * 60 ) ) / 60;
 
-        std::string message = _( "Away: %{days}d %{hours}h %{minutes}m." );
+        std::string message = _( "Away %{days}d %{hours}h %{minutes}m" );
         StringReplace( message, "%{days}", std::to_string( days ) );
         StringReplace( message, "%{hours}", std::to_string( hours ) );
         StringReplace( message, "%{minutes}", std::to_string( minutes ) );
 
         if ( summary.totalOfflineSeconds > 0 ) {
             const uint64_t lifetimeDays = summary.totalOfflineSeconds / static_cast<uint64_t>( offlineSecondsPerDay );
-            const uint64_t lifetimeHours = ( summary.totalOfflineSeconds % static_cast<uint64_t>( offlineSecondsPerDay ) ) / ( 60 * 60 );
-
-            std::string lifetime = _( "Lifetime: %{days}d %{hours}h offline." );
+            std::string lifetime = _( " | Life %{days}d" );
             StringReplace( lifetime, "%{days}", std::to_string( lifetimeDays ) );
-            StringReplace( lifetime, "%{hours}", std::to_string( lifetimeHours ) );
-            message += "\n";
             message += lifetime;
         }
 
@@ -1227,118 +1332,106 @@ namespace
             return;
         }
 
-        std::string income = _( "Income: %{count} resource types." );
-        StringReplace( income, "%{count}", std::to_string( summary.productionRewards.GetValidItemsCount() ) );
+        std::string economy = _( "Income %{income} | State %{state}% | Rush %{rush}/100" );
+        StringReplace( economy, "%{income}", std::to_string( summary.productionRewards.GetValidItemsCount() ) );
+        StringReplace( economy, "%{state}", std::to_string( summary.stateEfficiencyPercent ) );
+        StringReplace( economy, "%{rush}", std::to_string( summary.supplyRushAfter ) );
         message += "\n";
-        message += income;
+        message += economy;
 
-        std::string state = _( "State: %{efficiency}% | C%{castles} T%{towns} H%{heroes} M%{mines} | Rush %{rush}/100." );
-        StringReplace( state, "%{efficiency}", std::to_string( summary.stateEfficiencyPercent ) );
-        StringReplace( state, "%{castles}", std::to_string( summary.stateCastles ) );
-        StringReplace( state, "%{towns}", std::to_string( summary.stateTowns ) );
-        StringReplace( state, "%{heroes}", std::to_string( summary.stateHeroes ) );
-        StringReplace( state, "%{mines}", std::to_string( summary.stateMines ) );
-        StringReplace( state, "%{rush}", std::to_string( summary.supplyRushAfter ) );
+        std::string progress = _( "Streak %{streak} | Renown +%{earned} (%{total})" );
+        StringReplace( progress, "%{streak}", std::to_string( summary.homecomingStreak ) );
+        StringReplace( progress, "%{earned}", std::to_string( summary.renownEarned ) );
+        StringReplace( progress, "%{total}", std::to_string( summary.renownTotal ) );
         message += "\n";
-        message += state;
+        message += progress;
 
-        if ( summary.supplyRushTriggered ) {
-            message += "\n";
-            message += _( "SUPPLY RUSH: +20% base production." );
-        }
-
-        if ( summary.homecomingTier > 0 && summary.eventCount > 0 ) {
-            std::string homecoming = _( "Homecoming: %{chest} +%{percent}%, %{events} events." );
-            StringReplace( homecoming, "%{chest}", getHomecomingChestName( summary.homecomingTier ) );
-            StringReplace( homecoming, "%{percent}", std::to_string( getHomecomingBonusPercent( summary.homecomingTier ) ) );
-            StringReplace( homecoming, "%{events}", std::to_string( summary.eventCount ) );
-            message += "\n";
-            message += homecoming;
-        }
-
-        if ( summary.homecomingStreak > 0 || summary.renownEarned > 0 ) {
-            std::string progress = _( "Streak: %{streak} | Renown: +%{earned} (%{total})." );
-            StringReplace( progress, "%{streak}", std::to_string( summary.homecomingStreak ) );
-            StringReplace( progress, "%{earned}", std::to_string( summary.renownEarned ) );
-            StringReplace( progress, "%{total}", std::to_string( summary.renownTotal ) );
-            message += "\n";
-            message += progress;
-        }
-
-        std::string rank = _( "Title: %{rank}." );
-        StringReplace( rank, "%{rank}", getOfflineRankName( summary.rankAfter ) );
+        std::string title = _( "Title: %{rank}" );
+        StringReplace( title, "%{rank}", getOfflineRankName( summary.rankAfter ) );
         if ( summary.rankAfter < 6 ) {
             const uint64_t nextThreshold = getOfflineRankThreshold( summary.rankAfter + 1 );
             const uint64_t remainingRenown = nextThreshold > summary.renownTotal ? nextThreshold - summary.renownTotal : 0;
-            std::string next = _( " Next: %{renown} Renown." );
+            std::string next = _( " | Next %{renown}" );
             StringReplace( next, "%{renown}", std::to_string( remainingRenown ) );
-            rank += next;
+            title += next;
         }
         message += "\n";
-        message += rank;
+        message += title;
 
-        if ( summary.milestoneBonus > 0 ) {
-            std::string bonus = _( "Streak bonus: +%{amount} %{resource}." );
-            StringReplace( bonus, "%{amount}", std::to_string( summary.milestoneBonus ) );
-            StringReplace( bonus, "%{resource}", Resource::String( summary.milestoneResource ) );
-            message += "\n";
-            message += bonus;
+        {
+            std::string bonuses = _( "Bonus:" );
+            bool hasBonus = false;
+
+            if ( summary.homecomingTier > 0 && summary.eventCount > 0 ) {
+                std::string home = _( " Home %{%}%%" );
+                StringReplace( home, "%{%}", std::to_string( getHomecomingBonusPercent( summary.homecomingTier ) ) );
+                bonuses += home;
+                hasBonus = true;
+            }
+            if ( summary.supplyRushTriggered ) {
+                bonuses += _( " Rush" );
+                hasBonus = true;
+            }
+            if ( summary.milestoneBonus > 0 ) {
+                bonuses += _( " Streak" );
+                hasBonus = true;
+            }
+            if ( summary.rareDiscoveryBonus > 0 ) {
+                bonuses += _( " Rare" );
+                hasBonus = true;
+            }
+            if ( summary.rankUpBonus > 0 ) {
+                bonuses += _( " Rank" );
+                hasBonus = true;
+            }
+
+            if ( hasBonus ) {
+                message += "\n";
+                message += bonuses;
+            }
         }
 
-        if ( summary.rareDiscoveryBonus > 0 ) {
-            std::string bonus = _( "Rare cache: +%{amount} %{resource}." );
-            StringReplace( bonus, "%{amount}", std::to_string( summary.rareDiscoveryBonus ) );
-            StringReplace( bonus, "%{resource}", Resource::String( summary.rareDiscoveryResource ) );
-            message += "\n";
-            message += bonus;
-        }
-
-        if ( summary.rankUpBonus > 0 ) {
-            std::string bonus = _( "Rank-up cache: +%{amount} %{resource}." );
-            StringReplace( bonus, "%{amount}", std::to_string( summary.rankUpBonus ) );
-            StringReplace( bonus, "%{resource}", Resource::String( summary.rankUpResource ) );
-            message += "\n";
-            message += bonus;
-        }
-
-        if ( summary.contractId >= 0 ) {
-            message += "\n";
-            if ( summary.contractCompleted ) {
-                std::string contract = _( "Contract complete." );
-                if ( summary.contractRewardBonus > 0 ) {
-                    std::string reward = _( " +%{amount} %{resource}." );
-                    StringReplace( reward, "%{amount}", std::to_string( summary.contractRewardBonus ) );
-                    StringReplace( reward, "%{resource}", Resource::String( summary.contractRewardResource ) );
-                    contract += reward;
+        {
+            std::string objectives;
+            if ( summary.contractId >= 0 ) {
+                if ( summary.contractCompleted ) {
+                    objectives = _( "Contract done" );
                 }
-                message += contract;
+                else {
+                    objectives = _( "Contract %{progress}/%{target}" );
+                    StringReplace( objectives, "%{progress}", std::to_string( summary.contractProgressAfter ) );
+                    StringReplace( objectives, "%{target}", std::to_string( summary.contractTarget ) );
+                }
             }
-            else {
-                std::string contract = _( "Contract: %{progress}/%{target}." );
-                StringReplace( contract, "%{progress}", std::to_string( summary.contractProgressAfter ) );
-                StringReplace( contract, "%{target}", std::to_string( summary.contractTarget ) );
-                message += contract;
+
+            if ( summary.treasureFragmentsEarned > 0 ) {
+                if ( !objectives.empty() ) {
+                    objectives += " | ";
+                }
+
+                if ( summary.treasureMapCompleted ) {
+                    objectives += _( "Map done" );
+                }
+                else {
+                    std::string fragments = _( "Map +%{earned} (%{current}/5)" );
+                    StringReplace( fragments, "%{earned}", std::to_string( summary.treasureFragmentsEarned ) );
+                    StringReplace( fragments, "%{current}", std::to_string( summary.treasureFragmentsAfter ) );
+                    objectives += fragments;
+                }
+            }
+
+            if ( !objectives.empty() ) {
+                message += "\n";
+                message += objectives;
             }
         }
 
-        if ( summary.treasureFragmentsEarned > 0 ) {
+        if ( summary.recruitedCreatures > 0 ) {
+            std::string recruited = _( "Recruit %{count} creatures | %{towns} settlements | paid" );
+            StringReplace( recruited, "%{count}", std::to_string( summary.recruitedCreatures ) );
+            StringReplace( recruited, "%{towns}", std::to_string( summary.recruitmentSettlements ) );
             message += "\n";
-            if ( summary.treasureMapCompleted ) {
-                std::string treasure = _( "Treasure map complete." );
-                if ( summary.treasureRewardBonus > 0 ) {
-                    std::string reward = _( " +%{amount} %{resource}." );
-                    StringReplace( reward, "%{amount}", std::to_string( summary.treasureRewardBonus ) );
-                    StringReplace( reward, "%{resource}", Resource::String( summary.treasureRewardResource ) );
-                    treasure += reward;
-                }
-                message += treasure;
-            }
-            else {
-                std::string fragments = _( "Map fragments: +%{earned} (%{current}/5)." );
-                StringReplace( fragments, "%{earned}", std::to_string( summary.treasureFragmentsEarned ) );
-                StringReplace( fragments, "%{current}", std::to_string( summary.treasureFragmentsAfter ) );
-                message += fragments;
-            }
+            message += recruited;
         }
 
         message += "\n";
