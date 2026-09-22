@@ -79,6 +79,7 @@ namespace AI
     {
         bool evaluated = false;
         double highestThreat = -1;
+        double friendlyArmyStrength = 0;
         int friendlyHeroes = 0;
         int friendlyCastles = 0;
         int enemyCastles = 0;

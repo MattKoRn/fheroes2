@@ -328,20 +328,33 @@ void AI::Planner::evaluateRegionSafety()
         RegionStats & stats = _regions[regionID];
 
         if ( ( stats.friendlyCastles && stats.enemyCastles ) || ( stats.highestThreat > 0 && !stats.enemyCastles ) ) {
-            // Distinguish between an undefended invasion and a region where friendly heroes are
-            // already present. This feeds castle defense, reinforcement and hero recruitment
-            // priorities without treating every enemy incursion as the same emergency.
+            // Evaluate danger from actual army strength rather than hero count alone. A weak scout
+            // should not make an invasion look defended, while a strong field army should reduce
+            // the urgency of pulling even more heroes away from other objectives.
             const bool contestedCastleRegion = stats.friendlyCastles > 0 && stats.enemyCastles > 0;
 
-            int safety = contestedCastleRegion ? -75 : -70;
-            if ( stats.friendlyHeroes == 1 ) {
-                safety += contestedCastleRegion ? 15 : 20;
+            const double threat = std::max( 1.0, stats.highestThreat );
+            const double defenseRatio = stats.friendlyArmyStrength / threat;
+
+            int safety = -90;
+            if ( defenseRatio >= 1.5 ) {
+                safety = -20;
             }
-            else if ( stats.friendlyHeroes >= 2 ) {
-                safety += contestedCastleRegion ? 30 : 40;
+            else if ( defenseRatio >= 1.0 ) {
+                safety = -35;
+            }
+            else if ( defenseRatio >= 0.6 ) {
+                safety = -55;
+            }
+            else if ( defenseRatio >= 0.3 ) {
+                safety = -75;
             }
 
-            stats.safetyFactor = std::clamp( safety, -100, -20 );
+            if ( contestedCastleRegion ) {
+                safety -= 10;
+            }
+
+            stats.safetyFactor = std::clamp( safety, -100, -15 );
             stats.evaluated = true;
             regionsToCheck.emplace_back( regionID, stats.safetyFactor );
         }
@@ -755,6 +768,7 @@ fheroes2::GameMode AI::Planner::KingdomTurn( Kingdom & kingdom )
 
             if ( hero->GetColor() == myColor && !hero->Modes( Heroes::PATROL ) ) {
                 ++stats.friendlyHeroes;
+                stats.friendlyArmyStrength += hero->GetArmy().GetStrength();
 
                 const int wisdomLevel = hero->GetLevelSkill( Skill::Secondary::WISDOM );
                 if ( wisdomLevel + 2 > stats.spellLevel ) {
@@ -772,6 +786,7 @@ fheroes2::GameMode AI::Planner::KingdomTurn( Kingdom & kingdom )
 
             if ( castle->isFriends( myColor ) ) {
                 ++stats.friendlyCastles;
+                stats.friendlyArmyStrength += castle->GetArmy().GetStrength();
             }
             else if ( castle->GetColor() != PlayerColor::NONE ) {
                 ++stats.enemyCastles;

@@ -102,7 +102,12 @@ namespace
         const Battle::Unit * secondaryTarget = ( behind != nullptr ) ? behind->GetUnit() : nullptr;
 
         if ( secondaryTarget && secondaryTarget->GetUID() != target.GetUID() && secondaryTarget->GetUID() != attacker.GetUID() ) {
-            return secondaryTarget->evaluateThreatForUnit( attacker );
+            const double value = secondaryTarget->evaluateThreatForUnit( attacker );
+
+            // Piercing/double-cell attacks can hit the unit behind the primary target. Score
+            // that unit by current allegiance so Hypnotize and other control effects are handled
+            // correctly, and strongly avoid vectors that would clip a friendly stack.
+            return secondaryTarget->GetCurrentColor() == attacker.GetCurrentColor() ? -value * 1.5 : value;
         }
 
         return 0.0;
@@ -119,7 +124,7 @@ namespace
         const std::array<const Battle::Cell *, 2> targetCells = { targetPos.GetHead(), targetPos.GetTail() };
 
         std::pair<int32_t, Battle::CellDirection> bestAttackVector{ -1, Battle::CellDirection::UNKNOWN };
-        double bestAttackValue = 0.0;
+        double bestAttackValue = std::numeric_limits<double>::lowest();
 
         for ( const Battle::Cell * attackCell : attackCells ) {
             if ( attackCell == nullptr ) {
