@@ -658,7 +658,7 @@ namespace
             // Keep a smaller second layer of variance inside each army so different creature
             // stacks do not all grow by exactly the same percentage.
             const uint32_t slotSeed = seed ^ static_cast<uint32_t>( 0x9E3779B9u + slot * 0x85EBCA6Bu );
-            const double stackMultiplier = getRandomizedEnemyMultiplier( multiplier, slotSeed, 90, 110, 3.0 );
+            const double stackMultiplier = getRandomizedEnemyMultiplier( multiplier, slotSeed, 90, 110, 2.85 );
 
             const uint64_t scaledCount = static_cast<uint64_t>( std::ceil( static_cast<double>( troop->GetCount() ) * stackMultiplier ) );
             troop->SetCount( static_cast<uint32_t>( std::min<uint64_t>( scaledCount, std::numeric_limits<uint32_t>::max() ) ) );

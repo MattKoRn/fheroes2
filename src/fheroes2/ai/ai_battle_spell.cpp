@@ -164,7 +164,31 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
 
     const uint32_t spellDamage = fheroes2::getSpellDamage( spell, _commander->GetPower(), _commander );
 
-    const auto damageHeuristic = [this, spellDamage, &spell, retreating, &enemies]( const Battle::Unit * unit, const double armyStrength, const double armySpeed ) {
+    Battle::Units currentFriendly;
+    Battle::Units currentEnemies;
+    currentFriendly.reserve( friendly.size() + enemies.size() );
+    currentEnemies.reserve( friendly.size() + enemies.size() );
+
+    const auto classifyByCurrentAllegiance = [this, &currentFriendly, &currentEnemies]( Battle::Unit * unit ) {
+        assert( unit != nullptr );
+
+        if ( unit->GetCurrentColor() == _myColor ) {
+            currentFriendly.emplace_back( unit );
+        }
+        else {
+            currentEnemies.emplace_back( unit );
+        }
+    };
+
+    for ( Battle::Unit * unit : friendly ) {
+        classifyByCurrentAllegiance( unit );
+    }
+    for ( Battle::Unit * unit : enemies ) {
+        classifyByCurrentAllegiance( unit );
+    }
+
+    const auto damageHeuristic = [this, spellDamage, &spell, retreating, &currentEnemies]( const Battle::Unit * unit, const double armyStrength,
+                                                                                           const double armySpeed ) {
         const uint32_t damage = spellDamage * ( 100 - unit->GetMagicResist( spell, _commander ) ) / 100;
 
         // If the unit is immune to this spell, then no one will be killed, no strength will be lost and the unit will not be woken up if it is disabled
@@ -216,7 +240,7 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
             if ( unit->Modes( Battle::CAP_MIRROROWNER ) ) {
                 // This monster has Mirror Image copies.
                 // Add an additional bonus to it.
-                for ( const auto * enemyUnit : enemies ) {
+                for ( const auto * enemyUnit : currentEnemies ) {
                     if ( enemyUnit->Modes( Battle::CAP_MIRRORIMAGE ) && ( enemyUnit->GetMirror() == unit ) ) {
                         overallStrength += enemyUnit->GetStrength();
                     }
@@ -240,16 +264,16 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
     SpellcastOutcome bestOutcome;
 
     if ( spell.isSingleTarget() ) {
-        for ( const Battle::Unit * enemy : enemies ) {
+        for ( const Battle::Unit * enemy : currentEnemies ) {
             bestOutcome.updateOutcome( damageHeuristic( enemy, _enemyArmyStrength, _enemyAverageSpeed ), enemy->GetHeadIndex() );
         }
     }
     else if ( spell.isApplyWithoutFocusObject() ) {
         double spellHeuristic = 0;
-        for ( const Battle::Unit * enemy : enemies ) {
+        for ( const Battle::Unit * enemy : currentEnemies ) {
             spellHeuristic += damageHeuristic( enemy, _enemyArmyStrength, _enemyAverageSpeed );
         }
-        for ( const Battle::Unit * unit : friendly ) {
+        for ( const Battle::Unit * unit : currentFriendly ) {
             const double valueLost = damageHeuristic( unit, _myArmyStrength, _myArmyAverageSpeed );
             // check if we're retreating and will lose current unit
             if ( retreating && unit->isUID( currentUnit.GetUID() ) && std::fabs( valueLost - unit->GetStrength() ) < 0.001 ) {
@@ -286,7 +310,7 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
               };
 
         if ( spell.GetID() == Spell::CHAINLIGHTNING ) {
-            for ( const Battle::Unit * enemy : enemies ) {
+            for ( const Battle::Unit * enemy : currentEnemies ) {
                 if ( !enemy->AllowApplySpell( spell, _commander ) ) {
                     continue;
                 }
