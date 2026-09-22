@@ -1538,8 +1538,18 @@ namespace
                     continue;
                 }
 
+                const auto returnRecruitQuotaToCarry = [&]( const uint64_t quota ) {
+                    const long double returnedCarry = static_cast<long double>( data.creatureRecruitCarry[monsterId] )
+                                                      + static_cast<long double>( quota ) * divisor;
+                    data.creatureRecruitCarry[monsterId]
+                        = returnedCarry >= static_cast<long double>( std::numeric_limits<uint64_t>::max() )
+                              ? std::numeric_limits<uint64_t>::max()
+                              : static_cast<uint64_t>( returnedCarry );
+                };
+
                 const int affordable = kingdom.GetFunds().getLowestQuotient( monster.GetCost() );
                 if ( affordable <= 0 ) {
+                    returnRecruitQuotaToCarry( recruitQuota );
                     continue;
                 }
 
@@ -1553,6 +1563,7 @@ namespace
                 if ( !destination->CanJoinTroop( monster ) ) {
                     Heroes * guestHero = castle->GetHero();
                     if ( guestHero == nullptr || !guestHero->GetArmy().CanJoinTroop( monster ) ) {
+                        returnRecruitQuotaToCarry( recruitQuota );
                         continue;
                     }
                     destination = &guestHero->GetArmy();
@@ -1560,23 +1571,12 @@ namespace
 
                 const Funds cost = monster.GetCost() * recruitCount;
                 if ( !kingdom.AllowPayment( cost ) || !destination->JoinTroop( monster, recruitCount, false ) ) {
-                    // Keep the earned whole-creature quota when army space prevents deployment.
-                    const long double returnedCarry = static_cast<long double>( data.creatureRecruitCarry[monsterId] )
-                                                      + static_cast<long double>( recruitQuota ) * divisor;
-                    data.creatureRecruitCarry[monsterId]
-                        = returnedCarry >= static_cast<long double>( std::numeric_limits<uint64_t>::max() )
-                              ? std::numeric_limits<uint64_t>::max()
-                              : static_cast<uint64_t>( returnedCarry );
+                    returnRecruitQuotaToCarry( recruitQuota );
                     continue;
                 }
 
                 if ( recruitQuota > recruitCount ) {
-                    const long double returnedCarry = static_cast<long double>( data.creatureRecruitCarry[monsterId] )
-                                                      + static_cast<long double>( recruitQuota - recruitCount ) * divisor;
-                    data.creatureRecruitCarry[monsterId]
-                        = returnedCarry >= static_cast<long double>( std::numeric_limits<uint64_t>::max() )
-                              ? std::numeric_limits<uint64_t>::max()
-                              : static_cast<uint64_t>( returnedCarry );
+                    returnRecruitQuotaToCarry( recruitQuota - recruitCount );
                 }
 
                 kingdom.OddFundsResource( cost );
