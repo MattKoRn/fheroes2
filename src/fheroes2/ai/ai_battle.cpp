@@ -237,7 +237,15 @@ namespace
         }
 
         const uint32_t potentialDamage = attacker.getPotentialDamage( target );
-        if ( potentialDamage < target.GetHitPoints() && attacker.GetHitPoints() > 0 ) {
+        const bool targetSurvives = potentialDamage < target.GetHitPoints();
+
+        if ( targetSurvives && !target.isRetaliationAllowed() ) {
+            // A stack that has already retaliated (or is otherwise unable to retaliate) is a
+            // particularly efficient melee target because follow-up damage is effectively free.
+            attackValue *= 1.10;
+        }
+
+        if ( targetSurvives && attacker.GetHitPoints() > 0 && !attacker.isIgnoringRetaliation() && target.isRetaliationAllowed() ) {
             const uint32_t retaliatoryDamage = target.EstimateRetaliatoryDamage( potentialDamage );
             if ( retaliatoryDamage > 0 ) {
                 const double retaliationRatio

@@ -1071,6 +1071,49 @@ namespace
         return modifier;
     }
 
+    double getRegionalDangerPriorityModifier( const MP2::MapObjectType objectType, const int safetyFactor )
+    {
+        if ( safetyFactor >= 0 ) {
+            return 1.0;
+        }
+
+        const double danger = std::clamp( static_cast<double>( -safetyFactor ) / 100.0, 0.0, 1.0 );
+
+        switch ( objectType ) {
+        case MP2::OBJ_CASTLE:
+        case MP2::OBJ_HERO:
+            // Hostile regions are where decisive attacks and interceptions matter most.
+            return 1.0 + danger * 0.35;
+
+        case MP2::OBJ_ABANDONED_MINE:
+        case MP2::OBJ_ALCHEMIST_LAB:
+        case MP2::OBJ_ARTIFACT:
+        case MP2::OBJ_MINE:
+        case MP2::OBJ_SAWMILL:
+            // Permanent gains remain useful, but should not pull heroes deep into danger as
+            // aggressively as direct military objectives.
+            return 1.0 - danger * 0.15;
+
+        case MP2::OBJ_MONSTER:
+            // Optional neutral fights in an unsafe region compound attrition and exposure.
+            return 1.0 - danger * 0.45;
+
+        case MP2::OBJ_BARREL:
+        case MP2::OBJ_CAMPFIRE:
+        case MP2::OBJ_FLOTSAM:
+        case MP2::OBJ_RESOURCE:
+        case MP2::OBJ_SEA_CHEST:
+        case MP2::OBJ_TREASURE_CHEST:
+            // Small consumable pickups are poor reasons to remain in enemy threat zones.
+            return 1.0 - danger * 0.60;
+
+        default:
+            break;
+        }
+
+        return 1.0;
+    }
+
     double getFogDiscoveryValue( const Heroes & hero )
     {
         switch ( hero.getAIRole() ) {
@@ -2658,6 +2701,11 @@ int AI::Planner::getPriorityTarget( Heroes & hero, double & maxPriority )
 
         if ( value > 0 ) {
             value *= getReachabilityPriorityModifier( type, actualDistance, heroMovePoints, hero.getAIRole() );
+
+            const uint32_t regionID = world.getTile( destination ).GetRegion();
+            if ( regionID < _regions.size() ) {
+                value *= getRegionalDangerPriorityModifier( type, _regions[regionID].safetyFactor );
+            }
         }
     };
 
