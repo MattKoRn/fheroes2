@@ -882,11 +882,8 @@ namespace
             }
         }
 
-        if ( heroes.empty() ) {
-            return;
-        }
-
-        // Freshly recruited heroes tend to have the weakest armies, so fill them first.
+        // Freshly recruited heroes tend to have the weakest armies, so fill them first. Castles
+        // are still valid reserve destinations when the kingdom currently has no heroes.
         std::sort( heroes.begin(), heroes.end(), []( const Heroes * lhs, const Heroes * rhs ) {
             return lhs->GetArmy().GetStrength() < rhs->GetArmy().GetStrength();
         } );
@@ -939,6 +936,10 @@ namespace
         }
 
         if ( changed ) {
+            // Keep the aggregate roster synchronized with the reserve mutation. Otherwise a crash
+            // between this save and the normal end-of-turn snapshot can restore already-deployed
+            // reserve creatures again on the next map.
+            capturePersistentCreatureRoster( data, kingdom );
             saveOfflineProgressData( data );
         }
     }
