@@ -9,6 +9,7 @@ set "BUILD_DIR=%ROOT%\build\windows-release"
 set "INSTALL_DIR=%LOCALAPPDATA%\Programs\fheroes2"
 set "TRIPLET=x64-windows"
 set "VCPKG_DEFAULT_BINARY_CACHE=%LOCALAPPDATA%\fheroes2-vcpkg-cache"
+set "PATH=%PATH%;%LOCALAPPDATA%\Microsoft\WindowsApps"
 
 echo.
 echo ============================================================
@@ -145,8 +146,9 @@ echo.
 exit /b 1
 
 :refresh_path
-for /f "delims=" %%P in ('powershell -NoProfile -Command "$m=[Environment]::GetEnvironmentVariable(''Path'',''Machine''); $u=[Environment]::GetEnvironmentVariable(''Path'',''User''); Write-Output ($m+'';''+$u)"') do set "PATH=%%P"
-set "PATH=%PATH%;%ProgramFiles%\Git\cmd;%ProgramFiles%\CMake\bin;%LOCALAPPDATA%\Microsoft\WinGet\Links"
+rem winget's Git and CMake packages normally install to these locations.
+rem Adding them directly lets this same CMD process use newly installed tools.
+set "PATH=%PATH%;%ProgramFiles%\Git\cmd;%ProgramFiles%\CMake\bin;%LOCALAPPDATA%\Programs\Git\cmd;%LOCALAPPDATA%\Programs\CMake\bin;%LOCALAPPDATA%\Microsoft\WinGet\Links;%LOCALAPPDATA%\Microsoft\WindowsApps"
 exit /b 0
 
 :ensure_git
