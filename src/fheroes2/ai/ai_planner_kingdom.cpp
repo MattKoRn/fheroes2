@@ -978,15 +978,22 @@ bool AI::Planner::purchaseNewHeroes( const std::vector<AICastle> & sortedCastleL
                 continue;
 
             const uint32_t regionID = world.getTile( mapIndex ).GetRegion();
-            const int heroesInRegion = _regions[regionID].friendlyHeroes;
+            const RegionStats & regionStats = _regions[regionID];
+            const int heroesInRegion = regionStats.friendlyHeroes;
+            const bool regionNeedsDefense = regionStats.safetyFactor < 0;
 
-            if ( heroesInRegion > 1 )
+            // In safe territory two local heroes are enough. Dangerous regions may recruit
+            // another hero so reinforcement and persistent reserve armies can actually be used.
+            if ( heroesInRegion > 1 && !regionNeedsDefense ) {
                 continue;
+            }
 
             const size_t neighboursCount = world.getRegion( regionID ).getNeighboursCount();
 
-            // don't buy another hero if there's nothing to do or castle is on an island
-            if ( heroesInRegion > 0 && ( !moreTasksForHeroes || ( sortedCastleList.size() > 1 && neighboursCount == 0 ) ) ) {
+            // Peacetime recruitment still avoids idle heroes and isolated islands. Active danger
+            // overrides the generic "no more tasks" condition because defense is itself a task.
+            if ( heroesInRegion > 0 && !regionNeedsDefense
+                 && ( !moreTasksForHeroes || ( sortedCastleList.size() > 1 && neighboursCount == 0 ) ) ) {
                 continue;
             }
 

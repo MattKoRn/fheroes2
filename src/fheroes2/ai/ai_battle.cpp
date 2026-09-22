@@ -164,7 +164,7 @@ namespace
 
         // Active shooters project damage across the whole battlefield, so shutting them down
         // is more valuable than their raw stack strength alone suggests.
-        if ( target.isArchers() && !target.isHandFighting() ) {
+        if ( target.isArchers() && !target.isHandFighting() && target.GetShots() > 0 ) {
             value *= 1.20;
         }
 
