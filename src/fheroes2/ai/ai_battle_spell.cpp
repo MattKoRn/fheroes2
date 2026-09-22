@@ -172,6 +172,31 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
             return 0.0;
         }
 
+        const auto applyTacticalPriority = [this, unit]( const double value ) {
+            if ( unit->GetCurrentColor() == _myColor ) {
+                return value;
+            }
+
+            double result = value;
+
+            if ( unit->isArchers() && !unit->isHandFighting() && unit->GetShots() > 0 ) {
+                result *= 1.15;
+            }
+
+            const uint32_t initialCount = unit->GetInitialCount();
+            if ( initialCount > 0 ) {
+                const uint64_t currentCount = unit->GetCount();
+                if ( currentCount * 4 <= initialCount ) {
+                    result *= 1.20;
+                }
+                else if ( currentCount * 2 <= initialCount ) {
+                    result *= 1.10;
+                }
+            }
+
+            return result;
+        };
+
         // If we retreat, we are not interested in partial damage, but only in the number of units actually killed
         if ( retreating ) {
             if ( unit->Modes( Battle::CAP_MIRRORIMAGE ) ) {
@@ -198,7 +223,7 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
                 }
             }
 
-            return overallStrength + armyStrength * bonus;
+            return applyTacticalPriority( overallStrength + armyStrength * bonus );
         }
 
         // Otherwise use the amount of strength lost (% of the total unit's strength)
@@ -209,7 +234,7 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
             unitPercentageLost += unitPercentageLost - 1.0;
         }
 
-        return unitPercentageLost * unit->GetStrength();
+        return applyTacticalPriority( unitPercentageLost * unit->GetStrength() );
     };
 
     SpellcastOutcome bestOutcome;
