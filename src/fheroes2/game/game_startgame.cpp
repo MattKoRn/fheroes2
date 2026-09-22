@@ -703,24 +703,6 @@ namespace
         }
     }
 
-    std::string getOfflineContractDescription( const int contractId )
-    {
-        switch ( contractId ) {
-        case 0:
-            return _( "Accumulate productive hours while the kingdom works without you." );
-        case 1:
-            return _( "Bring home a broad mix of resources from your offline production." );
-        case 2:
-            return _( "Build progress through stronger homecoming chests and expedition events." );
-        case 3:
-            return _( "Keep rare-resource operations and long expeditions moving." );
-        case 4:
-            return _( "Combine time away, production variety, and expedition activity." );
-        default:
-            return {};
-        }
-    }
-
     void initializeOfflineContract( OfflineProgressData & data )
     {
         if ( data.contractId >= 0 && data.contractId < 5 && data.contractTarget > 0 ) {
@@ -830,22 +812,6 @@ namespace
 
         summary.nextContractId = data.contractId;
         summary.nextContractTarget = data.contractTarget;
-    }
-
-    std::string getTreasureMapName( const int mapId )
-    {
-        switch ( mapId ) {
-        case 0:
-            return _( "The Cartographer's Secret" );
-        case 1:
-            return _( "The Dragon Coast Cache" );
-        case 2:
-            return _( "The Wizard's Lost Vault" );
-        case 3:
-            return _( "The Pirate King's Hoard" );
-        default:
-            return _( "Forgotten Treasure" );
-        }
     }
 
     int getTreasureMapRewardPercent( const int mapId )
@@ -1064,27 +1030,6 @@ namespace
         return summary;
     }
 
-    std::string getOfflineReturnTitle( const int64_t elapsedSeconds )
-    {
-        if ( elapsedSeconds < 15 * 60 ) {
-            return _( "Quick Supply Run" );
-        }
-        if ( elapsedSeconds < 6 * 60 * 60 ) {
-            return _( "Caravan Returns" );
-        }
-        if ( elapsedSeconds < offlineSecondsPerDay ) {
-            return _( "A Productive Absence" );
-        }
-        if ( elapsedSeconds < 7 * offlineSecondsPerDay ) {
-            return _( "The Kingdom Prospered" );
-        }
-        if ( elapsedSeconds < 30 * offlineSecondsPerDay ) {
-            return _( "A Royal Homecoming" );
-        }
-
-        return _( "A Legendary Return" );
-    }
-
     std::string getHomecomingChestName( const int tier )
     {
         switch ( tier ) {
@@ -1103,46 +1048,6 @@ namespace
         }
     }
 
-    std::string getOfflineEventText( const int eventId )
-    {
-        switch ( eventId ) {
-        case 0:
-            return _( "Scouts discovered an abandoned cache beside the road." );
-        case 1:
-            return _( "A merchant caravan returned with a profitable surplus." );
-        case 2:
-            return _( "Prospectors struck a richer vein than expected." );
-        case 3:
-            return _( "The quartermaster won a remarkably favorable bargain." );
-        case 4:
-            return _( "Workers celebrated a record shift and set aside an extra shipment." );
-        case 5:
-            return _( "Miners opened a forgotten tunnel and found untouched stores." );
-        case 6:
-            return _( "A grateful village sent tribute to your banners." );
-        case 7:
-            return _( "Your patrols recovered supplies from a deserted encampment." );
-        default:
-            return {};
-        }
-    }
-
-    std::string getRareDiscoveryText( const int discoveryId )
-    {
-        switch ( discoveryId ) {
-        case 0:
-            return _( "Rare discovery: scouts uncovered a sealed royal strongbox." );
-        case 1:
-            return _( "Rare discovery: an old prospector revealed a forgotten mother lode." );
-        case 2:
-            return _( "Rare discovery: a lost caravan was found intact beyond the old road." );
-        case 3:
-            return _( "Rare discovery: villagers opened a hidden wartime storehouse in your honor." );
-        default:
-            return {};
-        }
-    }
-
     std::string getHomecomingMilestoneName( const int milestonePercent )
     {
         switch ( milestonePercent ) {
@@ -1155,31 +1060,6 @@ namespace
         default:
             return {};
         }
-    }
-
-    std::string getOfflineReturnFlavor( const int64_t elapsedSeconds, const bool hasRewards )
-    {
-        if ( !hasRewards ) {
-            return _( "The quartermaster reports that no new income was banked during this absence. Your stored treasury is exactly as you left it." );
-        }
-
-        if ( elapsedSeconds < 15 * 60 ) {
-            return _( "The quartermaster had barely finished counting the ledgers, but the kingdom still squeezed in a little work." );
-        }
-        if ( elapsedSeconds < 6 * 60 * 60 ) {
-            return _( "Sawmills turned, mines echoed, and caravans kept the roads busy while you were away." );
-        }
-        if ( elapsedSeconds < offlineSecondsPerDay ) {
-            return _( "By torchlight and sunrise, your workers kept the kingdom's coffers moving." );
-        }
-        if ( elapsedSeconds < 7 * offlineSecondsPerDay ) {
-            return _( "Several busy days passed. Wagons rolled through the gates and the treasury steadily grew." );
-        }
-        if ( elapsedSeconds < 30 * offlineSecondsPerDay ) {
-            return _( "The realm carried on through many sunrises. Your quartermasters have assembled a sizeable homecoming haul." );
-        }
-
-        return _( "Your return has become an event in its own right. The ledgers are thick, the wagons are full, and the treasury doors have been busy." );
     }
 
     std::pair<int, int32_t> getBestOfflineHaul( const Funds & rewards )
@@ -1210,217 +1090,133 @@ namespace
         const int64_t hours = seconds / ( 60 * 60 );
         seconds %= 60 * 60;
         const int64_t minutes = seconds / 60;
-        seconds %= 60;
 
-        const bool hasRewards = summary.rewards.GetValidItemsCount() != 0;
-
-        std::string title = _( "Kingdom Chronicle: %{return}" );
-        StringReplace( title, "%{return}", getOfflineReturnTitle( summary.elapsedSeconds ) );
-
-        std::string message = _( "Your banners rise again!" );
-        message += "\n\n";
-
-        std::string awayTime = _( "Away: %{days} days, %{hours} hours, %{minutes} minutes and %{seconds} seconds." );
-        StringReplace( awayTime, "%{days}", std::to_string( days ) );
-        StringReplace( awayTime, "%{hours}", std::to_string( hours ) );
-        StringReplace( awayTime, "%{minutes}", std::to_string( minutes ) );
-        StringReplace( awayTime, "%{seconds}", std::to_string( seconds ) );
-        message += awayTime;
+        std::string message = _( "Away: %{days}d %{hours}h %{minutes}m." );
+        StringReplace( message, "%{days}", std::to_string( days ) );
+        StringReplace( message, "%{hours}", std::to_string( hours ) );
+        StringReplace( message, "%{minutes}", std::to_string( minutes ) );
 
         if ( summary.totalOfflineSeconds > 0 ) {
             const uint64_t lifetimeDays = summary.totalOfflineSeconds / static_cast<uint64_t>( offlineSecondsPerDay );
             const uint64_t lifetimeHours = ( summary.totalOfflineSeconds % static_cast<uint64_t>( offlineSecondsPerDay ) ) / ( 60 * 60 );
-            std::string lifetime = _( "Kingdom-away lifetime: %{days} days and %{hours} hours." );
+
+            std::string lifetime = _( "Lifetime: %{days}d %{hours}h offline." );
             StringReplace( lifetime, "%{days}", std::to_string( lifetimeDays ) );
             StringReplace( lifetime, "%{hours}", std::to_string( lifetimeHours ) );
             message += "\n";
             message += lifetime;
         }
 
-        message += "\n\n";
-        message += getOfflineReturnFlavor( summary.elapsedSeconds, hasRewards );
-
-        if ( !hasRewards ) {
-            message += "\n\n";
-            message += _( "The realm awaits your next command." );
-            fheroes2::showStandardTextMessage( std::move( title ), std::move( message ), Dialog::OK );
+        if ( summary.rewards.GetValidItemsCount() == 0 ) {
+            message += "\n";
+            message += _( "Rewards: none." );
+            fheroes2::showStandardTextMessage( _( "Offline Progress" ), std::move( message ), Dialog::OK );
             return;
         }
 
-        std::string collectionSummary = _( "Income report: %{count} resource types collected." );
-        StringReplace( collectionSummary, "%{count}", std::to_string( summary.productionRewards.GetValidItemsCount() ) );
-        message += "\n\n";
-        message += collectionSummary;
+        std::string income = _( "Income: %{count} resource types." );
+        StringReplace( income, "%{count}", std::to_string( summary.productionRewards.GetValidItemsCount() ) );
+        message += "\n";
+        message += income;
 
         if ( summary.homecomingTier > 0 && summary.eventCount > 0 ) {
-            std::string homecoming = _( "Homecoming reward: %{chest} (+%{percent}% expedition bonus)." );
+            std::string homecoming = _( "Homecoming: %{chest} +%{percent}%%, %{events} events." );
             StringReplace( homecoming, "%{chest}", getHomecomingChestName( summary.homecomingTier ) );
             StringReplace( homecoming, "%{percent}", std::to_string( getHomecomingBonusPercent( summary.homecomingTier ) ) );
+            StringReplace( homecoming, "%{events}", std::to_string( summary.eventCount ) );
             message += "\n";
             message += homecoming;
-            message += "\n";
-            message += _( "Expedition log:" );
-
-            for ( size_t i = 0; i < summary.eventCount; ++i ) {
-                const OfflineEvent & event = summary.events[i];
-                message += "\n- ";
-                message += getOfflineEventText( event.eventId );
-
-                std::string bonusText = _( " +%{amount} %{resource}." );
-                StringReplace( bonusText, "%{amount}", std::to_string( event.bonus ) );
-                StringReplace( bonusText, "%{resource}", Resource::String( event.resource ) );
-                message += bonusText;
-            }
         }
 
-        if ( summary.homecomingStreak > 0 ) {
-            std::string streakText = _( "Homecoming streak: %{count} qualifying returns." );
-            StringReplace( streakText, "%{count}", std::to_string( summary.homecomingStreak ) );
+        if ( summary.homecomingStreak > 0 || summary.renownEarned > 0 ) {
+            std::string progress = _( "Streak: %{streak} | Renown: +%{earned} (%{total})." );
+            StringReplace( progress, "%{streak}", std::to_string( summary.homecomingStreak ) );
+            StringReplace( progress, "%{earned}", std::to_string( summary.renownEarned ) );
+            StringReplace( progress, "%{total}", std::to_string( summary.renownTotal ) );
             message += "\n";
-            message += streakText;
+            message += progress;
         }
 
-        if ( summary.milestoneBonus > 0 ) {
-            std::string milestoneText = _( "%{milestone}! Streak milestone bonus: +%{amount} %{resource}." );
-            StringReplace( milestoneText, "%{milestone}", getHomecomingMilestoneName( summary.milestonePercent ) );
-            StringReplace( milestoneText, "%{amount}", std::to_string( summary.milestoneBonus ) );
-            StringReplace( milestoneText, "%{resource}", Resource::String( summary.milestoneResource ) );
-            message += "\n";
-            message += milestoneText;
-        }
-
-        if ( summary.rareDiscovery && summary.rareDiscoveryBonus > 0 ) {
-            message += "\n";
-            message += getRareDiscoveryText( summary.rareDiscoveryId );
-
-            std::string discoveryLoot = _( " Discovery cache: +%{amount} %{resource}!" );
-            StringReplace( discoveryLoot, "%{amount}", std::to_string( summary.rareDiscoveryBonus ) );
-            StringReplace( discoveryLoot, "%{resource}", Resource::String( summary.rareDiscoveryResource ) );
-            message += discoveryLoot;
-        }
-
-        if ( summary.renownEarned > 0 ) {
-            std::string renownText = _( "Offline Renown: +%{earned} (total %{total})." );
-            StringReplace( renownText, "%{earned}", std::to_string( summary.renownEarned ) );
-            StringReplace( renownText, "%{total}", std::to_string( summary.renownTotal ) );
-            message += "\n";
-            message += renownText;
-        }
-
-        std::string rankText = _( "Kingdom title: %{rank}." );
-        StringReplace( rankText, "%{rank}", getOfflineRankName( summary.rankAfter ) );
-        message += "\n";
-        message += rankText;
-
-        if ( summary.rankUpBonus > 0 ) {
-            std::string rankUpText = _( "New title unlocked: %{rank}! Rank-up cache: +%{amount} %{resource}." );
-            StringReplace( rankUpText, "%{rank}", getOfflineRankName( summary.rankAfter ) );
-            StringReplace( rankUpText, "%{amount}", std::to_string( summary.rankUpBonus ) );
-            StringReplace( rankUpText, "%{resource}", Resource::String( summary.rankUpResource ) );
-            message += "\n";
-            message += rankUpText;
-        }
-
+        std::string rank = _( "Title: %{rank}." );
+        StringReplace( rank, "%{rank}", getOfflineRankName( summary.rankAfter ) );
         if ( summary.rankAfter < 6 ) {
             const uint64_t nextThreshold = getOfflineRankThreshold( summary.rankAfter + 1 );
             const uint64_t remainingRenown = nextThreshold > summary.renownTotal ? nextThreshold - summary.renownTotal : 0;
-            std::string nextRankText = _( "Next title in %{renown} Renown." );
-            StringReplace( nextRankText, "%{renown}", std::to_string( remainingRenown ) );
+            std::string next = _( " Next: %{renown} Renown." );
+            StringReplace( next, "%{renown}", std::to_string( remainingRenown ) );
+            rank += next;
+        }
+        message += "\n";
+        message += rank;
+
+        if ( summary.milestoneBonus > 0 ) {
+            std::string bonus = _( "Streak bonus: +%{amount} %{resource}." );
+            StringReplace( bonus, "%{amount}", std::to_string( summary.milestoneBonus ) );
+            StringReplace( bonus, "%{resource}", Resource::String( summary.milestoneResource ) );
             message += "\n";
-            message += nextRankText;
+            message += bonus;
+        }
+
+        if ( summary.rareDiscoveryBonus > 0 ) {
+            std::string bonus = _( "Rare cache: +%{amount} %{resource}." );
+            StringReplace( bonus, "%{amount}", std::to_string( summary.rareDiscoveryBonus ) );
+            StringReplace( bonus, "%{resource}", Resource::String( summary.rareDiscoveryResource ) );
+            message += "\n";
+            message += bonus;
+        }
+
+        if ( summary.rankUpBonus > 0 ) {
+            std::string bonus = _( "Rank-up cache: +%{amount} %{resource}." );
+            StringReplace( bonus, "%{amount}", std::to_string( summary.rankUpBonus ) );
+            StringReplace( bonus, "%{resource}", Resource::String( summary.rankUpResource ) );
+            message += "\n";
+            message += bonus;
         }
 
         if ( summary.contractId >= 0 ) {
             message += "\n";
-
             if ( summary.contractCompleted ) {
-                std::string contractComplete = _( "Contract complete: %{contract}!" );
-                StringReplace( contractComplete, "%{contract}", getOfflineContractName( summary.contractId ) );
-                message += contractComplete;
-
+                std::string contract = _( "Contract complete." );
                 if ( summary.contractRewardBonus > 0 ) {
-                    std::string contractReward = _( " Contract cache: +%{amount} %{resource}." );
-                    StringReplace( contractReward, "%{amount}", std::to_string( summary.contractRewardBonus ) );
-                    StringReplace( contractReward, "%{resource}", Resource::String( summary.contractRewardResource ) );
-                    message += contractReward;
+                    std::string reward = _( " +%{amount} %{resource}." );
+                    StringReplace( reward, "%{amount}", std::to_string( summary.contractRewardBonus ) );
+                    StringReplace( reward, "%{resource}", Resource::String( summary.contractRewardResource ) );
+                    contract += reward;
                 }
-
-                if ( summary.nextContractId >= 0 ) {
-                    std::string nextContract = _( " New contract: %{contract} — %{description} Target: %{target}." );
-                    StringReplace( nextContract, "%{contract}", getOfflineContractName( summary.nextContractId ) );
-                    StringReplace( nextContract, "%{description}", getOfflineContractDescription( summary.nextContractId ) );
-                    StringReplace( nextContract, "%{target}", std::to_string( summary.nextContractTarget ) );
-                    message += "\n";
-                    message += nextContract;
-                }
+                message += contract;
             }
             else {
-                std::string contractProgress = _( "Kingdom contract: %{contract} — %{description} Progress: %{progress}/%{target}." );
-                StringReplace( contractProgress, "%{contract}", getOfflineContractName( summary.contractId ) );
-                StringReplace( contractProgress, "%{description}", getOfflineContractDescription( summary.contractId ) );
-                StringReplace( contractProgress, "%{progress}", std::to_string( summary.contractProgressAfter ) );
-                StringReplace( contractProgress, "%{target}", std::to_string( summary.contractTarget ) );
-                message += contractProgress;
-
-                const uint64_t gained = summary.contractProgressAfter >= summary.contractProgressBefore
-                                            ? summary.contractProgressAfter - summary.contractProgressBefore
-                                            : 0;
-                if ( gained > 0 ) {
-                    std::string gainedText = _( " +%{progress} contract progress this return." );
-                    StringReplace( gainedText, "%{progress}", std::to_string( gained ) );
-                    message += gainedText;
-                }
+                std::string contract = _( "Contract: %{progress}/%{target}." );
+                StringReplace( contract, "%{progress}", std::to_string( summary.contractProgressAfter ) );
+                StringReplace( contract, "%{target}", std::to_string( summary.contractTarget ) );
+                message += contract;
             }
         }
 
         if ( summary.treasureFragmentsEarned > 0 ) {
             message += "\n";
-
             if ( summary.treasureMapCompleted ) {
-                std::string treasureFound = _( "Treasure map completed: %{map}!" );
-                StringReplace( treasureFound, "%{map}", getTreasureMapName( summary.treasureMapId ) );
-                message += treasureFound;
-
+                std::string treasure = _( "Treasure map complete." );
                 if ( summary.treasureRewardBonus > 0 ) {
-                    std::string treasureReward = _( " Treasure cache: +%{amount} %{resource}." );
-                    StringReplace( treasureReward, "%{amount}", std::to_string( summary.treasureRewardBonus ) );
-                    StringReplace( treasureReward, "%{resource}", Resource::String( summary.treasureRewardResource ) );
-                    message += treasureReward;
+                    std::string reward = _( " +%{amount} %{resource}." );
+                    StringReplace( reward, "%{amount}", std::to_string( summary.treasureRewardBonus ) );
+                    StringReplace( reward, "%{resource}", Resource::String( summary.treasureRewardResource ) );
+                    treasure += reward;
                 }
-
-                std::string mapCount = _( " Maps completed: %{count}. New map fragments: %{fragments}/5." );
-                StringReplace( mapCount, "%{count}", std::to_string( summary.treasureMapsCompleted ) );
-                StringReplace( mapCount, "%{fragments}", std::to_string( summary.treasureFragmentsAfter ) );
-                message += mapCount;
+                message += treasure;
             }
             else {
-                std::string fragments = _( "Treasure hunt: +%{earned} map fragments (%{current}/5)." );
+                std::string fragments = _( "Map fragments: +%{earned} (%{current}/5)." );
                 StringReplace( fragments, "%{earned}", std::to_string( summary.treasureFragmentsEarned ) );
                 StringReplace( fragments, "%{current}", std::to_string( summary.treasureFragmentsAfter ) );
                 message += fragments;
-
-                const uint32_t remaining = 5 - std::min<uint32_t>( 5, summary.treasureFragmentsAfter );
-                if ( remaining > 0 ) {
-                    std::string remainingText = _( " %{remaining} fragments until the next treasure map." );
-                    StringReplace( remainingText, "%{remaining}", std::to_string( remaining ) );
-                    message += remainingText;
-                }
             }
         }
 
-        const auto [bestResource, bestReward] = getBestOfflineHaul( summary.rewards );
-        if ( bestResource != Resource::UNKNOWN && bestReward > 0 ) {
-            std::string bestHaul = _( "Best haul: +%{amount} %{resource}." );
-            StringReplace( bestHaul, "%{amount}", std::to_string( bestReward ) );
-            StringReplace( bestHaul, "%{resource}", Resource::String( bestResource ) );
-            message += "\n";
-            message += bestHaul;
-        }
+        message += "\n";
+        message += _( "Treasury:" );
 
-        message += "\n\n";
-        message += _( "Treasury delivery:" );
-
-        fheroes2::showResourceMessage( fheroes2::Text( std::move( title ), fheroes2::FontType::normalYellow() ),
+        fheroes2::showResourceMessage( fheroes2::Text( _( "Offline Progress" ), fheroes2::FontType::normalYellow() ),
                                        fheroes2::Text( std::move( message ), fheroes2::FontType::normalWhite() ), Dialog::OK, summary.rewards );
     }
 

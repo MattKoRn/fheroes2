@@ -29,7 +29,7 @@ Offline state is stored in the fheroes2 config directory as:
 
 The file stores the last-seen Unix timestamp, exact resource counts, the last known daily income, and per-resource fractional carry. Offline time is not capped. Rewards use the saved daily income prorated by real elapsed time, with fractional carry retained so repeated short offline sessions do not lose progress.
 
-When a map starts or a save is loaded, the saved wallet replaces that map/save's resource counts and accrued rewards are applied. The return popup is presented as a **Kingdom Chronicle** with duration-based homecoming titles, themed activity text, the exact time away in days/hours/minutes/seconds, the number of resource types collected, a best-haul highlight, and the normal resource reward display.
+When a map starts or a save is loaded, the saved wallet replaces that map/save's resource counts and accrued rewards are applied. The offline popup is deliberately compact and stats-only so it stays inside the game window: it shows time away, lifetime offline time, resource production, homecoming/streak/Renown status, concise bonus lines, contract progress, treasure fragments, and the normal resource reward display. Narrative/story text is not shown.
 
 Meaningful absences also earn a **Homecoming Reward**. Starting at 30 minutes away, the game creates deterministic expedition events that grant bonus shipments only from resources that actually produced offline income. Longer absences improve the chest tier and total bonus: Scout's Satchel (5%), Caravan Crate (10%), Royal Chest (15%), King's Vault (20%), and Legendary Hoard (25%). Royal Chest returns can produce two expedition events; King's Vault and Legendary Hoard returns can produce up to three, using different eligible resources when possible. Events are derived from the completed offline session, so reopening or reloading cannot reroll them.
 
@@ -43,6 +43,6 @@ The system now also maintains a persistent **Kingdom Contract**. Five contracts 
 
 Offline returns now also feed a persistent **Treasure Hunt**. Productive absences of at least two hours earn one map fragment; day-long absences earn an extra fragment, and a rare discovery or completed Kingdom Contract can add another, up to three fragments per return. Five fragments complete a treasure map. Overflow carries forward to the next map.
 
-Completed maps rotate through The Cartographer's Secret, The Dragon Coast Cache, The Wizard's Lost Vault, and The Pirate King's Hoard. Opening one grants a deterministic 35–50% treasure cache on a resource that actually produced income, plus bonus Renown. The session seed fixes the reward so reloads cannot reroll it.
+Completed treasure maps rotate through four reward tiers. Opening one grants a deterministic 35–50% treasure cache on a resource that actually produced income, plus bonus Renown. The session seed fixes the reward so reloads cannot reroll it.
 
 The state file is upgraded to version 5 to store treasure fragments and completed-map count alongside contracts, Renown, streaks, and lifetime offline seconds. Version-1 through version-4 files migrate automatically; exact resources, uncapped elapsed time, base offline-income calculation, and fractional carry remain compatible.
