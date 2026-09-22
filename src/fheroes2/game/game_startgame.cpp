@@ -1478,7 +1478,7 @@ namespace
 
     void applyOfflineCreatureRecruitment( OfflineProgressSummary & summary, OfflineProgressData & data, Kingdom & kingdom )
     {
-        if ( summary.elapsedSeconds <= 0 || summary.productionRewards.GetValidItemsCount() == 0 ) {
+        if ( summary.elapsedSeconds <= 0 ) {
             return;
         }
 
@@ -1493,11 +1493,13 @@ namespace
             return;
         }
 
-        // Recruitment has no elapsed-time ceiling. It accrues forever at a deliberately low rate.
-        // All built tiers are eligible immediately, and recruitment may spend the full treasury.
+        // Auto-buy mode: every offline return spends from the real treasury to recruit as many
+        // currently available dwelling creatures as possible. Stronger tiers are considered first.
         constexpr std::array<uint32_t, 6> baseDwellings{ DWELLING_MONSTER1, DWELLING_MONSTER2, DWELLING_MONSTER3,
                                                          DWELLING_MONSTER4, DWELLING_MONSTER5, DWELLING_MONSTER6 };
-        constexpr int64_t fullGrowthSeconds = 35 * offlineSecondsPerDay;
+
+        // Version 9 used time-based fractional recruitment. Auto-buy no longer uses that bank.
+        data.creatureRecruitCarry.fill( 0 );
 
         for ( size_t castleIndex = 0; castleIndex < settlementLimit; ++castleIndex ) {
             Castle * castle = castles[castleIndex];
@@ -1523,63 +1525,26 @@ namespace
                     continue;
                 }
 
-                const size_t monsterId = static_cast<size_t>( monster.GetID() );
-                const long double divisor = static_cast<long double>( fullGrowthSeconds ) * 100.0L;
-                const long double numerator = static_cast<long double>( data.creatureRecruitCarry[monsterId] )
-                                              + static_cast<long double>( monster.GetGrown() ) * static_cast<long double>( summary.elapsedSeconds )
-                                                    * static_cast<long double>( summary.stateEfficiencyPercent );
-                const long double quotaValue = std::floor( numerator / divisor );
-                uint64_t recruitQuota = quotaValue >= static_cast<long double>( std::numeric_limits<uint64_t>::max() )
-                                            ? std::numeric_limits<uint64_t>::max()
-                                            : static_cast<uint64_t>( quotaValue );
-                data.creatureRecruitCarry[monsterId] = static_cast<uint64_t>( std::fmod( numerator, divisor ) );
-
-                if ( recruitQuota == 0 ) {
+                const uint32_t available = castle->getMonstersInDwelling( actualDwelling );
+                if ( available == 0 ) {
                     continue;
                 }
 
-                const auto returnRecruitQuotaToCarry = [&]( const uint64_t quota ) {
-                    const long double returnedCarry = static_cast<long double>( data.creatureRecruitCarry[monsterId] )
-                                                      + static_cast<long double>( quota ) * divisor;
-                    data.creatureRecruitCarry[monsterId]
-                        = returnedCarry >= static_cast<long double>( std::numeric_limits<uint64_t>::max() )
-                              ? std::numeric_limits<uint64_t>::max()
-                              : static_cast<uint64_t>( returnedCarry );
-                };
-
-                const int affordable = kingdom.GetFunds().getLowestQuotient( monster.GetCost() );
-                if ( affordable <= 0 ) {
-                    returnRecruitQuotaToCarry( recruitQuota );
-                    continue;
-                }
-
-                const uint64_t affordableQuota = std::min<uint64_t>( recruitQuota, static_cast<uint64_t>( affordable ) );
-                const uint32_t recruitCount = static_cast<uint32_t>( std::min<uint64_t>( affordableQuota, std::numeric_limits<uint32_t>::max() ) );
+                const uint32_t affordable = castle->getRecruitLimit( monster, kingdom.GetFunds() );
+                const uint32_t recruitCount = std::min( available, affordable );
                 if ( recruitCount == 0 ) {
                     continue;
                 }
 
-                Army * destination = &castle->GetArmy();
-                if ( !destination->CanJoinTroop( monster ) ) {
-                    Heroes * guestHero = castle->GetHero();
-                    if ( guestHero == nullptr || !guestHero->GetArmy().CanJoinTroop( monster ) ) {
-                        returnRecruitQuotaToCarry( recruitQuota );
-                        continue;
-                    }
-                    destination = &guestHero->GetArmy();
-                }
+                const Troop troop( monster, recruitCount );
+                const Funds cost = troop.GetTotalCost();
 
-                const Funds cost = monster.GetCost() * recruitCount;
-                if ( !kingdom.AllowPayment( cost ) || !destination->JoinTroop( monster, recruitCount, false ) ) {
-                    returnRecruitQuotaToCarry( recruitQuota );
+                // Castle::RecruitMonster() uses real dwelling stock, pays the normal price and
+                // falls back to a visiting hero if the castle garrison has no suitable slot.
+                if ( !castle->RecruitMonster( troop, false ) ) {
                     continue;
                 }
 
-                if ( recruitQuota > recruitCount ) {
-                    returnRecruitQuotaToCarry( recruitQuota - recruitCount );
-                }
-
-                kingdom.OddFundsResource( cost );
                 summary.recruitmentSpent += cost;
                 summary.recruitedCreatures += recruitCount;
                 ++summary.recruitedStacks;
