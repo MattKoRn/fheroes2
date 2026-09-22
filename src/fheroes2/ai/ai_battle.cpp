@@ -173,7 +173,7 @@ namespace
             // Removing a stack completely denies all of its future turns and retaliation opportunities.
             value *= 1.35;
         }
-        else if ( potentialDamage * 2 >= target.GetHitPoints() ) {
+        else if ( static_cast<uint64_t>( potentialDamage ) * 2 >= target.GetHitPoints() ) {
             // Prefer attacks that put a dangerous stack close to elimination over light chip damage.
             value *= 1.10;
         }
@@ -1469,7 +1469,7 @@ Battle::Actions AI::BattlePlanner::archerDecision( Battle::Arena & arena, const 
     // Archers are blocked and there is nowhere to retreat, they are fighting in melee
     else if ( currentUnit.isHandFighting() ) {
         BattleTargetPair target;
-        int32_t bestOutcome = INT32_MIN;
+        int64_t bestOutcome = std::numeric_limits<int64_t>::min();
 
         for ( const Battle::Unit * enemy : enemies ) {
             assert( enemy != nullptr );
@@ -1483,10 +1483,10 @@ Battle::Actions AI::BattlePlanner::archerDecision( Battle::Arena & arena, const 
 
             const uint32_t archerMeleeDmg = currentUnit.getPotentialDamage( *enemy );
             const uint32_t retaliatoryDmg = enemy->EstimateRetaliatoryDamage( archerMeleeDmg );
-            const int32_t damageDiff = static_cast<int32_t>( archerMeleeDmg ) - static_cast<int32_t>( retaliatoryDmg );
-            const int32_t tacticalBonus = static_cast<int32_t>( std::min<double>( getTacticalTargetValue( currentUnit, *enemy ) * 0.15,
-                                                                                 static_cast<double>( std::numeric_limits<int32_t>::max() / 4 ) ) );
-            const int32_t outcome = damageDiff + tacticalBonus;
+            const int64_t damageDiff = static_cast<int64_t>( archerMeleeDmg ) - static_cast<int64_t>( retaliatoryDmg );
+            const int64_t tacticalBonus = static_cast<int64_t>( std::min<double>( getTacticalTargetValue( currentUnit, *enemy ) * 0.15,
+                                                                                 static_cast<double>( std::numeric_limits<int32_t>::max() ) ) );
+            const int64_t outcome = damageDiff + tacticalBonus;
             if ( bestOutcome < outcome ) {
                 bestOutcome = outcome;
 
@@ -1552,7 +1552,7 @@ Battle::Actions AI::BattlePlanner::archerDecision( Battle::Arena & arena, const 
 
                         if ( isExtraLogicAllowed ) {
                             const uint32_t damageHitPoints = std::min( unit->GetHitPoints(), currentUnit.getPotentialDamage( *unit ) );
-                            if ( currentUnit.GetColor() == unit->GetCurrentColor() ) {
+                            if ( currentUnit.GetCurrentColor() == unit->GetCurrentColor() ) {
                                 friendDamageHitPoints += damageHitPoints;
                             }
                             else {
@@ -1560,8 +1560,9 @@ Battle::Actions AI::BattlePlanner::archerDecision( Battle::Arena & arena, const 
                             }
                         }
 
-                        if ( currentUnit.GetColor() == unit->GetCurrentColor() ) {
-                            result += unit->evaluateThreatForUnit( currentUnit );
+                        if ( currentUnit.GetCurrentColor() == unit->GetCurrentColor() ) {
+                            // Friendly collateral must reduce the value of an area shot, not make it look more attractive.
+                            result -= unit->evaluateThreatForUnit( currentUnit );
                         }
                         else {
                             result += getTacticalTargetValue( currentUnit, *unit );

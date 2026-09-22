@@ -1015,7 +1015,7 @@ namespace
         }
 
         const bool reachableThisTurn = distance <= movePoints;
-        const bool requiresMultipleTurns = distance > movePoints * 2;
+        const bool requiresMultipleTurns = static_cast<uint64_t>( distance ) > static_cast<uint64_t>( movePoints ) * 2;
 
         switch ( objectType ) {
         case MP2::OBJ_CASTLE:
@@ -1024,6 +1024,7 @@ namespace
             // starting another trip that leaves the target time to move or reinforce.
             return reachableThisTurn ? 1.25 : 1.0;
 
+        case MP2::OBJ_ABANDONED_MINE:
         case MP2::OBJ_ALCHEMIST_LAB:
         case MP2::OBJ_ARTIFACT:
         case MP2::OBJ_MINE:
@@ -2600,6 +2601,8 @@ int AI::Planner::getPriorityTarget( Heroes & hero, double & maxPriority )
 
         value -= enemyThreatPenalty;
 
+        const uint32_t actualDistance = distance;
+
         // Distant object which is out of reach for the current turn must have lower priority.
         if ( distance > heroMovePoints ) {
             distance = heroMovePoints + ( distance - heroMovePoints ) * 2;
@@ -2608,7 +2611,7 @@ int AI::Planner::getPriorityTarget( Heroes & hero, double & maxPriority )
         value = scaleWithDistanceAndTime( value, distance, type );
 
         if ( value > 0 ) {
-            value *= getReachabilityPriorityModifier( type, distance, heroMovePoints );
+            value *= getReachabilityPriorityModifier( type, actualDistance, heroMovePoints );
         }
     };
 
