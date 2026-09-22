@@ -30,6 +30,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <fstream>
 #include <functional>
 #include <limits>
@@ -223,9 +224,14 @@ namespace
 
     bool loadOfflineProgressData( OfflineProgressData & data )
     {
-        std::ifstream input( getOfflineProgressFilePath() );
+        const std::string filePath = getOfflineProgressFilePath();
+        std::ifstream input( filePath );
         if ( !input ) {
-            return false;
+            // A backup can exist if the process was interrupted while replacing the state file.
+            input.open( filePath + ".bak" );
+            if ( !input ) {
+                return false;
+            }
         }
 
         int version = 0;
@@ -416,9 +422,13 @@ namespace
 
     void saveOfflineProgressData( const OfflineProgressData & data )
     {
-        std::ofstream output( getOfflineProgressFilePath(), std::ios::trunc );
+        const std::string filePath = getOfflineProgressFilePath();
+        const std::string tempFilePath = filePath + ".tmp";
+        const std::string backupFilePath = filePath + ".bak";
+
+        std::ofstream output( tempFilePath, std::ios::trunc );
         if ( !output ) {
-            ERROR_LOG( "Unable to write offline progress data." )
+            ERROR_LOG( "Unable to write temporary offline progress data." )
             return;
         }
 
@@ -480,6 +490,37 @@ namespace
             output << ' ' << value;
         }
         output << '\n';
+
+        output.flush();
+        if ( !output ) {
+            ERROR_LOG( "Unable to flush temporary offline progress data." )
+            output.close();
+            System::Unlink( tempFilePath );
+            return;
+        }
+
+        output.close();
+
+        // Replace the live file only after the temporary file is fully written. Keep one backup
+        // during the swap so an interrupted rename cannot destroy the last valid snapshot.
+        System::Unlink( backupFilePath );
+        const bool hadOriginal = System::IsFile( filePath );
+        if ( hadOriginal && std::rename( filePath.c_str(), backupFilePath.c_str() ) != 0 ) {
+            ERROR_LOG( "Unable to back up offline progress data." )
+            System::Unlink( tempFilePath );
+            return;
+        }
+
+        if ( std::rename( tempFilePath.c_str(), filePath.c_str() ) != 0 ) {
+            ERROR_LOG( "Unable to replace offline progress data." )
+            if ( hadOriginal ) {
+                std::rename( backupFilePath.c_str(), filePath.c_str() );
+            }
+            System::Unlink( tempFilePath );
+            return;
+        }
+
+        System::Unlink( backupFilePath );
     }
 
     void setKingdomFundsExact( Kingdom & kingdom, const Funds & target )
@@ -947,9 +988,12 @@ namespace
     void persistOfflineProgressSnapshot( Kingdom & kingdom )
     {
         OfflineProgressData data;
-        loadOfflineProgressData( data );
+        const bool hasSavedData = loadOfflineProgressData( data );
+        const int64_t now = getCurrentUnixTime();
 
-        data.lastSeenUnix = getCurrentUnixTime();
+        // Never move the offline clock backwards. A temporary system-clock rollback would
+        // otherwise become a fake offline interval after the clock returns to normal.
+        data.lastSeenUnix = hasSavedData ? std::max( data.lastSeenUnix, now ) : now;
         data.resources = kingdom.GetFunds();
         captureOfflineKingdomState( data, kingdom );
         capturePersistentCreatureRoster( data, kingdom );
@@ -1707,7 +1751,8 @@ namespace
         setKingdomFundsExact( kingdom, data.resources );
 
         OfflineProgressSummary summary;
-        summary.elapsedSeconds = std::max<int64_t>( 0, now - data.lastSeenUnix );
+        const int64_t previousLastSeenUnix = data.lastSeenUnix;
+        summary.elapsedSeconds = now > previousLastSeenUnix ? now - previousLastSeenUnix : 0;
         summary.stateCastles = data.stateCastles;
         summary.stateTowns = data.stateTowns;
         summary.stateHeroes = data.stateHeroes;
@@ -1751,11 +1796,11 @@ namespace
             data.resources.*member = static_cast<int32_t>( baseResource + reward );
         }
 
-        applyOfflineHomecomingBonus( summary, data, data.lastSeenUnix );
+        applyOfflineHomecomingBonus( summary, data, previousLastSeenUnix );
         applyOfflineStreakProgress( summary, data );
-        applyOfflineRareDiscovery( summary, data, data.lastSeenUnix );
+        applyOfflineRareDiscovery( summary, data, previousLastSeenUnix );
         applyOfflineContractProgress( summary, data );
-        applyOfflineTreasureHunt( summary, data, data.lastSeenUnix );
+        applyOfflineTreasureHunt( summary, data, previousLastSeenUnix );
         applyOfflineSupplyRush( summary, data );
         applyOfflineRenownProgress( summary, data );
 
@@ -1763,7 +1808,8 @@ namespace
         applyOfflineCreatureRecruitment( summary, data, kingdom );
 
         // The next offline interval uses the active map and player state at this snapshot.
-        data.lastSeenUnix = now;
+        // Preserve a future saved timestamp if the local system clock temporarily moves backwards.
+        data.lastSeenUnix = std::max( previousLastSeenUnix, now );
         captureOfflineKingdomState( data, kingdom );
         capturePersistentCreatureRoster( data, kingdom );
         saveOfflineProgressData( data );

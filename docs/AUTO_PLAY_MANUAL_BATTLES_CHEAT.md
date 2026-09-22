@@ -70,3 +70,6 @@ The battlefield hex grid is forced off in this fork. Movement-area and cursor-sh
 
 
 Enemy scaling is intentionally varied. Enemy heroes and castle garrisons receive deterministic per-map random variation around the strength-based base multiplier (roughly 70–140% of the scaling bonus), plus smaller per-stack variation while preserving the same 2.85x hard cap. Neutral wandering stacks use a wider 60–150% spread and are capped at 2.35x. Seeds are based on the map and entity/tile so reloads do not reroll the result.
+
+
+Offline persistence now keeps the last-seen timestamp monotonic so system-clock rollback cannot create duplicate offline time. State-file saves are written to a temporary file and swapped into place with a backup, reducing the chance of losing the offline wallet/roster if the process stops during a save.
