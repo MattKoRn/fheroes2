@@ -135,6 +135,7 @@ namespace
         uint32_t supplyRushMeter{ 0 };
         PersistentCreatureRoster creatureRoster{};
         PersistentCreatureRoster creatureReserve{};
+        PersistentCreatureRoster creatureRecruitCarry{};
     };
 
     struct OfflineEvent
@@ -249,6 +250,7 @@ namespace
         bool hasSupplyRushMeter = false;
         bool hasCreatureRoster = false;
         bool hasCreatureReserve = false;
+        bool hasCreatureRecruitCarry = false;
 
         const auto readFunds = [&input]( Funds & funds ) {
             for ( const FundsMember member : offlineFundMembers ) {
@@ -370,6 +372,14 @@ namespace
                     }
                 }
             }
+            else if ( key == "creature_recruit_carry" ) {
+                hasCreatureRecruitCarry = true;
+                for ( uint64_t & value : data.creatureRecruitCarry ) {
+                    if ( !( input >> value ) ) {
+                        return false;
+                    }
+                }
+            }
             else {
                 std::string ignoredLine;
                 std::getline( input, ignoredLine );
@@ -395,8 +405,12 @@ namespace
                    && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter )
               || ( version == 8 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
                    && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
-                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter && hasCreatureRoster && hasCreatureReserve );
-        return ( version >= 1 && version <= 8 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
+                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter && hasCreatureRoster && hasCreatureReserve )
+              || ( version == 9 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
+                   && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
+                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter && hasCreatureRoster && hasCreatureReserve
+                   && hasCreatureRecruitCarry );
+        return ( version >= 1 && version <= 9 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
     }
 
     void saveOfflineProgressData( const OfflineProgressData & data )
@@ -417,7 +431,7 @@ namespace
             output << '\n';
         };
 
-        output << "version 8\n";
+        output << "version 9\n";
         output << "last_seen_unix " << data.lastSeenUnix << '\n';
         output << "resources ";
         writeFunds( data.resources );
@@ -457,6 +471,12 @@ namespace
         output << "creature_reserve";
         for ( const uint64_t count : data.creatureReserve ) {
             output << ' ' << count;
+        }
+        output << '\n';
+
+        output << "creature_recruit_carry";
+        for ( const uint64_t value : data.creatureRecruitCarry ) {
+            output << ' ' << value;
         }
         output << '\n';
     }
@@ -1458,7 +1478,7 @@ namespace
 
     void applyOfflineCreatureRecruitment( OfflineProgressSummary & summary, OfflineProgressData & data, Kingdom & kingdom )
     {
-        if ( summary.elapsedSeconds < 12 * 60 * 60 || summary.productionRewards.GetValidItemsCount() == 0 ) {
+        if ( summary.elapsedSeconds <= 0 || summary.productionRewards.GetValidItemsCount() == 0 ) {
             return;
         }
 
@@ -1503,14 +1523,19 @@ namespace
                     continue;
                 }
 
-                const long double recruitRate = static_cast<long double>( monster.GetGrown() ) * static_cast<long double>( summary.elapsedSeconds )
-                                                * static_cast<long double>( summary.stateEfficiencyPercent )
-                                                / ( static_cast<long double>( fullGrowthSeconds ) * 100.0L );
-                uint64_t recruitQuota = recruitRate >= static_cast<long double>( std::numeric_limits<uint64_t>::max() )
+                const size_t monsterId = static_cast<size_t>( monster.GetID() );
+                const long double divisor = static_cast<long double>( fullGrowthSeconds ) * 100.0L;
+                const long double numerator = static_cast<long double>( data.creatureRecruitCarry[monsterId] )
+                                              + static_cast<long double>( monster.GetGrown() ) * static_cast<long double>( summary.elapsedSeconds )
+                                                    * static_cast<long double>( summary.stateEfficiencyPercent );
+                const long double quotaValue = std::floor( numerator / divisor );
+                uint64_t recruitQuota = quotaValue >= static_cast<long double>( std::numeric_limits<uint64_t>::max() )
                                             ? std::numeric_limits<uint64_t>::max()
-                                            : static_cast<uint64_t>( recruitRate );
+                                            : static_cast<uint64_t>( quotaValue );
+                data.creatureRecruitCarry[monsterId] = static_cast<uint64_t>( std::fmod( numerator, divisor ) );
+
                 if ( recruitQuota == 0 ) {
-                    recruitQuota = 1;
+                    continue;
                 }
 
                 const int affordable = kingdom.GetFunds().getLowestQuotient( monster.GetCost() );
@@ -1518,8 +1543,8 @@ namespace
                     continue;
                 }
 
-                recruitQuota = std::min<uint64_t>( recruitQuota, static_cast<uint64_t>( affordable ) );
-                const uint32_t recruitCount = static_cast<uint32_t>( std::min<uint64_t>( recruitQuota, std::numeric_limits<uint32_t>::max() ) );
+                const uint64_t affordableQuota = std::min<uint64_t>( recruitQuota, static_cast<uint64_t>( affordable ) );
+                const uint32_t recruitCount = static_cast<uint32_t>( std::min<uint64_t>( affordableQuota, std::numeric_limits<uint32_t>::max() ) );
                 if ( recruitCount == 0 ) {
                     continue;
                 }
@@ -1535,7 +1560,23 @@ namespace
 
                 const Funds cost = monster.GetCost() * recruitCount;
                 if ( !kingdom.AllowPayment( cost ) || !destination->JoinTroop( monster, recruitCount, false ) ) {
+                    // Keep the earned whole-creature quota when army space prevents deployment.
+                    const long double returnedCarry = static_cast<long double>( data.creatureRecruitCarry[monsterId] )
+                                                      + static_cast<long double>( recruitQuota ) * divisor;
+                    data.creatureRecruitCarry[monsterId]
+                        = returnedCarry >= static_cast<long double>( std::numeric_limits<uint64_t>::max() )
+                              ? std::numeric_limits<uint64_t>::max()
+                              : static_cast<uint64_t>( returnedCarry );
                     continue;
+                }
+
+                if ( recruitQuota > recruitCount ) {
+                    const long double returnedCarry = static_cast<long double>( data.creatureRecruitCarry[monsterId] )
+                                                      + static_cast<long double>( recruitQuota - recruitCount ) * divisor;
+                    data.creatureRecruitCarry[monsterId]
+                        = returnedCarry >= static_cast<long double>( std::numeric_limits<uint64_t>::max() )
+                              ? std::numeric_limits<uint64_t>::max()
+                              : static_cast<uint64_t>( returnedCarry );
                 }
 
                 kingdom.OddFundsResource( cost );
