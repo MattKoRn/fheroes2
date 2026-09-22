@@ -532,5 +532,12 @@ void AI::Planner::CastleTurn( Castle & castle, const bool defensiveStrategy )
         const RegionStats & stats = _regions[regionID];
 
         CastleDevelopment( castle, stats.safetyFactor, stats.spellLevel );
+
+        // If a hero is currently using this safe settlement, convert any remaining affordable
+        // creature stock into immediate field strength after the day's development decision.
+        // Empty safe towns still preserve resources for future construction.
+        if ( castle.GetHero() != nullptr ) {
+            reinforceCastle( castle );
+        }
     }
 }

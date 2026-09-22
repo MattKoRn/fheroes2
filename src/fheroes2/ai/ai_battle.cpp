@@ -207,7 +207,7 @@ namespace
                 const Battle::Unit * unit = board->at( index ).GetUnit();
 
                 // Attacking unit can be under the influence of the Hypnotize spell
-                if ( unit == nullptr || unit == &attacker || unit->GetColor() == attacker.GetCurrentColor() ) {
+                if ( unit == nullptr || unit == &attacker || unit->GetCurrentColor() == attacker.GetCurrentColor() ) {
                     continue;
                 }
 
