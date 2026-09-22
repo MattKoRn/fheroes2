@@ -1720,7 +1720,7 @@ namespace
             message += "\n";
             if ( summary.recruitedCreatures > 0 ) {
                 std::string recruited = _( "Auto-buy: %{count} creatures | %{towns} towns." );
-                StringReplace( recruited, "%{count}", std::to_string( summary.recruitedCreatures ) );
+                StringReplace( recruited, "%{count}", fheroes2::abbreviateNumber( summary.recruitedCreatures ) );
                 StringReplace( recruited, "%{towns}", std::to_string( summary.recruitmentSettlements ) );
                 message += recruited;
             }
@@ -1828,7 +1828,7 @@ namespace
 
         if ( summary.recruitedCreatures > 0 ) {
             std::string recruited = _( "Auto-buy %{count} | %{towns} towns | paid" );
-            StringReplace( recruited, "%{count}", std::to_string( summary.recruitedCreatures ) );
+            StringReplace( recruited, "%{count}", fheroes2::abbreviateNumber( summary.recruitedCreatures ) );
             StringReplace( recruited, "%{towns}", std::to_string( summary.recruitmentSettlements ) );
             message += "\n";
             message += recruited;
