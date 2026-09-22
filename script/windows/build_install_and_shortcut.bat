@@ -93,6 +93,7 @@ cmake -S "%ROOT%" -B "%BUILD_DIR%" ^
     -DVCPKG_TARGET_TRIPLET=%TRIPLET% ^
     -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON ^
     -DENABLE_IMAGE=ON ^
+    -DGET_HOMM2_DEMO=ON ^
     -DCMAKE_INSTALL_PREFIX="%INSTALL_DIR%"
 if errorlevel 1 (
     echo ERROR: CMake configuration failed.
@@ -131,6 +132,16 @@ if not exist "%INSTALL_DIR%\bin\fheroes2.exe" (
     goto :fail
 )
 
+if not exist "%INSTALL_DIR%\share\fheroes2\data\HEROES2.AGG" (
+    echo ERROR: The game executable was installed, but the required HoMM II game data was not.
+    echo Expected:
+    echo   %INSTALL_DIR%\share\fheroes2\data\HEROES2.AGG
+    echo.
+    echo The one-click installer is configured to install the official free demo data.
+    echo Review the CMake download/install messages above for the download error.
+    goto :fail
+)
+
 echo.
 echo [11/11] Creating Desktop shortcut...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
@@ -154,6 +165,7 @@ echo fheroes2 is installed at:
 echo   %INSTALL_DIR%
 echo.
 echo A Desktop shortcut named "fheroes2" has been created.
+echo HoMM II demo game data was installed automatically.
 echo.
 pause
 exit /b 0
@@ -280,8 +292,8 @@ echo Review the specific error above.
 echo.
 echo If winget itself is missing, install or update "App Installer"
 echo from the Microsoft Store. The script handles Git, CMake,
-echo vcpkg, Visual Studio C++ Build Tools, compilation, installation,
-echo and Desktop shortcut creation automatically.
+echo vcpkg, Visual Studio C++ Build Tools, demo game data, compilation,
+echo installation, and Desktop shortcut creation automatically.
 echo.
 pause
 exit /b 1

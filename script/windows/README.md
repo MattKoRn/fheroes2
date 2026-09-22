@@ -27,3 +27,10 @@ Windows Package Manager (`winget`) must be available. It is normally provided by
 Windows may ask for administrator approval when the Visual Studio C++ Build Tools need to be installed.
 
 The original `install_packages.bat` helper remains available for the older Visual Studio package workflow.
+
+
+## Game data
+
+The one-click installer configures CMake with `GET_HOMM2_DEMO=ON`, so the official free Heroes of Might and Magic II demo data is downloaded and installed automatically. A successful install must contain `share\fheroes2\data\HEROES2.AGG`; the installer checks this before creating the Desktop shortcut.
+
+If you later want to use a legally purchased full Heroes II data set instead, you can replace/install the corresponding `ANIM`, `DATA`, `MAPS`, and `MUSIC` resources using the bundled extraction tools.
