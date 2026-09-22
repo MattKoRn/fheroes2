@@ -47,7 +47,7 @@ if not defined VCPKG_ROOT (
 
 if not exist "%VCPKG_ROOT%\vcpkg.exe" (
     echo.
-    echo [5/10] Preparing vcpkg in "%VCPKG_ROOT%"...
+    echo [5/11] Preparing vcpkg in "%VCPKG_ROOT%"...
     if not exist "%VCPKG_ROOT%\.git" (
         git clone --depth 1 https://github.com/microsoft/vcpkg.git "%VCPKG_ROOT%"
         if errorlevel 1 (
@@ -63,11 +63,11 @@ if not exist "%VCPKG_ROOT%\vcpkg.exe" (
     )
 ) else (
     echo.
-    echo [5/10] Using existing vcpkg at "%VCPKG_ROOT%".
+    echo [5/11] Using existing vcpkg at "%VCPKG_ROOT%".
 )
 
 echo.
-echo [6/10] Installing SDL2 and zlib dependencies...
+echo [6/11] Installing SDL2 and zlib dependencies...
 "%VCPKG_ROOT%\vcpkg.exe" install --triplet %TRIPLET% sdl2 sdl2-image sdl2-mixer zlib
 if errorlevel 1 (
     echo ERROR: vcpkg dependency installation failed.
@@ -75,7 +75,19 @@ if errorlevel 1 (
 )
 
 echo.
-echo [7/10] Configuring Release build...
+echo [7/11] Cleaning old CMake build cache...
+if exist "%BUILD_DIR%" (
+    rmdir /S /Q "%BUILD_DIR%"
+    if exist "%BUILD_DIR%" (
+        echo ERROR: Could not remove the old build directory:
+        echo   %BUILD_DIR%
+        echo Close Visual Studio or any program using files in that folder, then run this script again.
+        goto :fail
+    )
+)
+
+echo.
+echo [8/11] Configuring Release build...
 cmake -S "%ROOT%" -B "%BUILD_DIR%" ^
     -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" ^
     -DVCPKG_TARGET_TRIPLET=%TRIPLET% ^
@@ -87,7 +99,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [8/10] Compiling fheroes2...
+echo [9/11] Compiling fheroes2...
 cmake --build "%BUILD_DIR%" --config Release --parallel
 if errorlevel 1 (
     echo ERROR: Compilation failed.
@@ -95,7 +107,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [9/10] Installing to "%INSTALL_DIR%"...
+echo [10/11] Installing to "%INSTALL_DIR%"...
 cmake --install "%BUILD_DIR%" --config Release
 if errorlevel 1 (
     echo ERROR: CMake install failed.
@@ -113,7 +125,7 @@ if not exist "%INSTALL_DIR%\bin\fheroes2.exe" (
 )
 
 echo.
-echo [10/10] Creating Desktop shortcut...
+echo [11/11] Creating Desktop shortcut...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "$desktop=[Environment]::GetFolderPath('Desktop');" ^
     "$shell=New-Object -ComObject WScript.Shell;" ^
@@ -142,11 +154,11 @@ exit /b 0
 :ensure_winget
 where winget >nul 2>nul
 if not errorlevel 1 (
-    echo [1/10] Windows Package Manager found.
+    echo [1/11] Windows Package Manager found.
     exit /b 0
 )
 
-echo [1/10] ERROR: Windows Package Manager (winget) was not found.
+echo [1/11] ERROR: Windows Package Manager (winget) was not found.
 echo.
 echo Install or update "App Installer" from the Microsoft Store,
 echo then double-click this file again. Git and CMake do not need
@@ -163,11 +175,11 @@ exit /b 0
 :ensure_git
 where git >nul 2>nul
 if not errorlevel 1 (
-    echo [2/10] Git found.
+    echo [2/11] Git found.
     exit /b 0
 )
 
-echo [2/10] Git is missing. Installing Git for Windows...
+echo [2/11] Git is missing. Installing Git for Windows...
 winget install --id Git.Git --exact --source winget --accept-source-agreements --accept-package-agreements --silent
 if errorlevel 1 (
     echo ERROR: winget could not install Git.
@@ -188,11 +200,11 @@ exit /b 0
 :ensure_cmake
 where cmake >nul 2>nul
 if not errorlevel 1 (
-    echo [3/10] CMake found.
+    echo [3/11] CMake found.
     exit /b 0
 )
 
-echo [3/10] CMake is missing. Installing CMake...
+echo [3/11] CMake is missing. Installing CMake...
 winget install --id Kitware.CMake --exact --source winget --accept-source-agreements --accept-package-agreements --silent
 if errorlevel 1 (
     echo ERROR: winget could not install CMake.
@@ -220,11 +232,11 @@ if exist "%VSWHERE%" (
 )
 
 if defined VS_PATH (
-    echo [4/10] Visual Studio C++ Build Tools found.
+    echo [4/11] Visual Studio C++ Build Tools found.
     exit /b 0
 )
 
-echo [4/10] Visual Studio C++ Build Tools are missing.
+echo [4/11] Visual Studio C++ Build Tools are missing.
 echo Windows may ask for administrator approval.
 echo Installing Visual Studio 2022 Build Tools with the C++ workload...
 winget install --id Microsoft.VisualStudio.2022.BuildTools --exact --source winget ^
