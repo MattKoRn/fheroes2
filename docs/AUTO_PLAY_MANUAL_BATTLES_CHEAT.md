@@ -62,3 +62,8 @@ New-map enemy scaling compares the carried roster's actual monster strength with
 
 
 Large creature-count displays now use an algorithmic suffix formatter. Compact army and battle stack labels use K, M, B, then generated suffixes aa, ab, ... zz, aaa, and onward rather than a fixed suffix table. The formatter itself has no fixed suffix list; actual deployed troop counts still obey the engine's 32-bit stack limit, with excess persistent creatures kept in reserve.
+
+
+## Battle presentation
+
+The battlefield hex grid is forced off in this fork. Movement-area and cursor-shadow visuals remain separate and are not disabled. The engine's default battle animation speed is increased by one step, from 4 to 5; visible auto-play battles use this new default speed.

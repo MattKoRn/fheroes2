@@ -113,7 +113,7 @@ Settings::Settings()
     _gameOptions.SetModes( GAME_SHOW_BUTTONS );
     _gameOptions.SetModes( GAME_SHOW_STATUS );
 
-    _gameOptions.SetModes( GAME_BATTLE_SHOW_GRID );
+    // Keep the battlefield hex grid hidden. Movement and cursor shadows remain available.
     _gameOptions.SetModes( GAME_BATTLE_SHOW_MOUSE_SHADOW );
     _gameOptions.SetModes( GAME_BATTLE_SHOW_MOVE_SHADOW );
     _gameOptions.SetModes( GAME_BATTLE_AUTO_RESOLVE );
@@ -1199,9 +1199,10 @@ void Settings::EnablePriceOfLoyaltySupport( const bool set )
     }
 }
 
-void Settings::SetBattleGrid( bool f )
+void Settings::SetBattleGrid( bool )
 {
-    f ? _gameOptions.SetModes( GAME_BATTLE_SHOW_GRID ) : _gameOptions.ResetModes( GAME_BATTLE_SHOW_GRID );
+    // The fork intentionally hides the battlefield hex grid in combat.
+    _gameOptions.ResetModes( GAME_BATTLE_SHOW_GRID );
 }
 
 void Settings::SetBattleMovementShaded( bool f )

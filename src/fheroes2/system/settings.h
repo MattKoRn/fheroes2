@@ -40,7 +40,7 @@ class OStreamBase;
 
 enum class PlayerColor : uint8_t;
 
-inline constexpr int defaultBattleSpeed{ 4 };
+inline constexpr int defaultBattleSpeed{ 5 };
 
 enum AdventureMapScrollSpeed : int
 {
