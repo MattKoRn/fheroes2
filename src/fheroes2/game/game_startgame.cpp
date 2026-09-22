@@ -1400,14 +1400,10 @@ namespace
             return;
         }
 
-        // Recruitment has no elapsed-time ceiling. It accrues forever, but at only one normal
-        // week of base growth per 35 real-world days. Normal creature prices still apply.
-        Funds remainingBudget = kingdom.GetFunds() / 4;
-
+        // Recruitment has no elapsed-time ceiling. It accrues forever at a deliberately low rate.
+        // All built tiers are eligible immediately, and recruitment may spend the full treasury.
         constexpr std::array<uint32_t, 6> baseDwellings{ DWELLING_MONSTER1, DWELLING_MONSTER2, DWELLING_MONSTER3,
                                                          DWELLING_MONSTER4, DWELLING_MONSTER5, DWELLING_MONSTER6 };
-        constexpr std::array<int64_t, 6> tierUnlockSeconds{ 12 * 60 * 60, 18 * 60 * 60, 24 * 60 * 60,
-                                                            36 * 60 * 60, 72 * 60 * 60, 7 * offlineSecondsPerDay };
         constexpr int64_t fullGrowthSeconds = 35 * offlineSecondsPerDay;
 
         for ( size_t castleIndex = 0; castleIndex < settlementLimit; ++castleIndex ) {
@@ -1420,7 +1416,7 @@ namespace
 
             for ( int tier = Castle::maxNumOfDwellings - 1; tier >= 0; --tier ) {
                 const uint32_t baseDwelling = baseDwellings[static_cast<size_t>( tier )];
-                if ( !castle->isBuild( baseDwelling ) || summary.elapsedSeconds < tierUnlockSeconds[static_cast<size_t>( tier )] ) {
+                if ( !castle->isBuild( baseDwelling ) ) {
                     continue;
                 }
 
@@ -1444,7 +1440,7 @@ namespace
                     recruitQuota = 1;
                 }
 
-                const int affordable = remainingBudget.getLowestQuotient( monster.GetCost() );
+                const int affordable = kingdom.GetFunds().getLowestQuotient( monster.GetCost() );
                 if ( affordable <= 0 ) {
                     continue;
                 }
@@ -1470,7 +1466,6 @@ namespace
                 }
 
                 kingdom.OddFundsResource( cost );
-                remainingBudget -= cost;
                 summary.recruitmentSpent += cost;
                 summary.recruitedCreatures += recruitCount;
                 ++summary.recruitedStacks;
