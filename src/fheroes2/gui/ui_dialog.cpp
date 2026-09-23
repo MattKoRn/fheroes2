@@ -240,10 +240,7 @@ namespace fheroes2
             if ( buttons & Dialog::OK ) {
                 return Dialog::OK;
             }
-            if ( buttons & Dialog::YES ) {
-                return Dialog::YES;
-            }
-
+            // A YES-only dialog should simply close without confirming anything.
             return Dialog::ZERO;
         };
 
