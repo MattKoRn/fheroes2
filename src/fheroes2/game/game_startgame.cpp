@@ -94,6 +94,7 @@
 #include "ui_constants.h"
 #include "ui_dialog.h"
 #include "ui_language.h"
+#include "ui_monster.h"
 #include "ui_text.h"
 #include "ui_tool.h"
 #include "week.h"
@@ -238,80 +239,104 @@ namespace
                 return;
             }
 
-            const int32_t columns = std::min<int32_t>( 4, static_cast<int32_t>( _creatures.size() ) );
-            const int32_t rows = ( static_cast<int32_t>( _creatures.size() ) + columns - 1 ) / columns;
+            const fheroes2::Sprite & sampleFrame = Assets::getImage( ICN::STRIP, 12 );
+            const fheroes2::Text sampleCountText( "x999", fheroes2::FontType::smallWhite() );
+            _countTextHeight = sampleCountText.height();
+            _spriteRowHeight = sampleFrame.height() + _countTextHeight + 4;
 
-            // The caller calculates the exact vertical space left by the dialog title, body,
-            // button and frame. Shrink only the grid when the screen is tight.
-            _area = { fheroes2::boxAreaWidthPx, std::min<int32_t>( rows * 34, std::max<int32_t>( 1, maxHeight ) ) };
+            const int32_t columns = std::min<int32_t>( 4, static_cast<int32_t>( _creatures.size() ) );
+            const int32_t totalRows = ( static_cast<int32_t>( _creatures.size() ) + columns - 1 ) / columns;
+            const int32_t totalHeightAllSprites = totalRows * _spriteRowHeight;
+
+            if ( totalHeightAllSprites <= maxHeight ) {
+                _visibleCreaturesCount = _creatures.size();
+                _overflowCreaturesCount = 0;
+                _area = { fheroes2::boxAreaWidthPx, totalHeightAllSprites };
+                return;
+            }
+
+            const fheroes2::Text sampleOverflowText( _( "Recruited 999 more creatures!" ), fheroes2::FontType::normalWhite() );
+            const int32_t overflowSpacer = 8;
+            const int32_t overflowTextHeight = sampleOverflowText.height( fheroes2::boxAreaWidthPx );
+            const int32_t overflowTotalHeight = overflowTextHeight + overflowSpacer;
+
+            const int32_t availableForSprites = maxHeight - overflowTotalHeight;
+            const int32_t maxRows = std::max<int32_t>( 0, availableForSprites / _spriteRowHeight );
+
+            _visibleCreaturesCount = std::min( _creatures.size(), static_cast<size_t>( maxRows * 4 ) );
+            _overflowCreaturesCount = 0;
+            for ( size_t i = _visibleCreaturesCount; i < _creatures.size(); ++i ) {
+                _overflowCreaturesCount += _creatures[i].second;
+            }
+
+            const int32_t visibleColumns = _visibleCreaturesCount > 0 ? std::min<int32_t>( 4, static_cast<int32_t>( _visibleCreaturesCount ) ) : 1;
+            const int32_t visibleRows = _visibleCreaturesCount > 0 ? ( static_cast<int32_t>( _visibleCreaturesCount ) + visibleColumns - 1 ) / visibleColumns : 0;
+
+            const int32_t totalHeight = visibleRows * _spriteRowHeight + ( _overflowCreaturesCount > 0 ? overflowTotalHeight : 0 );
+            _area = { fheroes2::boxAreaWidthPx, totalHeight };
         }
 
         void draw( fheroes2::Image & output, const fheroes2::Point & offset ) const override
         {
-            if ( _creatures.empty() || _area.height <= 0 ) {
+            if ( _area.height <= 0 ) {
                 return;
             }
 
-            const int32_t columns = std::min<int32_t>( 4, static_cast<int32_t>( _creatures.size() ) );
-            const int32_t rows = ( static_cast<int32_t>( _creatures.size() ) + columns - 1 ) / columns;
-            const int32_t cellWidth = _area.width / columns;
-            const int32_t cellHeight = std::max<int32_t>( 1, _area.height / rows );
+            if ( _visibleCreaturesCount > 0 ) {
+                const int32_t columns = std::min<int32_t>( 4, static_cast<int32_t>( _visibleCreaturesCount ) );
+                const int32_t cellWidth = _area.width / columns;
 
-            const fheroes2::Text sampleCountText( "x999", fheroes2::FontType::smallWhite() );
-            const int32_t countTextHeight = sampleCountText.height();
-            const bool showCountText = cellHeight >= countTextHeight + 10;
-            const int32_t maxIconWidth = std::max<int32_t>( 1, cellWidth - 4 );
-            const int32_t maxIconHeight = std::max<int32_t>( 1, cellHeight - ( showCountText ? countTextHeight + 2 : 0 ) );
+                for ( size_t i = 0; i < _visibleCreaturesCount; ++i ) {
+                    const Monster & monster = _creatures[i].first;
+                    const uint64_t count = _creatures[i].second;
 
-            for ( size_t i = 0; i < _creatures.size(); ++i ) {
-                const Monster & monster = _creatures[i].first;
-                const uint64_t count = _creatures[i].second;
+                    const int32_t column = static_cast<int32_t>( i ) % columns;
+                    const int32_t row = static_cast<int32_t>( i ) / columns;
+                    const int32_t cellX = offset.x + column * cellWidth;
+                    const int32_t cellY = offset.y + row * _spriteRowHeight;
 
-                const int32_t column = static_cast<int32_t>( i ) % columns;
-                const int32_t row = static_cast<int32_t>( i ) / columns;
-                const int32_t cellX = offset.x + column * cellWidth;
-                const int32_t cellY = offset.y + row * cellHeight;
+                    fheroes2::Sprite sprite = Assets::getImage( ICN::STRIP, 12 );
+                    sprite._disableTransformLayer();
+                    fheroes2::renderMonsterFrame( monster, sprite, { 6, 6 } );
 
-                const fheroes2::Sprite & original = Assets::getImage( ICN::MONS32, monster.GetSpriteIndex() );
+                    const int32_t iconX = cellX + ( cellWidth - sprite.width() ) / 2;
+                    fheroes2::Blit( sprite, output, iconX, cellY );
 
-                int32_t iconWidth = original.width();
-                int32_t iconHeight = original.height();
-                if ( iconWidth > maxIconWidth || iconHeight > maxIconHeight ) {
-                    const double scale = std::min( static_cast<double>( maxIconWidth ) / iconWidth, static_cast<double>( maxIconHeight ) / iconHeight );
-                    iconWidth = std::max<int32_t>( 1, static_cast<int32_t>( std::floor( iconWidth * scale ) ) );
-                    iconHeight = std::max<int32_t>( 1, static_cast<int32_t>( std::floor( iconHeight * scale ) ) );
+                    const fheroes2::Text countText( "x" + std::to_string( count ), fheroes2::FontType::smallWhite() );
+                    countText.draw( cellX + ( cellWidth - countText.width() ) / 2, cellY + _spriteRowHeight - countText.height(), output );
+                }
+            }
 
-                    fheroes2::Sprite resized( iconWidth, iconHeight );
-                    fheroes2::Resize( original, resized );
-                    fheroes2::Blit( resized, output, cellX + ( cellWidth - iconWidth ) / 2, cellY );
+            if ( _overflowCreaturesCount > 0 ) {
+                std::string overflowMsg;
+                if ( _overflowCreaturesCount == 1 ) {
+                    overflowMsg = _( "Recruited 1 more creature!" );
                 }
                 else {
-                    fheroes2::Blit( original, output, cellX + ( cellWidth - iconWidth ) / 2, cellY );
+                    overflowMsg = _( "Recruited %{count} more creatures!" );
+                    StringReplace( overflowMsg, "%{count}", std::to_string( _overflowCreaturesCount ) );
                 }
 
-                if ( showCountText ) {
-                    const fheroes2::Text countText( "x" + std::to_string( count ), fheroes2::FontType::smallWhite() );
-                    countText.draw( cellX + ( cellWidth - countText.width() ) / 2, cellY + cellHeight - countText.height(), output );
-                }
+                const fheroes2::Text overflowText( std::move( overflowMsg ), fheroes2::FontType::normalWhite() );
+                const int32_t textY = offset.y + _area.height - overflowText.height( fheroes2::boxAreaWidthPx );
+                overflowText.draw( offset.x, textY, fheroes2::boxAreaWidthPx, output );
             }
         }
 
         void processEvents( const fheroes2::Point & offset ) const override
         {
-            if ( _creatures.empty() || _area.height <= 0 ) {
+            if ( _visibleCreaturesCount == 0 || _area.height <= 0 ) {
                 return;
             }
 
-            const int32_t columns = std::min<int32_t>( 4, static_cast<int32_t>( _creatures.size() ) );
-            const int32_t rows = ( static_cast<int32_t>( _creatures.size() ) + columns - 1 ) / columns;
+            const int32_t columns = std::min<int32_t>( 4, static_cast<int32_t>( _visibleCreaturesCount ) );
             const int32_t cellWidth = _area.width / columns;
-            const int32_t cellHeight = std::max<int32_t>( 1, _area.height / rows );
 
             LocalEvent & eventHandler = LocalEvent::Get();
-            for ( size_t i = 0; i < _creatures.size(); ++i ) {
+            for ( size_t i = 0; i < _visibleCreaturesCount; ++i ) {
                 const int32_t column = static_cast<int32_t>( i ) % columns;
                 const int32_t row = static_cast<int32_t>( i ) / columns;
-                const fheroes2::Rect cellRoi{ offset.x + column * cellWidth, offset.y + row * cellHeight, cellWidth, cellHeight };
+                const fheroes2::Rect cellRoi{ offset.x + column * cellWidth, offset.y + row * _spriteRowHeight, cellWidth, _spriteRowHeight };
 
                 if ( eventHandler.isMouseRightButtonPressedInArea( cellRoi ) ) {
                     Dialog::ArmyInfo( Troop{ _creatures[i].first, 1 }, Dialog::ZERO );
@@ -327,6 +352,10 @@ namespace
 
     private:
         std::vector<std::pair<Monster, uint64_t>> _creatures;
+        size_t _visibleCreaturesCount{ 0 };
+        uint64_t _overflowCreaturesCount{ 0 };
+        int32_t _spriteRowHeight{ 0 };
+        int32_t _countTextHeight{ 0 };
     };
 
     int64_t getCurrentUnixTime()
