@@ -318,7 +318,8 @@ namespace
     bool buy( Profile & profile, const size_t id )
     {
         if ( id >= upgradeCount || profile.ranks[id] == std::numeric_limits<uint64_t>::max()
-             || effect( id, profile.ranks[id] + 1 ) <= effect( id, profile.ranks[id] ) ) {
+             || effect( id, profile.ranks[id] + 1 ) <= effect( id, profile.ranks[id] )
+             || ( id == BRUTAL_CRITICALS && profile.ranks[CRITICAL_TRAINING] == 0 ) ) {
             return false;
         }
 
@@ -330,6 +331,72 @@ namespace
         profile.points -= price;
         ++profile.ranks[id];
         return true;
+    }
+
+    long double autoBuyUtility( const Profile & profile, const size_t id )
+    {
+        const uint64_t rank = profile.ranks[id];
+        const long double delta = effect( id, rank + 1 ) - effect( id, rank );
+
+        switch ( id ) {
+        case ARMS_TRAINING:
+        case ARMOR_TRAINING:
+            // A single primary-stat point often changes physical damage by roughly 5-10%.
+            return delta * 7.0L;
+        case VETERAN_CORE:
+            return delta * 12.0L;
+        case BLOOD_DRINKER:
+            return delta * 0.75L;
+        case REAPER:
+            return delta * 0.45L;
+        case FEROCITY:
+        case IRON_SKIN:
+        case SORCERY:
+        case SPELL_WARD:
+            return delta;
+        case MARKSMAN:
+        case BRAWLER:
+        case PYROMANCY:
+        case CRYOMANCY:
+        case STORMCRAFT:
+        case CATACLYSM:
+        case ARROW_WARD:
+        case MELEE_GUARD:
+        case FIRE_WARD:
+        case COLD_WARD:
+        case STORM_WARD:
+        case CATACLYSM_WARD:
+            return delta * 0.70L;
+        case EXECUTIONER:
+        case OPENING_BLOW:
+        case GIANT_SLAYER:
+        case OVERWHELM:
+        case FRENZY:
+        case DISCIPLINE:
+        case LAST_STAND:
+        case BULWARK:
+        case UNYIELDING:
+        case RUTHLESS:
+            return delta * 0.55L;
+        case ARMOR_PIERCING:
+        case ARCANE_PIERCING:
+            return delta * 0.45L;
+        case LEADERSHIP:
+        case FORTUNE:
+            return delta * 4.0L;
+        case REGENERATION:
+            return delta * 0.80L;
+        case CRITICAL_TRAINING:
+            return delta * ( 50.0L + effect( BRUTAL_CRITICALS, profile.ranks[BRUTAL_CRITICALS] ) ) / 100.0L;
+        case BRUTAL_CRITICALS:
+            return delta * effect( CRITICAL_TRAINING, profile.ranks[CRITICAL_TRAINING] ) / 100.0L;
+        case EVASION:
+            return delta * 0.50L;
+        case CLOSE_QUARTERS:
+            return delta * 0.35L;
+        default:
+            return delta;
+        }
     }
 
     void autoBuy( Profile & profile )
@@ -349,8 +416,7 @@ namespace
                     continue;
                 }
 
-                const long double marginalReturn
-                    = ( effect( id, rank + 1 ) - effect( id, rank ) ) / static_cast<long double>( cost( id, rank ) );
+                const long double marginalReturn = autoBuyUtility( profile, id ) / static_cast<long double>( cost( id, rank ) );
                 if ( marginalReturn > bestReturn ) {
                     bestReturn = marginalReturn;
                     bestId = id;
@@ -634,6 +700,12 @@ namespace
         if ( canAdvance ) {
             message += "\nNext rank: " + shortEffectSummary( id, rank + 1 );
             message += "\nNext rank costs: " + formatNumber( cost( id, rank ) ) + " points";
+        }
+        if ( id == BRUTAL_CRITICALS && playerProfile.ranks[CRITICAL_TRAINING] == 0 ) {
+            message += "\nRequires: Critical Training rank 1";
+        }
+        if ( !canAdvance ) {
+            message += "\nMaximum effective rank reached.";
         }
         message += "\nAvailable points: " + formatNumber( playerProfile.points );
         fheroes2::showStandardTextMessage( upgrades[id].name, std::move( message ), Dialog::ZERO );
@@ -1221,8 +1293,9 @@ void fheroes2::RPG::showMenu()
                 window.applyTextBackgroundShading( rowArea );
                 drawBeveledPanel( rowArea, false );
 
+                const bool prerequisiteMet = i != BRUTAL_CRITICALS || playerProfile.ranks[CRITICAL_TRAINING] > 0;
                 const bool canBuy = playerProfile.ranks[i] < std::numeric_limits<uint64_t>::max()
-                                    && effect( i, playerProfile.ranks[i] + 1 ) > effect( i, playerProfile.ranks[i] )
+                                    && effect( i, playerProfile.ranks[i] + 1 ) > effect( i, playerProfile.ranks[i] ) && prerequisiteMet
                                     && playerProfile.points >= cost( i, playerProfile.ranks[i] );
                 if ( canBuy ) {
                     fheroes2::Fill( display, rowArea.x + 3, rowArea.y + 5, 2, rowArea.height - 10, fheroes2::GetColorId( 219, 175, 66 ) );
@@ -1249,8 +1322,9 @@ void fheroes2::RPG::showMenu()
                 const std::string next = rankCanAdvance ? shortEffectSummary( i, rank + 1 ) : "MAX EFFECT";
                 drawSingleLine( current + " -> " + next, textX, rowArea.y + 36, rowArea.width - 130,
                                 canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
-                const std::string buyLabel
-                    = rankCanAdvance ? "BUY " + formatNumber( cost( i, playerProfile.ranks[i] ) ) : "MAX";
+                const std::string buyLabel = !rankCanAdvance ? "MAX"
+                                             : !prerequisiteMet ? "LOCKED"
+                                                                : "BUY " + formatNumber( cost( i, playerProfile.ranks[i] ) );
                 drawText( buyLabel, buyAreas[row].x + 3, buyAreas[row].y + 5, buyAreas[row].width - 6,
                           canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
