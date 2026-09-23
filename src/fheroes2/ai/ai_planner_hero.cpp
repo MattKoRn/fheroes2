@@ -1210,14 +1210,16 @@ namespace
 
         switch ( type ) {
         case Skill::Secondary::WISDOM: {
-            // wouldn't check castles/spell availability since high wisdom drives building priority
-            const uint64_t spellDoctrines = fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::SORCERY )
-                                            + fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::PYROMANCY )
-                                            + fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::CRYOMANCY )
-                                            + fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::STORMCRAFT )
-                                            + fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::CATACLYSM );
+            // Don't check castles/spell availability since high Wisdom drives building priority.
+            // Value the real diminishing-return spell bonuses instead of raw ranks: otherwise a
+            // late-game RPG profile can make Wisdom dominate every secondary-skill choice.
+            const double spellDoctrineEffect = fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::SORCERY )
+                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::PYROMANCY )
+                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::CRYOMANCY )
+                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::STORMCRAFT )
+                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::CATACLYSM );
             const double baseWisdom = level == Skill::Level::BASIC ? 2500.0 : 1000.0;
-            return baseWisdom + std::min( 1500.0, static_cast<double>( spellDoctrines ) * 150.0 );
+            return baseWisdom + std::min( 1500.0, spellDoctrineEffect * 50.0 );
         }
         case Skill::Secondary::LOGISTICS:
             return 1500.0;
@@ -1225,7 +1227,7 @@ namespace
             if ( hero.GetArmy().AllTroopsAreUndead() ) {
                 return 100.0;
             }
-            return 1000.0 + static_cast<double>( fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::LEADERSHIP ) ) * 150.0;
+            return 1000.0 + static_cast<double>( fheroes2::RPG::moraleBonus( hero.GetColor() ) ) * 150.0;
         }
         case Skill::Secondary::NECROMANCY:
             return hero.GetArmy().AllTroopsAreUndead() ? 1000.0 : 100.0;
@@ -1234,9 +1236,9 @@ namespace
             if ( role == Heroes::Role::COURIER || role == Heroes::Role::SCOUT ) {
                 return 100.0;
             }
-            const uint64_t critRanks = fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::CRITICAL_TRAINING )
-                                       + fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::FORTUNE );
-            return 500.0 + static_cast<double>( critRanks ) * 125.0;
+            const double criticalValue = fheroes2::RPG::criticalChance( hero.GetColor() ) * 45.0;
+            const double fortuneValue = static_cast<double>( fheroes2::RPG::luckBonus( hero.GetColor() ) ) * 125.0;
+            return 500.0 + criticalValue + fortuneValue;
         }
         case Skill::Secondary::BALLISTICS: {
             const Heroes::Role role = hero.getAIRole();
@@ -1251,7 +1253,7 @@ namespace
                 return 100.0;
             }
             const double baseArchery = hero.GetArmy().isMeleeDominantArmy() ? 100.0 : 500.0;
-            return baseArchery + static_cast<double>( fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::MARKSMAN ) ) * 150.0;
+            return baseArchery + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::MARKSMAN ) * 55.0;
         }
         case Skill::Secondary::ESTATES: {
             const Heroes::Role role = hero.getAIRole();
@@ -1277,9 +1279,9 @@ namespace
         }
         case Skill::Secondary::MYSTICISM: {
             const double baseMysticism = hero.HaveSpellBook() ? 500.0 : 100.0;
-            const uint64_t spellDoctrines = fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::SORCERY )
-                                            + fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::ARCANE_PIERCING );
-            return baseMysticism + ( hero.HaveSpellBook() ? std::min( 600.0, static_cast<double>( spellDoctrines ) * 100.0 ) : 0.0 );
+            const double spellDoctrineEffect = fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::SORCERY )
+                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::ARCANE_PIERCING );
+            return baseMysticism + ( hero.HaveSpellBook() ? std::min( 600.0, spellDoctrineEffect * 30.0 ) : 0.0 );
         }
         case Skill::Secondary::EAGLE_EYE:
             return hero.HaveSpellBook() ? 250.0 : 0.0;
