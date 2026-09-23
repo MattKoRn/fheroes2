@@ -1315,7 +1315,7 @@ void fheroes2::RPG::showMenu()
                           canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
 
-            drawText( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3   Wheel: scroll   Right-click: inspect decree",
+            drawText( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3   Wheel: scroll   Hold/right-click: inspect",
                       area.x + 12, area.y + 337, area.width - 24, fheroes2::FontType::smallWhite() );
             window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
@@ -1360,7 +1360,7 @@ void fheroes2::RPG::showMenu()
 
         for ( size_t row = 0; row < visibleRows; ++row ) {
             const size_t i = tab * upgradesPerTab + scrollOffset + row;
-            if ( event.isMouseRightButtonPressedInArea( visibleUpgradeAreas[row] ) ) {
+            if ( event.isMouseRightButtonPressedInArea( visibleUpgradeAreas[row] ) || event.MouseLongPressLeft( visibleUpgradeAreas[row] ) ) {
                 showUpgradeDetails( i );
                 redraw = true;
                 break;
@@ -1372,7 +1372,7 @@ void fheroes2::RPG::showMenu()
             }
         }
 
-        if ( event.isMouseRightButtonPressedInArea( autoButton.area() ) ) {
+        if ( event.isMouseRightButtonPressedInArea( autoButton.area() ) || event.MouseLongPressLeft( autoButton.area() ) ) {
             fheroes2::showStandardTextMessage(
                 "Steward", "Automatically buys the available next rank with the largest immediate mechanical gain per point. Capped upgrades are skipped once another rank would add no effect.",
                 Dialog::ZERO );
