@@ -127,7 +127,7 @@ namespace
 
         "Adds Morale to your creature stacks during combat, up to +3 from this upgrade.",
         "Adds Luck to your creature stacks during combat, up to +3 from this upgrade.",
-        "At the beginning of a stack's turn, restores a percentage of the surviving creatures' missing hit points. This heals wounds but never resurrects dead creatures.",
+        "At the beginning of a stack's turn, restores a percentage of one creature's maximum hit points to the surviving stack. This repairs the wounded top creature but never resurrects dead creatures.",
         "Gives each creature attack a chance to become a critical hit. A critical hit deals 50% extra damage before Brutal Criticals is added.",
         "Increases the bonus damage of critical hits beyond their normal +50% damage.",
 
@@ -142,7 +142,6 @@ namespace
         "TRAINING YARD", "WAR COUNCIL", "TACTICS HALL", "GUARD HOUSE", "MAGE GUILD", "WARD HALL", "THRONE ROOM", "MASTER'S HALL"
     };
 
-    struct Profile
     struct Profile
     {
         uint64_t level{ 1 };
