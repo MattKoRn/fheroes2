@@ -28,6 +28,7 @@
 
 #include "dialog.h"
 #include "game_interface.h"
+#include "game_rpg.h"
 #include "heroes.h"
 #include "icn.h"
 #include "interface_base.h"
@@ -192,6 +193,9 @@ fheroes2::GameMode Interface::ButtonsPanel::queueEventProcessing()
               && le.MouseLongPressLeft( _heroMovementRect ) ) {
         _interface.EventResetHeroPath();
     }
+    else if ( le.MouseLongPressLeft( _kingdomRect ) ) {
+        fheroes2::RPG::showMenu();
+    }
     else if ( le.MouseClickLeft( _kingdomRect ) ) {
         _interface.EventKingdomInfo();
     }
@@ -220,7 +224,8 @@ fheroes2::GameMode Interface::ButtonsPanel::queueEventProcessing()
             Dialog::ZERO );
     }
     else if ( le.isMouseRightButtonPressedInArea( _kingdomRect ) ) {
-        fheroes2::showStandardTextMessage( _( "Kingdom Summary" ), _( "View a summary of your Kingdom." ), Dialog::ZERO );
+        fheroes2::showStandardTextMessage( _( "Kingdom Summary" ),
+                                           _( "View a summary of your Kingdom. Press and hold this button to open the Kingdom RPG." ), Dialog::ZERO );
     }
     else if ( le.isMouseRightButtonPressedInArea( _spellRect ) ) {
         fheroes2::showStandardTextMessage( _( "Cast Spell" ), _( "Cast an adventure spell." ), Dialog::ZERO );
