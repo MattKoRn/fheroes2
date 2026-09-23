@@ -254,8 +254,9 @@ namespace
 
             const fheroes2::Text sampleCountText( "x999", fheroes2::FontType::smallWhite() );
             const int32_t countTextHeight = sampleCountText.height();
-            const int32_t maxIconWidth = std::max<int32_t>( 8, cellWidth - 4 );
-            const int32_t maxIconHeight = std::max<int32_t>( 8, cellHeight - countTextHeight - 2 );
+            const bool showCountText = cellHeight >= countTextHeight + 10;
+            const int32_t maxIconWidth = std::max<int32_t>( 1, cellWidth - 4 );
+            const int32_t maxIconHeight = std::max<int32_t>( 1, cellHeight - ( showCountText ? countTextHeight + 2 : 0 ) );
 
             for ( size_t i = 0; i < _creatures.size(); ++i ) {
                 const Monster & monster = _creatures[i].first;
@@ -283,8 +284,10 @@ namespace
                     fheroes2::Blit( original, output, cellX + ( cellWidth - iconWidth ) / 2, cellY );
                 }
 
-                const fheroes2::Text countText( "x" + fheroes2::abbreviateNumber( count ), fheroes2::FontType::smallWhite() );
-                countText.draw( cellX + ( cellWidth - countText.width() ) / 2, cellY + cellHeight - countText.height(), output );
+                if ( showCountText ) {
+                    const fheroes2::Text countText( "x" + fheroes2::abbreviateNumber( count ), fheroes2::FontType::smallWhite() );
+                    countText.draw( cellX + ( cellWidth - countText.width() ) / 2, cellY + cellHeight - countText.height(), output );
+                }
             }
         }
 
@@ -2077,7 +2080,17 @@ namespace
         // getDialogHeight() without the grid gives us the exact fixed cost of this popup,
         // including translated text, the OK button and the frame. A DialogElement adds 20 pixels
         // of vertical spacing around its content, so subtract that too.
-        const int32_t fixedDialogHeight = fheroes2::getDialogHeight( headerText, bodyText, Dialog::OK );
+        int32_t fixedDialogHeight = fheroes2::getDialogHeight( headerText, bodyText, Dialog::OK );
+
+        // showMessage() adds one extra small-yellow decision line during F8 auto-play, while
+        // getDialogHeight() intentionally describes only the caller-supplied content.
+        if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+            std::string decisionMessage = _( "AI will choose in 5 seconds: %{decision}" );
+            StringReplace( decisionMessage, "%{decision}", fheroes2::getAutoPlayDialogDecisionText( Dialog::OK ) );
+            const fheroes2::Text decisionText( std::move( decisionMessage ), fheroes2::FontType::smallYellow() );
+            fixedDialogHeight += decisionText.height( fheroes2::boxAreaWidthPx ) + 10;
+        }
+
         const int32_t maxGridHeight = std::max<int32_t>( 1, fheroes2::Display::instance().height() - fixedDialogHeight - 20 );
 
         const OfflineRecruitmentDialogElement recruitedCreaturesUI( summary.recruitedCreatureRoster, maxGridHeight );
