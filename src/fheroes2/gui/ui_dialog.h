@@ -50,6 +50,19 @@ namespace fheroes2
     // Automatically generated popups use this to remain visible briefly without blocking auto-play.
     bool isAutoPlayPopupTimeoutEnabled();
 
+    class AutoPlayPopupTimeoutScope final
+    {
+    public:
+        explicit AutoPlayPopupTimeoutScope( bool enable );
+        ~AutoPlayPopupTimeoutScope();
+
+        AutoPlayPopupTimeoutScope( const AutoPlayPopupTimeoutScope & ) = delete;
+        AutoPlayPopupTimeoutScope & operator=( const AutoPlayPopupTimeoutScope & ) = delete;
+
+    private:
+        bool _active{ false };
+    };
+
     class AutoPlayDialogDecisionScope final
     {
     public:
