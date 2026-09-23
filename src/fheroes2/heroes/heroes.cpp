@@ -1896,7 +1896,8 @@ void Heroes::_levelUpSecondarySkill( const HeroSeedsForLevelUp & seeds, const in
     }
 
     if ( selected.isValid() ) {
-        if ( isControlAI() && fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+        const Player * autoPlayPlayer = Players::Get( GetColor() );
+        if ( autoPlayPlayer != nullptr && autoPlayPlayer->isAIAutoControlMode() && fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
             std::string decisionText = "Learn ";
             decisionText += Skill::Secondary::String( selected.Skill() );
             const fheroes2::SecondarySkillDialogElement skillUI( selected, *this );
