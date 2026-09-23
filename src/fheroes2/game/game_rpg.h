@@ -7,12 +7,14 @@ enum class PlayerColor : uint8_t;
 
 namespace fheroes2::RPG
 {
+    // Keep the numeric values stable. ExperienceKind crosses several RPG award paths and explicit
+    // values prevent a future enum insertion/reordering from silently changing an existing kind.
     enum class ExperienceKind : uint8_t
     {
-        HERO,
-        OFFLINE,
-        BATTLE,
-        ADVENTURE
+        HERO = 0,
+        OFFLINE = 1,
+        BATTLE = 2,
+        ADVENTURE = 3
     };
 
     // The local player's kingdom owns the persistent profile. Enemy profiles only live for this map.
