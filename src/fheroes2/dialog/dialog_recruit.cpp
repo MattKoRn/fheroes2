@@ -26,6 +26,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -275,6 +276,22 @@ Troop Dialog::RecruitMonster( const Monster & monster0, const uint32_t available
     uint32_t result = lockAutoPlaySelection ? std::min( selectedCount, max ) : max;
 
     Funds paymentCosts( paymentMonster * result );
+
+    std::unique_ptr<fheroes2::AutoPlayDialogDecisionScope> exactAutoPlayDecision;
+    if ( lockAutoPlaySelection ) {
+        std::string decisionText;
+        if ( result > 0 ) {
+            decisionText = "Recruit ";
+            decisionText += std::to_string( result );
+            decisionText += ' ';
+            decisionText += monster.GetPluralName( result );
+        }
+        else {
+            decisionText = "Cancel recruitment";
+        }
+
+        exactAutoPlayDecision = std::make_unique<fheroes2::AutoPlayDialogDecisionScope>( result > 0 ? Dialog::OK : Dialog::CANCEL, std::move( decisionText ) );
+    }
 
     const fheroes2::Size windowSize{ 299, 272 };
     const fheroes2::Point dialogOffset( ( display.width() - windowSize.width ) / 2, ( display.height() - windowSize.height ) / 2 + windowOffsetY );
