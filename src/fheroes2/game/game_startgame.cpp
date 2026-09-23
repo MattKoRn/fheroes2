@@ -1374,9 +1374,15 @@ namespace
         }
         if ( !supplies.empty() ) {
             message += "\n";
-            message += _( "Supplies: " );
+            // Offline progression intentionally does not modify the active map's treasury.
+            // These are the virtual production values used to calculate the RPG XP above, so
+            // labelling them as received supplies made the popup promise rewards it never gave.
+            message += _( "Virtual supplies used for XP: " );
             message += supplies;
         }
+
+        message += "\n";
+        message += _( "Treasury unchanged." );
 
         if ( summary.homecomingTier > 0 ) {
             const std::string chestName = getHomecomingChestName( summary.homecomingTier );
