@@ -67,6 +67,9 @@ namespace fheroes2::RPG
     [[nodiscard]] uint64_t kingdomLevel();
     [[nodiscard]] bool isStewardActive();
     [[nodiscard]] uint64_t doctrineRank( PlayerColor color, size_t upgradeId );
+    // Returns the actual current mechanical value of a doctrine (flat stat/point or percentage,
+    // depending on the doctrine). Prefer this over raw rank when valuing diminishing-return upgrades.
+    [[nodiscard]] double doctrineEffect( PlayerColor color, size_t upgradeId );
 
     [[nodiscard]] double damageMultiplier( PlayerColor attacker, PlayerColor defender, bool ranged, bool attackerOutnumbered, bool defenderOutnumbered,
                                            bool attackerFullHealth, bool defenderFullHealth, bool attackerBelowHalf, bool defenderBelowHalf );
