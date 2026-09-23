@@ -699,8 +699,9 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     // spend a point budget instead of receiving free ranks in every upgrade. This avoids
     // level-1 neutral stacks quietly spawning with dozens of combat bonuses.
     uint64_t seed = static_cast<uint64_t>( world.GetMapSeed() ) << 32;
-    seed ^= saturatedMultiply( playerProfile.level, 0x9E3779B185EBCA87ULL );
-    seed ^= static_cast<uint64_t>( playerColor );
+    // Unsigned multiplication intentionally wraps here: this is a hash mix, not arithmetic progression.
+    seed ^= playerProfile.level * 0x9E3779B185EBCA87ULL;
+    seed ^= static_cast<uint64_t>( playerColor ) * 0xC2B2AE3D27D4EB4FULL;
     std::mt19937_64 rng( seed );
 
     const uint64_t earnedPointBudget
