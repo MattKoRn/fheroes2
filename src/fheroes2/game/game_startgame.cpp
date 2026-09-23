@@ -31,6 +31,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <ctime>
 #include <fstream>
 #include <functional>
 #include <limits>
@@ -110,6 +111,27 @@ namespace
     int64_t offlineResumeElapsedSeconds{ 0 };
     bool offlineResumePending{ false };
 
+    int64_t getLocalCalendarDayIndex( const int64_t unixTime )
+    {
+        if ( unixTime <= 0 ) {
+            return 0;
+        }
+
+        const tm localTime = System::GetTM( static_cast<time_t>( unixTime ) );
+        int64_t year = static_cast<int64_t>( localTime.tm_year ) + 1900;
+        const int64_t month = static_cast<int64_t>( localTime.tm_mon ) + 1;
+        const int64_t day = localTime.tm_mday;
+
+        // Convert a Gregorian civil date to a monotonic day index. Unlike unixTime / 86400,
+        // this follows the player's local calendar across time zones and daylight-saving changes.
+        year -= month <= 2;
+        const int64_t era = ( year >= 0 ? year : year - 399 ) / 400;
+        const int64_t yearOfEra = year - era * 400;
+        const int64_t dayOfYear = ( 153 * ( month + ( month > 2 ? -3 : 9 ) ) + 2 ) / 5 + day - 1;
+        const int64_t dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear;
+        return era * 146097 + dayOfEra;
+    }
+
     using FundsMember = int32_t Funds::*;
 
     constexpr std::array<FundsMember, 7> offlineFundMembers{ &Funds::wood, &Funds::mercury, &Funds::ore, &Funds::sulfur,
@@ -126,6 +148,7 @@ namespace
         std::array<int64_t, 7> carry{};
         uint32_t homecomingStreak{ 0 };
         int64_t lastHomecomingStreakUnix{ 0 };
+        int64_t lastHomecomingStreakDay{ 0 };
         int64_t pendingResumeSeconds{ 0 };
         uint64_t totalOfflineSeconds{ 0 };
         uint64_t offlineRenown{ 0 };
@@ -240,6 +263,7 @@ namespace
         bool hasCarry = false;
         bool hasStreak = false;
         bool hasLastHomecomingStreakUnix = false;
+        bool hasLastHomecomingStreakDay = false;
         bool hasPendingResumeSeconds = false;
         bool hasTotalOfflineSeconds = false;
         bool hasOfflineRenown = false;
@@ -305,6 +329,10 @@ namespace
             else if ( key == "last_homecoming_streak_unix" ) {
                 input >> candidate.lastHomecomingStreakUnix;
                 hasLastHomecomingStreakUnix = true;
+            }
+            else if ( key == "last_homecoming_streak_day" ) {
+                input >> candidate.lastHomecomingStreakDay;
+                hasLastHomecomingStreakDay = true;
             }
             else if ( key == "pending_resume_seconds" ) {
                 input >> candidate.pendingResumeSeconds;
@@ -427,8 +455,12 @@ namespace
               || ( version == 12 && hasStreak && hasLastHomecomingStreakUnix && hasPendingResumeSeconds && hasTotalOfflineSeconds
                    && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget && hasContractsCompleted
                    && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
-                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter );
-        if ( !( version >= 1 && version <= 12 ) || !hasVersionSpecificFields || !hasTimestamp || !hasResources || !hasIncome || !hasCarry
+                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter )
+              || ( version == 13 && hasStreak && hasLastHomecomingStreakUnix && hasLastHomecomingStreakDay && hasPendingResumeSeconds
+                   && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
+                   && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns
+                   && hasStateHeroes && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter );
+        if ( !( version >= 1 && version <= 13 ) || !hasVersionSpecificFields || !hasTimestamp || !hasResources || !hasIncome || !hasCarry
              || candidate.lastSeenUnix <= 0 ) {
             return false;
         }
@@ -447,6 +479,15 @@ namespace
             if ( candidate.homecomingStreak == 0 ) {
                 candidate.lastHomecomingStreakUnix = 0;
             }
+        }
+
+        if ( candidate.homecomingStreak == 0 ) {
+            candidate.lastHomecomingStreakDay = 0;
+        }
+        else if ( version < 13 || candidate.lastHomecomingStreakDay <= 0 ) {
+            // Older formats stored only a timestamp. Convert it once to the local calendar date
+            // so future timezone or DST changes cannot reinterpret which streak day was earned.
+            candidate.lastHomecomingStreakDay = getLocalCalendarDayIndex( candidate.lastHomecomingStreakUnix );
         }
         candidate.stateCastles = std::min<uint32_t>( candidate.stateCastles, 255 );
         candidate.stateTowns = std::min<uint32_t>( candidate.stateTowns, 255 );
@@ -508,7 +549,7 @@ namespace
             output << '\n';
         };
 
-        output << "version 12\n";
+        output << "version 13\n";
         output << "last_seen_unix " << data.lastSeenUnix << '\n';
         output << "resources ";
         writeFunds( data.resources );
@@ -524,6 +565,7 @@ namespace
         output << '\n';
         output << "homecoming_streak " << data.homecomingStreak << '\n';
         output << "last_homecoming_streak_unix " << data.lastHomecomingStreakUnix << '\n';
+        output << "last_homecoming_streak_day " << data.lastHomecomingStreakDay << '\n';
         output << "pending_resume_seconds " << data.pendingResumeSeconds << '\n';
         output << "total_offline_seconds " << data.totalOfflineSeconds << '\n';
         output << "offline_renown " << data.offlineRenown << '\n';
@@ -789,11 +831,11 @@ namespace
             return;
         }
 
-        const int64_t returnDay = returnUnix / offlineSecondsPerDay;
-        if ( data.lastHomecomingStreakUnix > 0 ) {
-            const int64_t previousStreakDay = data.lastHomecomingStreakUnix / offlineSecondsPerDay;
+        const int64_t returnDay = getLocalCalendarDayIndex( returnUnix );
+        if ( data.lastHomecomingStreakUnix > 0 && data.lastHomecomingStreakDay > 0 ) {
+            const int64_t previousStreakDay = data.lastHomecomingStreakDay;
             if ( returnDay <= previousStreakDay ) {
-                // Same-day returns (and temporary clock rollbacks) must not farm the daily streak.
+                // Same-local-day returns (and temporary clock rollbacks) must not farm the daily streak.
                 summary.homecomingStreak = data.homecomingStreak;
                 return;
             }
@@ -813,6 +855,7 @@ namespace
         }
 
         data.lastHomecomingStreakUnix = returnUnix;
+        data.lastHomecomingStreakDay = returnDay;
         summary.homecomingStreak = data.homecomingStreak;
         summary.milestonePercent = getHomecomingMilestonePercent( data.homecomingStreak );
 
