@@ -1611,6 +1611,16 @@ uint64_t fheroes2::RPG::doctrineRank( const PlayerColor color, const size_t upgr
     return profile != nullptr ? profile->ranks[upgradeId] : 0;
 }
 
+double fheroes2::RPG::doctrineEffect( const PlayerColor color, const size_t upgradeId )
+{
+    if ( upgradeId >= upgradeCount ) {
+        return 0.0;
+    }
+
+    const Profile * profile = getProfile( color );
+    return profile == nullptr ? 0.0 : static_cast<double>( effect( upgradeId, profile->ranks[upgradeId] ) );
+}
+
 void fheroes2::RPG::showMenu()
 {
     if ( activePlayerColor == PlayerColor::NONE ) {
