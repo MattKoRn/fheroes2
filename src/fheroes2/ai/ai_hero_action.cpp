@@ -654,6 +654,33 @@ namespace
         }
     }
 
+    bool hasDetailedAutoPlayAdventureDecision( const MP2::MapObjectType objectType )
+    {
+        switch ( objectType ) {
+        case MP2::OBJ_MONSTER:
+        case MP2::OBJ_SEA_CHEST:
+        case MP2::OBJ_TREASURE_CHEST:
+        case MP2::OBJ_EVENT:
+        case MP2::OBJ_ARENA:
+        case MP2::OBJ_RUINS:
+        case MP2::OBJ_TREE_CITY:
+        case MP2::OBJ_WAGON_CAMP:
+        case MP2::OBJ_DESERT_TENT:
+        case MP2::OBJ_GENIE_LAMP:
+        case MP2::OBJ_WATER_ALTAR:
+        case MP2::OBJ_AIR_ALTAR:
+        case MP2::OBJ_FIRE_ALTAR:
+        case MP2::OBJ_EARTH_ALTAR:
+        case MP2::OBJ_BARROW_MOUNDS:
+        case MP2::OBJ_DRAGON_CITY:
+        case MP2::OBJ_CITY_OF_DEAD:
+        case MP2::OBJ_TROLL_BRIDGE:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     void AIToMonster( Heroes & hero, int32_t dst_index )
     {
         bool destroy = false;
@@ -661,6 +688,38 @@ namespace
         const Troop troop = getTroopFromTile( tile );
 
         const NeutralMonsterJoiningCondition join = Army::GetJoinSolution( hero, tile, troop );
+
+        if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+            std::string decisionText;
+            std::string message;
+
+            if ( join.reason == NeutralMonsterJoiningCondition::Reason::Alliance ) {
+                decisionText = hero.GetArmy().CanJoinTroop( troop ) ? "Accept allied creatures" : "Let allied creatures clear the path";
+            }
+            else if ( join.reason == NeutralMonsterJoiningCondition::Reason::Bane || join.reason == NeutralMonsterJoiningCondition::Reason::RunAway ) {
+                decisionText = "Let creatures flee";
+            }
+            else if ( join.reason == NeutralMonsterJoiningCondition::Reason::Free ) {
+                decisionText = "Accept free creatures";
+            }
+            else if ( join.reason == NeutralMonsterJoiningCondition::Reason::ForMoney ) {
+                decisionText = "Recruit ";
+                decisionText += std::to_string( join.monsterCount );
+                decisionText += ' ';
+                decisionText += troop.GetPluralName( join.monsterCount );
+                decisionText += " for ";
+                decisionText += std::to_string( troop.GetMonster().GetCost().gold * static_cast<int32_t>( join.monsterCount ) );
+                decisionText += " gold";
+            }
+            else {
+                decisionText = "Fight ";
+                decisionText += troop.GetMultiName();
+            }
+
+            message = "Auto-play evaluated the neutral creatures and will carry out its selected action.";
+            const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::OK, decisionText );
+            fheroes2::showStandardTextMessage( troop.GetName(), std::move( message ), Dialog::OK );
+        }
 
         if ( join.reason == NeutralMonsterJoiningCondition::Reason::Alliance ) {
             if ( hero.GetArmy().CanJoinTroop( troop ) ) {
@@ -1230,6 +1289,14 @@ namespace
         }
 
         if ( ( MP2::OBJ_ARENA == objectType && !hero.isObjectTypeVisited( objectType ) ) || !hero.isVisited( world.getTile( dst_index ) ) ) {
+            if ( objectType == MP2::OBJ_ARENA && fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+                std::string decisionText = "Train ";
+                decisionText += Skill::Primary::String( skill );
+                const fheroes2::PrimarySkillDialogElement skillUI( skill, "" );
+                const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::OK, std::move( decisionText ) );
+                fheroes2::showStandardTextMessage( _( "Arena" ), _( "Auto-play selected the primary skill it wants to improve." ), Dialog::OK, { &skillUI } );
+            }
+
             // increase skill
             hero.IncreasePrimarySkill( skill );
             hero.SetVisited( dst_index );
@@ -2108,7 +2175,8 @@ void AI::HeroesAction( Heroes & hero, const int32_t dst_index )
 
     Player * heroPlayer = Players::Get( hero.GetColor() );
     const bool showAutoPlayAdventurePopup
-        = isHeroActing && heroPlayer != nullptr && heroPlayer->isAIAutoControlMode() && fheroes2::isAutoPlayPopupTimeoutEnabled();
+        = isHeroActing && heroPlayer != nullptr && heroPlayer->isAIAutoControlMode() && fheroes2::isAutoPlayPopupTimeoutEnabled()
+          && !hasDetailedAutoPlayAdventureDecision( objectType );
 
     if ( showAutoPlayAdventurePopup ) {
         std::string message = _( "Auto-play has chosen this adventure action:" );
