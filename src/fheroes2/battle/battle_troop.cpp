@@ -604,7 +604,7 @@ uint32_t Battle::Unit::CalculateDamageUnit( const Unit & enemy, double dmg ) con
     dmg *= 1 + ( 0 < r ? 0.1 * std::min( r, 20 ) : 0.05 * std::max( r, -16 ) );
 
     if ( !Modes( CAP_TOWER ) ) {
-        const bool rangedAttack = isArchers() && !isHandFighting( *this, enemy );
+        const bool rangedAttack = isArchers() && !isHandFighting() && !isHandFighting( *this, enemy );
         const uint64_t attackerStartingHitPoints = static_cast<uint64_t>( GetMaxCount() ) * Monster::GetHitPoints();
         const uint64_t defenderStartingHitPoints = static_cast<uint64_t>( enemy.GetMaxCount() ) * enemy.Monster::GetHitPoints();
         const bool attackerFullHealth = static_cast<uint64_t>( GetHitPoints() ) == attackerStartingHitPoints;
@@ -613,9 +613,9 @@ uint32_t Battle::Unit::CalculateDamageUnit( const Unit & enemy, double dmg ) con
         const bool defenderBelowHalf = static_cast<uint64_t>( enemy.GetHitPoints() ) * 2 < defenderStartingHitPoints;
 
         dmg = std::min(
-            dmg * fheroes2::RPG::damageMultiplier( GetColor(), enemy.GetColor(), rangedAttack, GetCount() < enemy.GetCount(),
-                                                   enemy.GetCount() < GetCount(), attackerFullHealth, defenderFullHealth, attackerBelowHalf,
-                                                   defenderBelowHalf ),
+            dmg * fheroes2::RPG::damageMultiplier( GetColor(), enemy.Modes( CAP_TOWER ) ? PlayerColor::UNUSED : enemy.GetColor(), rangedAttack,
+                                                   GetCount() < enemy.GetCount(), enemy.GetCount() < GetCount(), attackerFullHealth,
+                                                   defenderFullHealth, attackerBelowHalf, defenderBelowHalf ),
             static_cast<double>( std::numeric_limits<uint32_t>::max() ) );
     }
 
@@ -650,9 +650,11 @@ uint32_t Battle::Unit::GetDamage( const Unit & enemy, Rand::PCG32 & randomGenera
             adjustedDamage *= 1.0L + fheroes2::RPG::criticalDamageBonusPercent( GetColor() ) / 100.0L;
         }
 
-        const uint32_t evasionChance = fheroes2::RPG::evasionChance( enemy.GetColor() );
-        if ( evasionChance > 0 && Rand::GetWithGen( 1, 100, randomGenerator ) <= evasionChance ) {
-            adjustedDamage *= 0.5L;
+        if ( !enemy.Modes( CAP_TOWER ) ) {
+            const uint32_t evasionChance = fheroes2::RPG::evasionChance( enemy.GetColor() );
+            if ( evasionChance > 0 && Rand::GetWithGen( 1, 100, randomGenerator ) <= evasionChance ) {
+                adjustedDamage *= 0.5L;
+            }
         }
     }
 
