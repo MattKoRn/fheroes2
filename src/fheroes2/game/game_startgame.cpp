@@ -691,7 +691,7 @@ namespace
         // the current turn's player: in Hot Seat that would make the persistent wallet and
         // creature roster jump between colors depending on whose turn a save was made on.
         for ( Player * player : conf.GetPlayers().getVector() ) {
-            if ( player != nullptr && ( player->isControlHuman() || player->isAIAutoControlMode() ) ) {
+            if ( player != nullptr && player->isPlay() && ( player->isControlHuman() || player->isAIAutoControlMode() ) ) {
                 return player->GetColor();
             }
         }
