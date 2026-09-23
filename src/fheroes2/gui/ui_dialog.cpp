@@ -230,17 +230,21 @@ namespace fheroes2
         TimeDelay autoDismissDelay( autoPlayPopupDisplayTimeMs );
 
         const auto getAutoDismissResult = [buttons]() {
-            // Never make an affirmative choice on behalf of the player.
+            // Auto-play owns the decision while it is active. Prefer the affirmative/default
+            // action so automated turns keep progressing through normal gameplay prompts.
+            if ( buttons & Dialog::YES ) {
+                return Dialog::YES;
+            }
+            if ( buttons & Dialog::OK ) {
+                return Dialog::OK;
+            }
             if ( buttons & Dialog::NO ) {
                 return Dialog::NO;
             }
             if ( buttons & Dialog::CANCEL ) {
                 return Dialog::CANCEL;
             }
-            if ( buttons & Dialog::OK ) {
-                return Dialog::OK;
-            }
-            // A YES-only dialog should simply close without confirming anything.
+
             return Dialog::ZERO;
         };
 
@@ -254,7 +258,7 @@ namespace fheroes2
                     ++elementId;
                 }
             }
-            else if ( !le.isMouseRightButtonPressed() ) {
+            else if ( !autoDismiss && !le.isMouseRightButtonPressed() ) {
                 break;
             }
 
