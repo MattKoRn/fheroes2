@@ -3291,7 +3291,7 @@ fheroes2::GameMode Interface::AdventureMap::HumanTurn( const bool isLoadedFromSa
                     res = Game::processExitEvent();
                 }
                 else if ( HotKeyPressEvent( Game::HotKeyEvent::WORLD_TRANSFER_CONTROL_TO_AI ) ) {
-                    Player * player = conf.GetPlayers().GetCurrent();
+                    Player * player = Settings::Get().GetPlayers().GetCurrent();
                     if ( player != nullptr && player->isControlHuman()
                          && fheroes2::showStandardTextMessage(
                                 _( "Auto-play" ),

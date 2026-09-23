@@ -32,6 +32,7 @@
 #include "resource.h"
 #include "screen.h"
 #include "timing.h"
+#include "tools.h"
 #include "translations.h"
 #include "ui_button.h"
 #include "ui_dialog.h"
