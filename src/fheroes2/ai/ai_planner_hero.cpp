@@ -975,6 +975,32 @@ namespace
         return 1.0;
     }
 
+    double getEnemyCastleBattleEfficiencyModifier( const Heroes & hero, const Castle & castle )
+    {
+        const double heroStrength = hero.GetArmy().GetStrength();
+        const double defenderStrength = castle.GetGarrisonStrength( hero );
+        if ( heroStrength <= 0.0 || defenderStrength <= 0.0 ) {
+            return 1.0;
+        }
+
+        const double strengthRatio = heroStrength / defenderStrength;
+
+        // When several castles are viable targets, prefer assaults that preserve more of the
+        // field army for the next objective. Critical defensive counterattacks bypass this
+        // modifier in calculateCastleValue().
+        if ( strengthRatio >= 4.0 ) {
+            return 1.20;
+        }
+        if ( strengthRatio >= 2.5 ) {
+            return 1.10;
+        }
+        if ( strengthRatio < 1.75 ) {
+            return 0.90;
+        }
+
+        return 1.0;
+    }
+
     double getDistanceModifier( const MP2::MapObjectType objectType )
     {
         // The value above 1.0 means that the object is useful only if it is nearby.
@@ -1313,6 +1339,9 @@ double AI::Planner::getGeneralObjectValue( const Heroes & hero, const int32_t in
                     // Apply a bonus so that the AI prefers to eliminate the threat if possible instead of guarding its castle
                     value = std::max( value, calculateCastleValue( castleUnderThreat ) * 2 );
                 }
+            }
+            else {
+                value *= getEnemyCastleBattleEfficiencyModifier( hero, *castle );
             }
 
             // This castle is defenseless
@@ -1977,6 +2006,9 @@ double AI::Planner::getFighterObjectValue( const Heroes & hero, const int32_t in
                     // Apply a bonus so that the AI prefers to eliminate the threat if possible instead of guarding its castle
                     value = std::max( value, calculateCastleValue( castleUnderThreat ) * 2 );
                 }
+            }
+            else {
+                value *= getEnemyCastleBattleEfficiencyModifier( hero, *castle );
             }
 
             // This castle is defenseless
