@@ -1896,6 +1896,14 @@ void Heroes::_levelUpSecondarySkill( const HeroSeedsForLevelUp & seeds, const in
     }
 
     if ( selected.isValid() ) {
+        if ( isControlAI() && fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+            std::string decisionText = "Learn ";
+            decisionText += Skill::Secondary::String( selected.Skill() );
+            const fheroes2::SecondarySkillDialogElement skillUI( selected, *this );
+            const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::OK, std::move( decisionText ) );
+            fheroes2::showStandardTextMessage( GetName(), _( "Auto-play selected this secondary skill for the hero's level-up." ), Dialog::OK, { &skillUI } );
+        }
+
         DEBUG_LOG( DBG_GAME, DBG_INFO, GetName() << ", selected: " << Skill::Secondary::String( selected.Skill() ) )
         Skill::Secondary * secs = _secondarySkills.FindSkill( selected.Skill() );
 
