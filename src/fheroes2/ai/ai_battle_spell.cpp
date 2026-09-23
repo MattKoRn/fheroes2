@@ -702,6 +702,19 @@ AI::SpellcastOutcome AI::BattlePlanner::spellResurrectValue( const Spell & spell
 
         double spellValue = missingHP * unit->GetMonsterStrength() / unit->Monster::GetHitPoints();
 
+        // Prefer restoring a stack that has not acted yet. A unit killed before its turn retains
+        // that turn state when resurrected, so restoring it can immediately add another action to
+        // the current round instead of only adding nominal army strength.
+        if ( !unit->Modes( Battle::TR_MOVED ) && unit->GetSpeed( false, true ) > Speed::STANDING ) {
+            spellValue *= 1.20;
+
+            // Fast stacks are especially likely to convert the resurrection into an action before
+            // the enemy gets another chance to remove them.
+            if ( unit->GetSpeed( false, true ) > _enemyAverageSpeed ) {
+                spellValue *= 1.08;
+            }
+        }
+
         // if we are winning battle; permanent resurrect bonus
         if ( _myArmyStrength > _enemyArmyStrength && spell.GetID() != Spell::RESURRECT ) {
             spellValue *= 2;
