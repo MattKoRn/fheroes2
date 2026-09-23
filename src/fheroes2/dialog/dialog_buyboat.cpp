@@ -31,8 +31,10 @@
 #include "payment.h"
 #include "resource.h"
 #include "screen.h"
+#include "timing.h"
 #include "translations.h"
 #include "ui_button.h"
+#include "ui_dialog.h"
 #include "ui_text.h"
 
 int Dialog::BuyBoat( bool enable )
@@ -80,11 +82,18 @@ int Dialog::BuyBoat( bool enable )
 
     LocalEvent & le = LocalEvent::Get();
 
+    const bool autoDismiss = fheroes2::isAutoPlayPopupTimeoutEnabled();
+    fheroes2::TimeDelay autoDismissDelay( fheroes2::autoPlayPopupDisplayTimeMs );
+
     // message loop
     while ( le.HandleEvents() ) {
         const int result = buttonGroup.processEvents();
         if ( result != Dialog::ZERO ) {
             return result;
+        }
+
+        if ( autoDismiss && autoDismissDelay.isPassed() ) {
+            return buttonOkay.isEnabled() ? Dialog::OK : Dialog::CANCEL;
         }
     }
 
