@@ -3188,6 +3188,18 @@ fheroes2::GameMode Interface::AdventureMap::HumanTurn( const bool isLoadedFromSa
                 if ( HotKeyPressEvent( Game::HotKeyEvent::GLOBAL_APP_QUIT ) || HotKeyPressEvent( Game::HotKeyEvent::DEFAULT_CANCEL ) ) {
                     res = Game::processExitEvent();
                 }
+                else if ( HotKeyPressEvent( Game::HotKeyEvent::WORLD_TRANSFER_CONTROL_TO_AI ) ) {
+                    Player * player = conf.GetPlayers().GetCurrent();
+                    if ( player != nullptr && player->isControlHuman()
+                         && fheroes2::showStandardTextMessage(
+                                _( "Auto-play" ),
+                                _( "Enable auto-play? The AI controls your adventure-map turns and battles. Battles are shown in full at normal speed." ),
+                                Dialog::YES | Dialog::NO )
+                                == Dialog::YES ) {
+                        player->setAIAutoControlMode( true );
+                        return fheroes2::GameMode::END_TURN;
+                    }
+                }
                 else if ( HotKeyPressEvent( Game::HotKeyEvent::WORLD_END_TURN ) ) {
                     res = EventEndTurn();
                 }
