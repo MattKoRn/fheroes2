@@ -214,6 +214,11 @@ public:
         _globalKeyDownEventHook = std::move( hook );
     }
 
+    void setGlobalApplicationFocusEventHook( std::function<void( bool )> hook )
+    {
+        _globalApplicationFocusEventHook = std::move( hook );
+    }
+
     // Return false when event handling should be stopped, true otherwise.
     bool HandleEvents( const bool sleepAfterEventProcessing = true, const bool allowExit = false );
 
@@ -500,8 +505,11 @@ private:
 
     std::function<fheroes2::Rect( const int32_t, const int32_t )> _globalMouseMotionEventHook;
     std::function<void( const fheroes2::Key, const int32_t )> _globalKeyDownEventHook;
+    std::function<void( bool )> _globalApplicationFocusEventHook;
 
     std::function<bool()> _processQuitEventHook;
+
+    bool _isApplicationFocused{ true };
 
     fheroes2::Rect _mouseCursorRenderArea;
 
@@ -538,6 +546,7 @@ private:
     void onMouseMotionEvent( fheroes2::Point position );
     void onMouseButtonEvent( const bool isPressed, const MouseButtonType buttonType, fheroes2::Point position );
     void onKeyboardEvent( const fheroes2::Key key, const int32_t keyModifier, const KeyboardEventState keyState );
+    void onApplicationFocusEvent( const bool isFocused );
     void onMouseWheelEvent( fheroes2::Point position );
     void onControllerAxisEvent( const ControllerAxisType axisType, const int16_t value );
     void onControllerButtonEvent( const bool isPressed, const ControllerButtonType buttonType );
