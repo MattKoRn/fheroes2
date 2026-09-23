@@ -16,29 +16,30 @@ namespace fheroes2::RPG
     };
 
     // The local player's kingdom owns the persistent profile. Enemy profiles only live for this map.
-    std::string dataDirectory();
+    [[nodiscard]] std::string dataDirectory();
     void beginMap( PlayerColor playerColor );
     void endMap();
-    uint64_t addExperience( PlayerColor color, uint64_t amount, ExperienceKind kind = ExperienceKind::HERO );
+    [[nodiscard]] uint64_t addExperience( PlayerColor color, uint64_t amount, ExperienceKind kind = ExperienceKind::HERO );
     void awardAdventureAction( PlayerColor color, int objectType, int32_t tileIndex );
     void awardBattle( PlayerColor color, PlayerColor opponent, uint32_t battleExperience, bool won, bool defending, bool siege );
 
-    // Persistent RPG combat affixes used by battle stacks.
-    uint32_t creatureAttackBonus( PlayerColor color );
-    uint32_t creatureDefenseBonus( PlayerColor color );
-    int moraleBonus( PlayerColor color );
-    int luckBonus( PlayerColor color );
-    double lifeStealPercent( PlayerColor color );
-    double killHealPercent( PlayerColor color );
-    double regenerationPercent( PlayerColor color );
-    double criticalChance( PlayerColor color );
-    double criticalDamageBonusPercent( PlayerColor color );
-    double evasionChance( PlayerColor color );
-    double rangedMeleePenaltyRecoveryPercent( PlayerColor color );
+    // Persistent RPG combat affixes used by battle stacks. These accessors are intentionally
+    // nodiscard: silently dropping a modifier is almost always a gameplay integration bug.
+    [[nodiscard]] uint32_t creatureAttackBonus( PlayerColor color );
+    [[nodiscard]] uint32_t creatureDefenseBonus( PlayerColor color );
+    [[nodiscard]] int moraleBonus( PlayerColor color );
+    [[nodiscard]] int luckBonus( PlayerColor color );
+    [[nodiscard]] double lifeStealPercent( PlayerColor color );
+    [[nodiscard]] double killHealPercent( PlayerColor color );
+    [[nodiscard]] double regenerationPercent( PlayerColor color );
+    [[nodiscard]] double criticalChance( PlayerColor color );
+    [[nodiscard]] double criticalDamageBonusPercent( PlayerColor color );
+    [[nodiscard]] double evasionChance( PlayerColor color );
+    [[nodiscard]] double rangedMeleePenaltyRecoveryPercent( PlayerColor color );
 
-    double damageMultiplier( PlayerColor attacker, PlayerColor defender, bool ranged, bool attackerOutnumbered, bool defenderOutnumbered,
-                             bool attackerFullHealth, bool defenderFullHealth, bool attackerBelowHalf, bool defenderBelowHalf );
-    double spellMultiplier( PlayerColor attacker, PlayerColor defender, int spellId );
-    std::string formatExperience( uint64_t value );
+    [[nodiscard]] double damageMultiplier( PlayerColor attacker, PlayerColor defender, bool ranged, bool attackerOutnumbered, bool defenderOutnumbered,
+                                           bool attackerFullHealth, bool defenderFullHealth, bool attackerBelowHalf, bool defenderBelowHalf );
+    [[nodiscard]] double spellMultiplier( PlayerColor attacker, PlayerColor defender, int spellId );
+    [[nodiscard]] std::string formatExperience( uint64_t value );
     void showMenu();
 }
