@@ -345,7 +345,7 @@ void AI::Planner::reinforceCastle( Castle & castle )
                 decisionText += troop.GetPluralName( troop.GetCount() );
                 const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::OK, std::move( decisionText ) );
 
-                selectedTroop = Dialog::RecruitMonster( troop.GetMonster(), troop.GetCount(), false, 0 );
+                selectedTroop = Dialog::RecruitMonster( troop.GetMonster(), troop.GetCount(), false, 0, troop.GetCount() );
                 if ( !selectedTroop.isValid() ) {
                     // Treat a manual cancellation as a handled choice so the AI does not start
                     // dismissing or moving stacks in an attempt to force this purchase.
