@@ -401,6 +401,18 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
     const bool isAutoPlayBattle = ( attackingPlayer != nullptr && attackingPlayer->isAIAutoControlMode() )
                                   || ( defendingPlayer != nullptr && defendingPlayer->isAIAutoControlMode() );
 
+    const auto shouldShowLocalBattlePopup = []( const HeroBase * hero ) {
+        if ( hero == nullptr ) {
+            return false;
+        }
+        if ( hero->isControlHuman() ) {
+            return true;
+        }
+
+        const Player * player = Players::Get( hero->GetColor() );
+        return player != nullptr && player->isAIAutoControlMode();
+    };
+
     // Auto-play battles are never auto-resolved. They are shown in full while the battle AI
     // controls auto-play players. Use the engine's normal/default animation speed for the
     // watched battle and restore the user's configured battle speed afterwards.
@@ -441,7 +453,7 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
             arena.FadeArena( clearMessageLog );
         }
 
-        if ( isHumanBattle
+        if ( ( isHumanBattle || isAutoPlayBattle )
              && arena.DialogBattleSummary( result,
                                            shouldTransferArtifacts ? getArtifactsToTransfer( winnerHero->GetBagArtifacts(), loserHero->GetBagArtifacts() )
                                                                    : std::vector<Artifact>{},
@@ -474,7 +486,7 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
 
                 const auto assembledArtifacts = winnerBag.assembleArtifactSetIfPossible();
 
-                if ( winnerHero->isControlHuman() ) {
+                if ( shouldShowLocalBattlePopup( winnerHero ) ) {
                     std::for_each( assembledArtifacts.begin(), assembledArtifacts.end(), Dialog::ArtifactSetAssembled );
                 }
             }
@@ -498,11 +510,11 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
         }
 
         if ( winnerHero && loserHero && winnerHero->GetLevelSkill( Skill::Secondary::EAGLE_EYE ) && loserHero->isHeroes() ) {
-            eagleEyeSkillAction( *winnerHero, arena.GetUsedSpells(), winnerHero->isControlHuman(), randomGenerator );
+            eagleEyeSkillAction( *winnerHero, arena.GetUsedSpells(), shouldShowLocalBattlePopup( winnerHero ), randomGenerator );
         }
 
         if ( winnerHero && winnerHero->GetLevelSkill( Skill::Secondary::NECROMANCY ) ) {
-            necromancySkillAction( *winnerHero, result.numOfDeadUnitsForNecromancy, winnerHero->isControlHuman() );
+            necromancySkillAction( *winnerHero, result.numOfDeadUnitsForNecromancy, shouldShowLocalBattlePopup( winnerHero ) );
         }
 
         break;
