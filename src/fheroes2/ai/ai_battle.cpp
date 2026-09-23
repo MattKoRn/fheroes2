@@ -167,6 +167,19 @@ namespace
     {
         double value = target.evaluateThreatForUnit( attacker );
 
+        const uint32_t targetSpeed = target.GetSpeed( false, true );
+        const bool targetCanStillAct = !target.Modes( Battle::TR_MOVED ) && targetSpeed > Speed::STANDING;
+        if ( targetCanStillAct ) {
+            // Damage dealt before an enemy acts is worth more because a kill can erase an entire
+            // pending turn. Fast stacks get an additional urgency bonus because they are harder to
+            // contain once they are allowed to move.
+            value *= 1.08;
+
+            if ( targetSpeed > attacker.GetSpeed( false, true ) ) {
+                value *= 1.05;
+            }
+        }
+
         // Active shooters project damage across the whole battlefield, so shutting them down
         // is more valuable than their raw stack strength alone suggests.
         if ( target.isArchers() && !target.isHandFighting() && target.GetShots() > 0 ) {
@@ -189,7 +202,8 @@ namespace
         const uint32_t potentialDamage = attacker.getPotentialDamage( target );
         if ( potentialDamage >= target.GetHitPoints() ) {
             // Removing a stack completely denies all of its future turns and retaliation opportunities.
-            value *= 1.35;
+            // A kill is even more valuable before the target has acted this round.
+            value *= targetCanStillAct ? 1.50 : 1.35;
         }
         else if ( static_cast<uint64_t>( potentialDamage ) * 2 >= target.GetHitPoints() ) {
             // Prefer attacks that put a dangerous stack close to elimination over light chip damage.
@@ -1768,7 +1782,7 @@ AI::BattleTargetPair AI::BattlePlanner::meleeUnitOffense( Battle::Arena & arena,
                 // If this distance was zero, it would mean that this enemy unit would have already been attacked by the current unit
                 assert( nearestCellInfo.dist > 0 );
 
-                const double priority = enemy->evaluateThreatForUnit( currentUnit ) / nearestCellInfo.dist;
+                const double priority = getTacticalTargetValue( currentUnit, *enemy ) / nearestCellInfo.dist;
                 if ( priority < maxPriority ) {
                     continue;
                 }
