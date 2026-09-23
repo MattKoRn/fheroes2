@@ -85,6 +85,7 @@
 #include "players.h"
 #include "rand.h"
 #include "resource.h"
+#include "resource_trading.h"
 #include "screen.h"
 #include "settings.h"
 #include "system.h"
@@ -1615,20 +1616,26 @@ namespace
         data.resources.*member += summary.rankUpBonus;
     }
 
+    double getOfflineRecruitmentGoldEquivalentCost( const Funds & cost, const uint32_t marketplaceCount )
+    {
+        const uint32_t markets = std::max<uint32_t>( 1, marketplaceCount );
+
+        const double commonResourceValue = static_cast<double>( fheroes2::getTradeCost( markets, Resource::WOOD, Resource::GOLD ) );
+        const double rareResourceValue = static_cast<double>( fheroes2::getTradeCost( markets, Resource::MERCURY, Resource::GOLD ) );
+
+        return static_cast<double>( cost.gold )
+               + static_cast<double>( cost.wood + cost.ore ) * commonResourceValue
+               + static_cast<double>( cost.mercury + cost.sulfur + cost.crystal + cost.gems ) * rareResourceValue;
+    }
+
     void applyOfflineCreatureRecruitment( OfflineProgressSummary & summary, OfflineProgressData & data, Kingdom & kingdom )
     {
         if ( summary.elapsedSeconds <= 0 ) {
             return;
         }
 
-        const uint64_t savedSettlementCount = static_cast<uint64_t>( summary.stateCastles ) + summary.stateTowns;
-        if ( savedSettlementCount == 0 ) {
-            return;
-        }
-
         VecCastles & castles = kingdom.GetCastles();
-        const size_t settlementLimit = std::min<size_t>( castles.size(), static_cast<size_t>( savedSettlementCount ) );
-        if ( settlementLimit == 0 ) {
+        if ( castles.empty() ) {
             return;
         }
 
@@ -1641,18 +1648,23 @@ namespace
             size_t settlementIndex;
             int tier;
             Monster monster;
+            double returnOnInvestment;
         };
 
         std::vector<RecruitmentOption> options;
-        options.reserve( settlementLimit * baseDwellings.size() );
+        options.reserve( castles.size() * baseDwellings.size() );
 
-        for ( size_t castleIndex = 0; castleIndex < settlementLimit; ++castleIndex ) {
+        const uint32_t marketplaceCount = kingdom.GetCountMarketplace();
+
+        // Every currently owned town participates. Offline recruitment no longer truncates the
+        // candidate list to the number of settlements stored in the previous offline snapshot.
+        for ( size_t castleIndex = 0; castleIndex < castles.size(); ++castleIndex ) {
             Castle * castle = castles[castleIndex];
             if ( castle == nullptr || castle->GetColor() != kingdom.GetColor() ) {
                 continue;
             }
 
-            for ( int tier = Castle::maxNumOfDwellings - 1; tier >= 0; --tier ) {
+            for ( int tier = 0; tier < Castle::maxNumOfDwellings; ++tier ) {
                 const uint32_t baseDwelling = baseDwellings[static_cast<size_t>( tier )];
                 if ( !castle->isBuild( baseDwelling ) ) {
                     continue;
@@ -1664,18 +1676,26 @@ namespace
                 }
 
                 const Monster monster( castle->GetRace(), actualDwelling );
-                if ( monster.isValid() ) {
-                    options.push_back( { castle, castleIndex, tier, monster } );
+                if ( !monster.isValid() ) {
+                    continue;
                 }
+
+                const double goldEquivalentCost = getOfflineRecruitmentGoldEquivalentCost( monster.GetCost(), marketplaceCount );
+                if ( goldEquivalentCost <= 0.0 ) {
+                    continue;
+                }
+
+                const double roi = monster.GetMonsterStrength() / goldEquivalentCost;
+                options.push_back( { castle, castleIndex, tier, monster, roi } );
             }
         }
 
-        // Tier priority must apply to the entire kingdom, not only within one castle. Otherwise
-        // a low-tier dwelling in an earlier castle can empty the treasury before a later tier-6
-        // dwelling is ever considered.
+        // Buy the most army strength per resource spent across the whole kingdom. Tier is only a
+        // tie-breaker now, so a cheaper lower-tier creature can correctly outrank an inefficient
+        // high-tier creature.
         std::sort( options.begin(), options.end(), []( const RecruitmentOption & lhs, const RecruitmentOption & rhs ) {
-            if ( lhs.tier != rhs.tier ) {
-                return lhs.tier > rhs.tier;
+            if ( std::fabs( lhs.returnOnInvestment - rhs.returnOnInvestment ) > 0.0000001 ) {
+                return lhs.returnOnInvestment > rhs.returnOnInvestment;
             }
 
             const double lhsStrength = lhs.monster.GetMonsterStrength();
@@ -1684,11 +1704,15 @@ namespace
                 return lhsStrength > rhsStrength;
             }
 
+            if ( lhs.tier != rhs.tier ) {
+                return lhs.tier > rhs.tier;
+            }
+
             return lhs.settlementIndex < rhs.settlementIndex;
         } );
 
         data.creatureRecruitCarry.fill( 0 );
-        std::vector<bool> recruitedAtSettlement( settlementLimit, false );
+        std::vector<bool> recruitedAtSettlement( castles.size(), false );
 
         for ( const RecruitmentOption & option : options ) {
             Castle * castle = option.castle;

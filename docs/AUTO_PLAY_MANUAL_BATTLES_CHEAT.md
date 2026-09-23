@@ -73,3 +73,6 @@ Enemy scaling is intentionally varied. Enemy heroes and castle garrisons receive
 
 
 Offline persistence now keeps the last-seen timestamp monotonic so system-clock rollback cannot create duplicate offline time. State-file saves are written to a temporary file and swapped into place with a backup, reducing the chance of losing the offline wallet/roster if the process stops during a save.
+
+
+Offline creature recruitment now evaluates every built dwelling in every currently owned town as one kingdom-wide pool. Purchases are ranked by combat strength per gold-equivalent resource cost using the kingdom's marketplace exchange rates; tier is only a tie-breaker.
