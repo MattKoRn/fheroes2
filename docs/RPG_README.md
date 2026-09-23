@@ -51,7 +51,7 @@ Offline progress still grants RPG XP for the full elapsed interval with no durat
 ## AI integration
 
 Adventure and combat AI are fully aware of RPG doctrines and stats:
-- **Adventure AI:** Evaluates army strength on the adventure map and in pathfinding using kingdom-wide creature Attack, Defense, Morale, and Luck bonuses, ensuring tactical decisions and combat engagements accurately reflect real force power.
+- **Adventure AI:** Evaluates army strength on the adventure map and in pathfinding using kingdom-wide creature Attack, Defense, Morale, and Luck bonuses, ensuring tactical decisions and combat engagements accurately reflect real force power. Secondary-skill planning values the doctrines' actual mechanical effects rather than raw rank counts, so high-rank diminishing-return builds do not make Wisdom, Luck, Archery, or Mysticism grow out of proportion.
 - **Combat AI:** Accounts for Sorcery and elemental spell doctrines, evaluates target spell resistances and wards, factors expected critical strike damage multipliers and evasion damage reductions into tactical target selection, and values stack sustain from Blood Drinker and Reaper when healing wounded troops.
 - **Strategic Magic Power:** Hero strategic value on the adventure map and in combat threat estimation directly scales damaging spell power by active kingdom spell multipliers (Sorcery, Pyromancy, Cryomancy, Stormcraft, Cataclysm).
 - **Castle & Guild Planning:** AI kingdom town development recognizes when a kingdom specializes in Cataclysm or Sorcery and accelerates higher Mage Guild levels (levels 4 and 5) in safe regions to unlock devastating high-tier magic for its heroes.
