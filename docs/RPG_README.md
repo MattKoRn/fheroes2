@@ -29,13 +29,14 @@ The menu supports full keyboard and touch controls:
 - **F9** or **Esc**: Toggle / close menu
 - **1 – 8** (or numpad **1 – 8**): Jump directly to that doctrine tab
 - **Left / Right** arrows or **Tab**: Cycle tabs
-- **Up / Down** arrows or mouse wheel: Scroll doctrine rows
-- **PageUp / PageDown / Home / End**: Jump scroll to top or bottom
-- **Scrollbar track**: Click above or below the thumb to page scroll
+- **Up / Down** arrows: Move the selected doctrine; the list scrolls automatically to keep it visible
+- **Mouse wheel / scroll arrows / scrollbar track**: Scroll doctrine rows while keeping selection in view
+- **PageUp / PageDown / Home / End**: Select the first or last doctrine in the current tab
+- **B**, **Enter**, or **Space**: Buy the selected doctrine; if it is locked, capped, or unaffordable, show its details instead
+- **I**: Inspect the selected doctrine
+- **O**: Open the Royal Guild Overview modal
 - **S** or **A**: Toggle Steward auto-buyer
 - **R**: Respec doctrines with confirmation prompt
-- **B**, **Enter**, or **Space**: Quick-buy first affordable doctrine in current view
-- **O** or **I**: Open Royal Guild Overview modal
 
 ## XP and economy
 
