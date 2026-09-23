@@ -49,6 +49,7 @@
 #include "screen.h"
 #include "settings.h"
 #include "statusbar.h"
+#include "timing.h"
 #include "tools.h"
 #include "translations.h"
 #include "ui_button.h"
@@ -544,6 +545,9 @@ bool BuildingInfo::DialogBuyBuilding( bool buttons ) const
     buttonGroup.draw();
     display.render();
 
+    const bool autoDismiss = fheroes2::isAutoPlayPopupTimeoutEnabled();
+    fheroes2::TimeDelay autoDismissDelay( fheroes2::autoPlayPopupDisplayTimeMs );
+
     while ( le.HandleEvents() ) {
         const int result = buttonGroup.processEvents();
         if ( result != Dialog::ZERO ) {
@@ -555,6 +559,10 @@ bool BuildingInfo::DialogBuyBuilding( bool buttons ) const
         }
         else if ( le.isMouseRightButtonPressedInArea( buttonCancel.area() ) ) {
             fheroes2::showStandardTextMessage( _( "Cancel" ), _( "Exit this menu without doing anything." ), Dialog::ZERO );
+        }
+
+        if ( autoDismiss && autoDismissDelay.isPassed() ) {
+            return buttonOkay.isEnabled();
         }
     }
 
