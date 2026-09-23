@@ -434,6 +434,22 @@ double AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::U
 
     const int spellID = spell.GetID();
 
+    const auto getEffectiveDurationMultiplier = [this, &target, spellID, forDispel]() {
+        const int32_t durationMultiplier = spellDurationMultiplier( target );
+        if ( durationMultiplier > 0 ) {
+            return durationMultiplier;
+        }
+
+        // A one-turn Blind or Paralyze still has immediate tactical value after the target has
+        // moved if it can still retaliate. Keep the generic duration rule for dispel valuation and
+        // for all other spells.
+        if ( !forDispel && target.isRetaliationAllowed() && ( spellID == Spell::BLIND || spellID == Spell::PARALYZE ) ) {
+            return 1;
+        }
+
+        return 0;
+    };
+
     double ratio = 0.0;
     switch ( spellID ) {
     case Spell::SLOW:
@@ -505,7 +521,7 @@ double AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::U
                 return 0;
             }
 
-            const int32_t spellDuration = spellDurationMultiplier( target );
+            const int32_t spellDuration = getEffectiveDurationMultiplier();
             if ( spellDuration < 1 ) {
                 // This spell might not be useful at all.
                 return 0;
@@ -624,7 +640,7 @@ double AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::U
         }
     }
 
-    return target.GetStrength() * ratio * spellDurationMultiplier( target );
+    return target.GetStrength() * ratio * getEffectiveDurationMultiplier();
 }
 
 AI::SpellcastOutcome AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::Units & targets, const Battle::Units & enemies ) const
