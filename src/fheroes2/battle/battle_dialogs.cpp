@@ -477,11 +477,10 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
     const bool attackerIsHuman = _attackingArmy->GetControl() & CONTROL_HUMAN;
     const bool defenderIsHuman = _defendingArmy->GetControl() & CONTROL_HUMAN;
 
-    const Player * currentPlayer = Settings::Get().GetPlayers().GetCurrent();
     const Player * attackingPlayer = Players::Get( _attackingArmy->GetColor() );
     const Player * defendingPlayer = Players::Get( _defendingArmy->GetColor() );
-    const bool attackerIsAutoPlay = attackingPlayer != nullptr && attackingPlayer == currentPlayer && attackingPlayer->isAIAutoControlMode();
-    const bool defenderIsAutoPlay = defendingPlayer != nullptr && defendingPlayer == currentPlayer && defendingPlayer->isAIAutoControlMode();
+    const bool attackerIsAutoPlay = attackingPlayer != nullptr && attackingPlayer->isAIAutoControlMode();
+    const bool defenderIsAutoPlay = defendingPlayer != nullptr && defendingPlayer->isAIAutoControlMode();
 
     const bool attackerGetsSummary = attackerIsHuman || attackerIsAutoPlay;
     const bool defenderGetsSummary = defenderIsHuman || defenderIsAutoPlay;
@@ -701,7 +700,7 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
         }
         const Player * winnerPlayer = winner != nullptr ? Players::Get( winner->GetColor() ) : nullptr;
         const bool isWinnerLocal
-            = winner != nullptr && ( winner->isControlHuman() || ( winnerPlayer != nullptr && winnerPlayer == currentPlayer && winnerPlayer->isAIAutoControlMode() ) );
+            = winner != nullptr && ( winner->isControlHuman() || ( winnerPlayer != nullptr && winnerPlayer->isAIAutoControlMode() ) );
 
         // Nothing to do if a non-local AI won and there are no Ultimate Artifacts.
         if ( !isWinnerLocal && !loser->GetBagArtifacts().ContainUltimateArtifact() ) {
