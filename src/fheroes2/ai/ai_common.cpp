@@ -35,6 +35,7 @@
 #include "army.h"
 #include "army_troop.h"
 #include "artifact_ultimate.h"
+#include "buildinginfo.h"
 #include "castle.h"
 #include "color.h"
 #include "difficulty.h"
@@ -52,6 +53,7 @@
 #include "puzzle.h"
 #include "resource.h"
 #include "resource_trading.h"
+#include "ui_dialog.h"
 #include "world.h"
 
 bool AI::BuildIfPossible( Castle & castle, const BuildingType building )
@@ -70,6 +72,13 @@ bool AI::BuildIfPossible( Castle & castle, const BuildingType building )
         break;
     default:
         return false;
+    }
+
+    if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+        const BuildingInfo buildingInfo( castle, building );
+        if ( !buildingInfo.DialogBuyBuilding( true ) ) {
+            return false;
+        }
     }
 
     const bool result = castle.BuyBuilding( building );
