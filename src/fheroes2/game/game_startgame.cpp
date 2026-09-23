@@ -2097,6 +2097,22 @@ namespace
         fheroes2::showMessage( headerText, bodyText, Dialog::OK, { &recruitedCreaturesUI } );
     }
 
+    void showOfflineProgressPopups( const OfflineProgressSummary & summary )
+    {
+        showOfflineProgressPopup( summary );
+
+        if ( !summary.showPopup ) {
+            return;
+        }
+
+        // The first modal can leave its OK/click/key state active for the current event cycle.
+        // Clear it before opening the second popup so the recruitment summary cannot be
+        // immediately dismissed by the input that closed Offline Progress.
+        LocalEvent::Get().reset();
+
+        showOfflineRecruitmentPopup( summary );
+    }
+
     bool SortPlayers( const Player * player1, const Player * player2 )
     {
         return ( player1->isControlHuman() && !player2->isControlHuman() )
@@ -2769,8 +2785,7 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
     // Prepare for render the whole game interface with adventure map filled with fog as it was not uncovered by 'updateMapFogDirections()'.
     redraw( REDRAW_GAMEAREA | REDRAW_RADAR | REDRAW_ICONS | REDRAW_BUTTONS | REDRAW_STATUS | REDRAW_BORDER );
 
-    showOfflineProgressPopup( offlineProgressSummary );
-    showOfflineRecruitmentPopup( offlineProgressSummary );
+    showOfflineProgressPopups( offlineProgressSummary );
 
     bool isLoadedFromSave = conf.LoadedGameVersion();
     bool skipTurns = isLoadedFromSave;
