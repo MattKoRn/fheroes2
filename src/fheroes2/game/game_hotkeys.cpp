@@ -542,6 +542,7 @@ void Game::globalKeyDownEvent( const fheroes2::Key key, const int32_t modifier )
             // Do not allow to transfer control to/from AI during battle
             if ( player && ( player->isControlHuman() || player->isAIAutoControlMode() ) && Battle::GetArena() == nullptr ) {
                 if ( player->isAIAutoControlMode() ) {
+                    const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::YES, _( "Disable auto-play" ) );
                     if ( fheroes2::showStandardTextMessage( _( "Auto-play" ),
                                                             _( "Disable auto-play and regain adventure-map control? The change takes effect on the next turn." ),
                                                             Dialog::YES | Dialog::NO )
