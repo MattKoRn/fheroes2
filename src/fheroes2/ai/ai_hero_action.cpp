@@ -708,7 +708,7 @@ namespace
                 decisionText += ' ';
                 decisionText += troop.GetPluralName( join.monsterCount );
                 decisionText += " for ";
-                decisionText += std::to_string( troop.GetMonster().GetCost().gold * static_cast<int32_t>( join.monsterCount ) );
+                decisionText += std::to_string( troop.GetTotalCost().gold );
                 decisionText += " gold";
             }
             else {
