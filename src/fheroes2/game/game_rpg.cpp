@@ -695,16 +695,52 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
         readProfile( path + ".bak", playerProfile );
     }
 
-    std::mt19937_64 rng( std::random_device{}() );
-    std::uniform_int_distribution<int> startingRank( 0, 2 );
-    const auto makeTemporaryProfile = [&rng, &startingRank]( const int minimumPower, const int maximumPower ) {
+    // Temporary enemy RPG builds are deterministic for the same map/profile level and
+    // spend a point budget instead of receiving free ranks in every upgrade. This avoids
+    // level-1 neutral stacks quietly spawning with dozens of combat bonuses.
+    uint64_t seed = static_cast<uint64_t>( world.GetMapSeed() ) << 32;
+    seed ^= saturatedMultiply( playerProfile.level, 0x9E3779B185EBCA87ULL );
+    seed ^= static_cast<uint64_t>( playerColor );
+    std::mt19937_64 rng( seed );
+
+    const uint64_t earnedPointBudget
+        = playerProfile.level > 1 ? saturatedMultiply( playerProfile.level - 1, pointsPerLevel ) : 0;
+
+    const auto makeTemporaryProfile = [&rng, earnedPointBudget]( const int minimumPower, const int maximumPower ) {
         std::uniform_int_distribution<int> variation( minimumPower, maximumPower );
         Profile temporary;
         temporary.level = std::max<uint64_t>( 1, scaledValue( playerProfile.level, variation( rng ) ) );
-        for ( size_t id = 0; id < upgradeCount; ++id ) {
-            temporary.ranks[id] = saturatedAdd( scaledValue( playerProfile.ranks[id], variation( rng ) ),
-                                                static_cast<uint64_t>( startingRank( rng ) ) );
+        temporary.points = scaledValue( earnedPointBudget, variation( rng ) );
+
+        while ( temporary.points > 0 ) {
+            std::array<size_t, upgradeCount> candidates{};
+            size_t candidateCount = 0;
+
+            for ( size_t id = 0; id < upgradeCount; ++id ) {
+                const uint64_t rank = temporary.ranks[id];
+                if ( rank == std::numeric_limits<uint64_t>::max() || effect( id, rank + 1 ) <= effect( id, rank )
+                     || cost( id, rank ) > temporary.points ) {
+                    continue;
+                }
+                if ( id == BRUTAL_CRITICALS && temporary.ranks[CRITICAL_TRAINING] == 0 ) {
+                    continue;
+                }
+
+                candidates[candidateCount++] = id;
+            }
+
+            if ( candidateCount == 0 ) {
+                break;
+            }
+
+            std::uniform_int_distribution<size_t> pick( 0, candidateCount - 1 );
+            if ( !buy( temporary, candidates[pick( rng )] ) ) {
+                break;
+            }
         }
+
+        // Temporary profiles do not carry unspent currency or persistent counters.
+        temporary.points = 0;
         return temporary;
     };
 
@@ -714,9 +750,9 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
             continue;
         }
 
-        enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 75, 125 ) );
+        enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 85, 115 ) );
     }
-    enemyProfiles.emplace( PlayerColor::NONE, makeTemporaryProfile( 65, 115 ) );
+    enemyProfiles.emplace( PlayerColor::NONE, makeTemporaryProfile( 60, 90 ) );
 }
 
 void fheroes2::RPG::endMap()
