@@ -19,7 +19,7 @@ The upgrade tree is now built around direct RPG combat mechanics instead of reso
 
 **Life steal and Reaper healing never resurrect dead creatures.** They can only repair the currently surviving stack. Regeneration follows the same rule. Critical hits and Evasion use independent combat rolls. Towers do not receive the creature-specific RPG affixes.
 
-Left-click the **BUY** plaque to purchase a rank. Hold right-click on an upgrade to see the exact current effect, next-rank effect, cost, prerequisites, and available guild points. High-impact primary stats, Morale/Luck, proc chances, and sustain effects use steeper costs than ordinary percentage upgrades. The **Steward** auto-buyer compares approximate expected combat value per point instead of treating +1 Attack and +1% chance as equivalent, and it skips capped or locked upgrades.
+Left-click or tap the **BUY** plaque to purchase a rank. Hold an upgrade row (or right-click it) to see the exact current effect, next-rank effect, cost, prerequisites, and available guild points. High-impact primary stats, Morale/Luck, proc chances, and sustain effects use steeper costs than ordinary percentage upgrades. The **Steward** auto-buyer compares approximate expected combat value per point instead of treating +1 Attack and +1% chance as equivalent, and it skips capped or locked upgrades.
 
 ## XP and economy
 
