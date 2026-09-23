@@ -305,8 +305,11 @@ bool AI::Planner::recruitHero( Castle & castle, bool buyArmy )
         return false;
     }
 
-    if ( fheroes2::isAutoPlayPopupTimeoutEnabled() && castle.DialogBuyHero( selectedRecruit ) != Dialog::OK ) {
-        return false;
+    if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+        const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::OK, std::string( "Recruit hero " ) + selectedRecruit->GetName() );
+        if ( castle.DialogBuyHero( selectedRecruit ) != Dialog::OK ) {
+            return false;
+        }
     }
 
     recruit = castle.RecruitHero( selectedRecruit );
