@@ -687,11 +687,9 @@ namespace
 
     PlayerColor getPersistentResourcePlayerColor( Settings & conf )
     {
-        Player * currentPlayer = conf.GetPlayers().GetCurrent();
-        if ( currentPlayer != nullptr && ( currentPlayer->isControlHuman() || currentPlayer->isAIAutoControlMode() ) ) {
-            return currentPlayer->GetColor();
-        }
-
+        // Offline progression belongs to one deterministic local-human kingdom. Do not prefer
+        // the current turn's player: in Hot Seat that would make the persistent wallet and
+        // creature roster jump between colors depending on whose turn a save was made on.
         for ( Player * player : conf.GetPlayers().getVector() ) {
             if ( player != nullptr && ( player->isControlHuman() || player->isAIAutoControlMode() ) ) {
                 return player->GetColor();
