@@ -272,7 +272,7 @@ Troop Dialog::RecruitMonster( const Monster & monster0, const uint32_t available
     // Auto-play callers pass the count the AI has already decided to buy. Keep that exact
     // amount visible instead of recomputing the human dialog's default maximum.
     const bool lockAutoPlaySelection = fheroes2::isAutoPlayPopupTimeoutEnabled() && selectedCount > 0;
-    uint32_t result = lockAutoPlaySelection ? std::min( selectedCount, available ) : max;
+    uint32_t result = lockAutoPlaySelection ? std::min( selectedCount, max ) : max;
 
     Funds paymentCosts( paymentMonster * result );
 
