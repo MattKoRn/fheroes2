@@ -42,9 +42,12 @@
 #include "logging.h"
 #include "luck.h"
 #include "morale.h"
+#include "players.h"
 #include "resource.h"
 #include "screen.h"
+#include "settings.h"
 #include "spell_info.h"
+#include "timing.h"
 #include "tools.h"
 #include "translations.h"
 #include "ui_button.h"
@@ -90,6 +93,12 @@ namespace
 
 namespace fheroes2
 {
+    bool isAutoPlayPopupTimeoutEnabled()
+    {
+        const Player * currentPlayer = Settings::Get().GetPlayers().GetCurrent();
+        return currentPlayer != nullptr && currentPlayer->isAIAutoControlMode();
+    }
+
     int showMessage( const TextBase & header, const TextBase & body, const int buttons, const std::vector<const DialogElement *> & elements /* = {} */ )
     {
         outputInTextSupportMode( header, body, buttons );
@@ -217,6 +226,27 @@ namespace fheroes2
         int result = Dialog::ZERO;
         LocalEvent & le = LocalEvent::Get();
 
+        const bool autoDismiss = isAutoPlayPopupTimeoutEnabled();
+        TimeDelay autoDismissDelay( autoPlayPopupDisplayTimeMs );
+
+        const auto getAutoDismissResult = [buttons]() {
+            // Never make an affirmative choice on behalf of the player.
+            if ( buttons & Dialog::NO ) {
+                return Dialog::NO;
+            }
+            if ( buttons & Dialog::CANCEL ) {
+                return Dialog::CANCEL;
+            }
+            if ( buttons & Dialog::OK ) {
+                return Dialog::OK;
+            }
+            if ( buttons & Dialog::YES ) {
+                return Dialog::YES;
+            }
+
+            return Dialog::ZERO;
+        };
+
         bool delayInEventHandling = true;
 
         while ( result == Dialog::ZERO && le.HandleEvents( delayInEventHandling ) ) {
@@ -244,6 +274,11 @@ namespace fheroes2
 
             if ( !delayInEventHandling ) {
                 display.render( pos );
+            }
+
+            if ( autoDismiss && autoDismissDelay.isPassed() ) {
+                result = getAutoDismissResult();
+                break;
             }
         }
 
