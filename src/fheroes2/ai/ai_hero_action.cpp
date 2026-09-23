@@ -861,6 +861,31 @@ namespace
             return { std::optional<uint32_t>{}, {}, art };
         }();
 
+        if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+            std::string rewardMessage;
+
+            if ( goldReward ) {
+                rewardMessage = _( "Auto-play chose the gold reward: " );
+                rewardMessage += std::to_string( *goldReward );
+                rewardMessage += _( " gold." );
+            }
+            else if ( experienceReward ) {
+                rewardMessage = _( "Auto-play chose the experience reward: " );
+                rewardMessage += std::to_string( *experienceReward );
+                rewardMessage += _( " experience." );
+            }
+            else if ( artifactReward ) {
+                rewardMessage = _( "Auto-play found the artifact: " );
+                rewardMessage += artifactReward->GetName();
+                rewardMessage += '.';
+            }
+            else {
+                rewardMessage = _( "The chest contains no usable reward." );
+            }
+
+            fheroes2::showStandardTextMessage( MP2::StringObject( objectType ), std::move( rewardMessage ), Dialog::OK );
+        }
+
         if ( goldReward ) {
             assert( goldReward > 0U );
 
@@ -1357,6 +1382,10 @@ namespace
             return;
         }
 
+        if ( fheroes2::isAutoPlayPopupTimeoutEnabled() && !mapEvent->message.empty() ) {
+            fheroes2::showStandardTextMessage( MP2::StringObject( MP2::OBJ_EVENT ), mapEvent->message, Dialog::OK );
+        }
+
         hero.GetKingdom().AddFundsResource( mapEvent->resources );
         hero.PickupArtifact( mapEvent->artifact );
 
@@ -1656,10 +1685,19 @@ namespace
             recruitTroopCount = availableTroopCount;
         }
 
-        const Troop troopToHire{ troop.GetID(), recruitTroopCount };
+        Troop troopToHire{ troop.GetID(), recruitTroopCount };
 
         if ( !canMonsterJoinHero( troopToHire, hero ) ) {
             return;
+        }
+
+        if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+            troopToHire = Dialog::RecruitMonster( troop.GetMonster(), recruitTroopCount, false, 0 );
+            if ( !troopToHire.isValid() ) {
+                return;
+            }
+
+            recruitTroopCount = troopToHire.GetCount();
         }
 
         if ( !hero.GetArmy().JoinTroop( troopToHire ) ) {
