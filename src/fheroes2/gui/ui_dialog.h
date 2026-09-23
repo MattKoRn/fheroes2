@@ -50,6 +50,24 @@ namespace fheroes2
     // Automatically generated popups use this to remain visible briefly without blocking auto-play.
     bool isAutoPlayPopupTimeoutEnabled();
 
+    class AutoPlayDialogDecisionScope final
+    {
+    public:
+        AutoPlayDialogDecisionScope( int result, std::string decisionText );
+        ~AutoPlayDialogDecisionScope();
+
+        AutoPlayDialogDecisionScope( const AutoPlayDialogDecisionScope & ) = delete;
+        AutoPlayDialogDecisionScope & operator=( const AutoPlayDialogDecisionScope & ) = delete;
+
+    private:
+        bool _active{ false };
+    };
+
+    // Return the AI-planned choice for this popup. If no explicit choice was supplied,
+    // a conservative fallback is chosen from the available buttons.
+    int getAutoPlayDialogDecisionResult( int buttons );
+    std::string getAutoPlayDialogDecisionText( int buttons );
+
     int showMessage( const TextBase & header, const TextBase & body, const int buttons, const std::vector<const DialogElement *> & elements = {} );
 
     int32_t getDialogHeight( const TextBase & header, const TextBase & body, const int buttons, const std::vector<const DialogElement *> & elements = {} );
