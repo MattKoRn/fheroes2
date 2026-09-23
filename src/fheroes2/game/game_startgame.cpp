@@ -126,6 +126,7 @@ namespace
         std::array<int64_t, 7> carry{};
         uint32_t homecomingStreak{ 0 };
         int64_t lastHomecomingStreakUnix{ 0 };
+        int64_t pendingResumeSeconds{ 0 };
         uint64_t totalOfflineSeconds{ 0 };
         uint64_t offlineRenown{ 0 };
         int contractId{ -1 };
@@ -239,6 +240,7 @@ namespace
         bool hasCarry = false;
         bool hasStreak = false;
         bool hasLastHomecomingStreakUnix = false;
+        bool hasPendingResumeSeconds = false;
         bool hasTotalOfflineSeconds = false;
         bool hasOfflineRenown = false;
         bool hasContractId = false;
@@ -303,6 +305,10 @@ namespace
             else if ( key == "last_homecoming_streak_unix" ) {
                 input >> candidate.lastHomecomingStreakUnix;
                 hasLastHomecomingStreakUnix = true;
+            }
+            else if ( key == "pending_resume_seconds" ) {
+                input >> candidate.pendingResumeSeconds;
+                hasPendingResumeSeconds = true;
             }
             else if ( key == "total_offline_seconds" ) {
                 input >> candidate.totalOfflineSeconds;
@@ -417,8 +423,12 @@ namespace
               || ( version == 11 && hasStreak && hasLastHomecomingStreakUnix && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId
                    && hasContractProgress && hasContractTarget && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted
                    && hasStateCastles && hasStateTowns && hasStateHeroes && hasStateMines && hasStateArtifacts && hasStateEfficiency
-                   && hasSupplyRushMeter );
-        if ( !( version >= 1 && version <= 11 ) || !hasVersionSpecificFields || !hasTimestamp || !hasResources || !hasIncome || !hasCarry
+                   && hasSupplyRushMeter )
+              || ( version == 12 && hasStreak && hasLastHomecomingStreakUnix && hasPendingResumeSeconds && hasTotalOfflineSeconds
+                   && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget && hasContractsCompleted
+                   && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
+                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter );
+        if ( !( version >= 1 && version <= 12 ) || !hasVersionSpecificFields || !hasTimestamp || !hasResources || !hasIncome || !hasCarry
              || candidate.lastSeenUnix <= 0 ) {
             return false;
         }
@@ -426,6 +436,7 @@ namespace
         // Normalize persistent counters before any arithmetic uses them. These limits are
         // structural invariants of the current format, not progression caps.
         candidate.treasureFragments = std::min<uint32_t>( candidate.treasureFragments, 4 );
+        candidate.pendingResumeSeconds = std::max<int64_t>( 0, candidate.pendingResumeSeconds );
         if ( version < 11 ) {
             // Version 10 and earlier tracked only the count. Anchor an existing streak to the
             // last valid snapshot so migration preserves it while preventing another same-day increment.
@@ -473,7 +484,7 @@ namespace
         return foundSnapshot;
     }
 
-    void saveOfflineProgressData( const OfflineProgressData & data )
+    bool saveOfflineProgressData( const OfflineProgressData & data )
     {
         const std::string filePath = getOfflineProgressFilePath();
         const std::string tempFilePath = filePath + ".tmp";
@@ -482,7 +493,7 @@ namespace
         std::ofstream output( tempFilePath, std::ios::trunc );
         if ( !output ) {
             ERROR_LOG( "Unable to write temporary offline progress data." )
-            return;
+            return false;
         }
 
         const auto writeFunds = [&output]( const Funds & funds ) {
@@ -495,7 +506,7 @@ namespace
             output << '\n';
         };
 
-        output << "version 11\n";
+        output << "version 12\n";
         output << "last_seen_unix " << data.lastSeenUnix << '\n';
         output << "resources ";
         writeFunds( data.resources );
@@ -511,6 +522,7 @@ namespace
         output << '\n';
         output << "homecoming_streak " << data.homecomingStreak << '\n';
         output << "last_homecoming_streak_unix " << data.lastHomecomingStreakUnix << '\n';
+        output << "pending_resume_seconds " << data.pendingResumeSeconds << '\n';
         output << "total_offline_seconds " << data.totalOfflineSeconds << '\n';
         output << "offline_renown " << data.offlineRenown << '\n';
         output << "contract_id " << data.contractId << '\n';
@@ -532,14 +544,14 @@ namespace
             ERROR_LOG( "Unable to flush temporary offline progress data." )
             output.close();
             System::Unlink( tempFilePath );
-            return;
+            return false;
         }
 
         output.close();
         if ( !output ) {
             ERROR_LOG( "Unable to close temporary offline progress data." )
             System::Unlink( tempFilePath );
-            return;
+            return false;
         }
 
         // Replace the live file only after the temporary file is fully written. Keep one backup
@@ -550,7 +562,7 @@ namespace
             if ( std::rename( filePath.c_str(), backupFilePath.c_str() ) != 0 ) {
                 ERROR_LOG( "Unable to back up offline progress data." )
                 System::Unlink( tempFilePath );
-                return;
+                return false;
             }
         }
 
@@ -560,10 +572,11 @@ namespace
                 std::rename( backupFilePath.c_str(), filePath.c_str() );
             }
             System::Unlink( tempFilePath );
-            return;
+            return false;
         }
 
         // Keep the previous valid offline snapshot at backupFilePath as a resilient fallback in case of corruption or crash.
+        return true;
     }
 
     PlayerColor getPersistentResourcePlayerColor( Settings & conf )
@@ -622,13 +635,24 @@ namespace
         const bool hasSavedData = loadOfflineProgressData( data );
         const int64_t now = snapshotUnix > 0 ? snapshotUnix : getCurrentUnixTime();
 
-        // Never move the offline clock backwards. A temporary system-clock rollback would
-        // otherwise become a fake offline interval after the clock returns to normal.
+        const bool hasPendingResume = offlineResumePending && offlineResumeElapsedSeconds > 0;
+        if ( hasPendingResume ) {
+            data.pendingResumeSeconds
+                = offlineResumeElapsedSeconds > std::numeric_limits<int64_t>::max() - data.pendingResumeSeconds
+                      ? std::numeric_limits<int64_t>::max()
+                      : data.pendingResumeSeconds + offlineResumeElapsedSeconds;
+        }
+
+        // Persist the pending resume interval and the advanced offline clock in one atomic
+        // snapshot. If the write fails, keep the interval in memory and do not acknowledge it.
         data.lastSeenUnix = hasSavedData ? std::max( data.lastSeenUnix, now ) : now;
         data.resources = kingdom.GetFunds();
         captureOfflineKingdomState( data, kingdom );
 
-        saveOfflineProgressData( data );
+        if ( saveOfflineProgressData( data ) && hasPendingResume ) {
+            offlineResumeElapsedSeconds = 0;
+            offlineResumePending = false;
+        }
     }
 
     int getHomecomingTier( const int64_t elapsedSeconds )
@@ -1293,7 +1317,12 @@ namespace
 
         OfflineProgressSummary summary;
         const int64_t previousLastSeenUnix = data.lastSeenUnix;
-        summary.elapsedSeconds = elapsedOverrideSeconds >= 0 ? elapsedOverrideSeconds : ( now > previousLastSeenUnix ? now - previousLastSeenUnix : 0 );
+        const int64_t currentElapsedSeconds
+            = elapsedOverrideSeconds >= 0 ? elapsedOverrideSeconds : ( now > previousLastSeenUnix ? now - previousLastSeenUnix : 0 );
+        summary.elapsedSeconds = data.pendingResumeSeconds > std::numeric_limits<int64_t>::max() - currentElapsedSeconds
+                                     ? std::numeric_limits<int64_t>::max()
+                                     : currentElapsedSeconds + data.pendingResumeSeconds;
+        data.pendingResumeSeconds = 0;
         summary.stateCastles = data.stateCastles;
         summary.stateTowns = data.stateTowns;
         summary.stateHeroes = data.stateHeroes;
