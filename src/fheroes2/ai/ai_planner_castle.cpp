@@ -32,6 +32,7 @@
 #include "army.h"
 #include "army_troop.h"
 #include "castle.h"
+#include "dialog.h"
 #include "difficulty.h"
 #include "game.h"
 #include "heroes.h"
@@ -42,6 +43,7 @@
 #include "payment.h"
 #include "race.h"
 #include "resource.h"
+#include "ui_dialog.h"
 #include "world.h"
 #include "world_regions.h"
 
@@ -236,9 +238,11 @@ namespace
             return false;
         }();
 
-        // If yes, then buy a boat
+        // If yes, then buy a boat. During auto-play show the normal purchase window first.
         if ( buyBoat ) {
-            castle.BuyBoat();
+            if ( !fheroes2::isAutoPlayPopupTimeoutEnabled() || Dialog::BuyBoat( true ) == Dialog::OK ) {
+                castle.BuyBoat();
+            }
         }
 
         if ( Build( castle, defensiveStructures, 10 ) ) {
@@ -316,9 +320,32 @@ void AI::Planner::reinforceCastle( Castle & castle )
     assert( castle.isControlAI() );
 
     const auto recruitMonster = [&castle]( const Troop & troop ) {
+        Troop selectedTroop = troop;
+
+        if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+            // Do not show the recruitment dialog until there is actually room for the selected
+            // creature. The AI may first need to rearrange or replace a weaker stack.
+            bool hasRoom = castle.GetArmy().CanJoinTroop( troop.GetMonster() );
+            if ( !hasRoom ) {
+                if ( const Heroes * guestHero = castle.GetHero(); guestHero != nullptr ) {
+                    hasRoom = guestHero->GetArmy().CanJoinTroop( troop.GetMonster() );
+                }
+            }
+
+            if ( hasRoom ) {
+                selectedTroop = Dialog::RecruitMonster( troop.GetMonster(), troop.GetCount(), false, 0 );
+                if ( !selectedTroop.isValid() ) {
+                    // Treat a manual cancellation as a handled choice so the AI does not start
+                    // dismissing or moving stacks in an attempt to force this purchase.
+                    return true;
+                }
+            }
+        }
+
         // This method can hire a unit to both the castle garrison and the guest hero's army (depending on the availability of suitable slots)
-        if ( castle.RecruitMonster( troop, false ) ) {
-            DEBUG_LOG( DBG_AI, DBG_INFO, castle.GetName() << " hires " << troop.GetCount() << " " << troop.GetPluralName( troop.GetCount() ) )
+        if ( castle.RecruitMonster( selectedTroop, false ) ) {
+            DEBUG_LOG( DBG_AI, DBG_INFO,
+                       castle.GetName() << " hires " << selectedTroop.GetCount() << " " << selectedTroop.GetPluralName( selectedTroop.GetCount() ) )
 
             return true;
         }
