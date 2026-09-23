@@ -467,14 +467,16 @@ namespace
 
         const std::string filePath = getOfflineProgressFilePath();
         // A crash can leave more than one valid snapshot. Select the newest timestamp rather
-        // than trusting a stale primary merely because it still parses.
-        const std::array<std::string, 3> candidatePaths{ filePath, filePath + ".tmp", filePath + ".bak" };
+        // than trusting a stale primary merely because it still parses. For equal timestamps,
+        // prefer backup < primary < temporary: a fully written .tmp is the newest atomic-write
+        // candidate, while the backup is deliberately the previous committed state.
+        const std::array<std::string, 3> candidatePaths{ filePath + ".bak", filePath, filePath + ".tmp" };
 
         bool foundSnapshot = false;
         int64_t newestTimestamp = 0;
         for ( const std::string & candidatePath : candidatePaths ) {
             OfflineProgressData candidate;
-            if ( loadFromPath( candidatePath, candidate ) && ( !foundSnapshot || candidate.lastSeenUnix > newestTimestamp ) ) {
+            if ( loadFromPath( candidatePath, candidate ) && ( !foundSnapshot || candidate.lastSeenUnix >= newestTimestamp ) ) {
                 data = std::move( candidate );
                 newestTimestamp = data.lastSeenUnix;
                 foundSnapshot = true;
