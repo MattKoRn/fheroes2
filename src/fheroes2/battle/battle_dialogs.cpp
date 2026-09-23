@@ -63,6 +63,7 @@
 #include "resource.h"
 #include "screen.h"
 #include "settings.h"
+#include "timing.h"
 #include "tools.h"
 #include "translations.h"
 #include "ui_button.h"
@@ -476,8 +477,16 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
     const bool attackerIsHuman = _attackingArmy->GetControl() & CONTROL_HUMAN;
     const bool defenderIsHuman = _defendingArmy->GetControl() & CONTROL_HUMAN;
 
-    if ( !attackerIsHuman && !defenderIsHuman ) {
-        // AI vs AI battle, this dialog should not be shown
+    const Player * attackingPlayer = Players::Get( _attackingArmy->GetColor() );
+    const Player * defendingPlayer = Players::Get( _defendingArmy->GetColor() );
+    const bool attackerIsAutoPlay = attackingPlayer != nullptr && attackingPlayer->isAIAutoControlMode();
+    const bool defenderIsAutoPlay = defendingPlayer != nullptr && defendingPlayer->isAIAutoControlMode();
+
+    const bool attackerGetsSummary = attackerIsHuman || attackerIsAutoPlay;
+    const bool defenderGetsSummary = defenderIsHuman || defenderIsAutoPlay;
+
+    if ( !attackerGetsSummary && !defenderGetsSummary ) {
+        // Normal AI vs AI battle: this dialog should not be shown.
         assert( 0 );
         return false;
     }
@@ -505,23 +514,23 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
     LoopedAnimationSequence sequence;
 
     fheroes2::FontType summaryTitleFont = fheroes2::FontType::normalWhite();
-    if ( ( res.attacker & RESULT_WINS ) && attackerIsHuman ) {
+    if ( ( res.attacker & RESULT_WINS ) && attackerGetsSummary ) {
         GetSummaryParams( res.attacker, res.defender, _attackingArmy->GetCommander(), res.attackerExperience, _defendingArmy->GetSurrenderCost(), sequence, title,
                           surrenderText, outcomeText );
         summaryTitleFont = fheroes2::FontType::normalYellow();
         AudioManager::PlayMusic( MUS::BATTLEWIN, Music::PlaybackMode::PLAY_ONCE );
     }
-    else if ( ( res.defender & RESULT_WINS ) && defenderIsHuman ) {
+    else if ( ( res.defender & RESULT_WINS ) && defenderGetsSummary ) {
         GetSummaryParams( res.defender, res.attacker, _defendingArmy->GetCommander(), res.defenderExperience, _attackingArmy->GetSurrenderCost(), sequence, title,
                           surrenderText, outcomeText );
         summaryTitleFont = fheroes2::FontType::normalYellow();
         AudioManager::PlayMusic( MUS::BATTLEWIN, Music::PlaybackMode::PLAY_ONCE );
     }
-    else if ( attackerIsHuman ) {
+    else if ( attackerGetsSummary ) {
         GetSummaryParams( res.attacker, res.defender, _attackingArmy->GetCommander(), res.attackerExperience, 0, sequence, title, surrenderText, outcomeText );
         AudioManager::PlayMusic( MUS::BATTLELOSE, Music::PlaybackMode::PLAY_ONCE );
     }
-    else if ( defenderIsHuman ) {
+    else if ( defenderGetsSummary ) {
         GetSummaryParams( res.defender, res.attacker, _defendingArmy->GetCommander(), res.defenderExperience, 0, sequence, title, surrenderText, outcomeText );
         AudioManager::PlayMusic( MUS::BATTLELOSE, Music::PlaybackMode::PLAY_ONCE );
     }
@@ -635,6 +644,9 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
 
     int sequenceId = sequence.id();
 
+    const bool autoDismiss = attackerIsAutoPlay || defenderIsAutoPlay;
+    fheroes2::TimeDelay autoDismissDelay( fheroes2::autoPlayPopupDisplayTimeMs );
+
     while ( le.HandleEvents() ) {
         buttonOk.drawOnState( le.isMouseLeftButtonPressedAndHeldInArea( buttonOk.area() ) );
 
@@ -660,6 +672,10 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
         }
 
         updateAnimation( display, sequenceId, sequence, animationRoi );
+
+        if ( autoDismiss && autoDismissDelay.isPassed() ) {
+            break;
+        }
     }
 
     // Free memory because RESTART button is not used more.
@@ -677,10 +693,11 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
         if ( winner == nullptr || loser == nullptr ) {
             return false;
         }
-        const bool isWinnerHuman = winner && winner->isControlHuman();
+        const Player * winnerPlayer = winner != nullptr ? Players::Get( winner->GetColor() ) : nullptr;
+        const bool isWinnerLocal = winner != nullptr && ( winner->isControlHuman() || ( winnerPlayer != nullptr && winnerPlayer->isAIAutoControlMode() ) );
 
-        // Nothing to do if the AI won and there are no Ultimate Artifacts.
-        if ( !isWinnerHuman && !loser->GetBagArtifacts().ContainUltimateArtifact() ) {
+        // Nothing to do if a non-local AI won and there are no Ultimate Artifacts.
+        if ( !isWinnerLocal && !loser->GetBagArtifacts().ContainUltimateArtifact() ) {
             return false;
         }
 
@@ -703,14 +720,14 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
 
         for ( const Artifact & art : artifacts ) {
             // Only the Ultimate Artifacts are shown for both the winner and loser's dialogs. Skip if it is a regular artifact and the AI won.
-            if ( !isWinnerHuman && !art.isUltimate() ) {
+            if ( !isWinnerLocal && !art.isUltimate() ) {
                 continue;
             }
 
             // If two identical artifacts go in a row, then we do not need to redraw anything, but only play the sound if necessary.
             if ( prevArtifactId == art.GetID() ) {
                 // Sound is never played for Ultimate Artifact messages.
-                if ( isWinnerHuman && !art.isUltimate() ) {
+                if ( isWinnerLocal && !art.isUltimate() ) {
                     Game::PlayPickupSound();
                 }
             }
@@ -734,7 +751,7 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
                     if ( needHeaderRedraw ) {
                         artifactHeader.restore();
                     }
-                    if ( isWinnerHuman ) {
+                    if ( isWinnerLocal ) {
                         artMsg = _( "As you reach for the %{name}, it mysteriously disappears." );
                     }
                     else {
@@ -761,6 +778,8 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
                 display.render( summaryRoi );
             }
 
+            fheroes2::TimeDelay artifactAutoDismissDelay( fheroes2::autoPlayPopupDisplayTimeMs );
+
             while ( le.HandleEvents() ) {
                 buttonOk.drawOnState( le.isMouseLeftButtonPressedAndHeldInArea( buttonOk.area() ) );
 
@@ -777,6 +796,10 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
                 }
 
                 updateAnimation( display, sequenceId, sequence, animationRoi );
+
+                if ( autoDismiss && artifactAutoDismissDelay.isPassed() ) {
+                    break;
+                }
             }
         }
     }
@@ -841,6 +864,9 @@ void Battle::Arena::DialogBattleNecromancy( const uint32_t raiseCount )
 
     int sequenceId = sequence.id();
 
+    const bool autoDismiss = fheroes2::isAutoPlayPopupTimeoutEnabled();
+    fheroes2::TimeDelay autoDismissDelay( fheroes2::autoPlayPopupDisplayTimeMs );
+
     while ( le.HandleEvents() ) {
         buttonOk.drawOnState( le.isMouseLeftButtonPressedAndHeldInArea( buttonOk.area() ) );
 
@@ -849,6 +875,10 @@ void Battle::Arena::DialogBattleNecromancy( const uint32_t raiseCount )
         }
 
         updateAnimation( display, sequenceId, sequence, animationRoi );
+
+        if ( autoDismiss && autoDismissDelay.isPassed() ) {
+            break;
+        }
     }
 }
 
