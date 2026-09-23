@@ -44,6 +44,12 @@ namespace fheroes2
     class DialogElement;
     class TextBase;
 
+    inline constexpr uint64_t autoPlayPopupDisplayTimeMs = 5000;
+
+    // Returns true when the currently active player is running under AI auto-control.
+    // Automatically generated popups use this to remain visible briefly without blocking auto-play.
+    bool isAutoPlayPopupTimeoutEnabled();
+
     int showMessage( const TextBase & header, const TextBase & body, const int buttons, const std::vector<const DialogElement *> & elements = {} );
 
     int32_t getDialogHeight( const TextBase & header, const TextBase & body, const int buttons, const std::vector<const DialogElement *> & elements = {} );
