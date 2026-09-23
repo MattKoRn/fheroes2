@@ -1786,7 +1786,7 @@ namespace
             decisionText += troop.GetPluralName( recruitTroopCount );
             const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::OK, std::move( decisionText ) );
 
-            troopToHire = Dialog::RecruitMonster( troop.GetMonster(), recruitTroopCount, false, 0 );
+            troopToHire = Dialog::RecruitMonster( troop.GetMonster(), recruitTroopCount, false, 0, recruitTroopCount );
             if ( !troopToHire.isValid() ) {
                 return;
             }
