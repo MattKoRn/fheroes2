@@ -278,7 +278,8 @@ namespace
 
     bool buy( Profile & profile, const size_t id )
     {
-        if ( id >= upgradeCount || profile.ranks[id] == std::numeric_limits<uint64_t>::max() ) {
+        if ( id >= upgradeCount || profile.ranks[id] == std::numeric_limits<uint64_t>::max()
+             || effect( id, profile.ranks[id] + 1 ) <= effect( id, profile.ranks[id] ) ) {
             return false;
         }
 
@@ -569,7 +570,7 @@ namespace
     {
         const uint64_t rank = playerProfile.ranks[id];
         const long double currentEffect = effect( id, rank );
-        const bool canAdvance = rank < std::numeric_limits<uint64_t>::max();
+        const bool canAdvance = rank < std::numeric_limits<uint64_t>::max() && effect( id, rank + 1 ) > currentEffect;
         std::string message = upgradeDetails[id];
         message += "\n\nCurrent rank: " + formatNumber( rank );
         message += "\nCurrent: " + shortEffectSummary( id, rank );
@@ -1123,6 +1124,7 @@ void fheroes2::RPG::showMenu()
                 drawBeveledPanel( rowArea, false );
 
                 const bool canBuy = playerProfile.ranks[i] < std::numeric_limits<uint64_t>::max()
+                                    && effect( i, playerProfile.ranks[i] + 1 ) > effect( i, playerProfile.ranks[i] )
                                     && playerProfile.points >= cost( playerProfile.ranks[i] );
                 if ( canBuy ) {
                     fheroes2::Fill( display, rowArea.x + 3, rowArea.y + 5, 2, rowArea.height - 10, fheroes2::GetColorId( 219, 175, 66 ) );
@@ -1144,7 +1146,9 @@ void fheroes2::RPG::showMenu()
 
                 const uint64_t rank = playerProfile.ranks[i];
                 const std::string current = shortEffectSummary( i, rank );
-                const std::string next = rank == std::numeric_limits<uint64_t>::max() ? "MAX" : shortEffectSummary( i, rank + 1 );
+                const bool rankCanAdvance
+                    = rank < std::numeric_limits<uint64_t>::max() && effect( i, rank + 1 ) > effect( i, rank );
+                const std::string next = rankCanAdvance ? shortEffectSummary( i, rank + 1 ) : "MAX EFFECT";
                 drawSingleLine( current + " -> " + next, textX, rowArea.y + 36, rowArea.width - 130,
                                 canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
                 drawText( "BUY " + formatNumber( cost( playerProfile.ranks[i] ) ), buyAreas[row].x + 3, buyAreas[row].y + 5, buyAreas[row].width - 6,
