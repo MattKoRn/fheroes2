@@ -125,6 +125,7 @@ namespace
         Funds dailyIncome;
         std::array<int64_t, 7> carry{};
         uint32_t homecomingStreak{ 0 };
+        int64_t lastHomecomingStreakUnix{ 0 };
         uint64_t totalOfflineSeconds{ 0 };
         uint64_t offlineRenown{ 0 };
         int contractId{ -1 };
@@ -237,6 +238,7 @@ namespace
         bool hasIncome = false;
         bool hasCarry = false;
         bool hasStreak = false;
+        bool hasLastHomecomingStreakUnix = false;
         bool hasTotalOfflineSeconds = false;
         bool hasOfflineRenown = false;
         bool hasContractId = false;
@@ -297,6 +299,10 @@ namespace
             else if ( key == "homecoming_streak" ) {
                 input >> candidate.homecomingStreak;
                 hasStreak = true;
+            }
+            else if ( key == "last_homecoming_streak_unix" ) {
+                input >> candidate.lastHomecomingStreakUnix;
+                hasLastHomecomingStreakUnix = true;
             }
             else if ( key == "total_offline_seconds" ) {
                 input >> candidate.totalOfflineSeconds;
@@ -407,8 +413,12 @@ namespace
                    && hasCreatureRecruitCarry )
               || ( version == 10 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
                    && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
-                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter );
-        if ( !( version >= 1 && version <= 10 ) || !hasVersionSpecificFields || !hasTimestamp || !hasResources || !hasIncome || !hasCarry
+                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter )
+              || ( version == 11 && hasStreak && hasLastHomecomingStreakUnix && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId
+                   && hasContractProgress && hasContractTarget && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted
+                   && hasStateCastles && hasStateTowns && hasStateHeroes && hasStateMines && hasStateArtifacts && hasStateEfficiency
+                   && hasSupplyRushMeter );
+        if ( !( version >= 1 && version <= 11 ) || !hasVersionSpecificFields || !hasTimestamp || !hasResources || !hasIncome || !hasCarry
              || candidate.lastSeenUnix <= 0 ) {
             return false;
         }
@@ -416,6 +426,17 @@ namespace
         // Normalize persistent counters before any arithmetic uses them. These limits are
         // structural invariants of the current format, not progression caps.
         candidate.treasureFragments = std::min<uint32_t>( candidate.treasureFragments, 4 );
+        if ( version < 11 ) {
+            // Version 10 and earlier tracked only the count. Anchor an existing streak to the
+            // last valid snapshot so migration preserves it while preventing another same-day increment.
+            candidate.lastHomecomingStreakUnix = candidate.homecomingStreak > 0 ? candidate.lastSeenUnix : 0;
+        }
+        else {
+            candidate.lastHomecomingStreakUnix = std::clamp<int64_t>( candidate.lastHomecomingStreakUnix, 0, candidate.lastSeenUnix );
+            if ( candidate.homecomingStreak == 0 ) {
+                candidate.lastHomecomingStreakUnix = 0;
+            }
+        }
         candidate.stateCastles = std::min<uint32_t>( candidate.stateCastles, 255 );
         candidate.stateTowns = std::min<uint32_t>( candidate.stateTowns, 255 );
         candidate.stateHeroes = std::min<uint32_t>( candidate.stateHeroes, 255 );
@@ -474,7 +495,7 @@ namespace
             output << '\n';
         };
 
-        output << "version 10\n";
+        output << "version 11\n";
         output << "last_seen_unix " << data.lastSeenUnix << '\n';
         output << "resources ";
         writeFunds( data.resources );
@@ -489,6 +510,7 @@ namespace
         }
         output << '\n';
         output << "homecoming_streak " << data.homecomingStreak << '\n';
+        output << "last_homecoming_streak_unix " << data.lastHomecomingStreakUnix << '\n';
         output << "total_offline_seconds " << data.totalOfflineSeconds << '\n';
         output << "offline_renown " << data.offlineRenown << '\n';
         output << "contract_id " << data.contractId << '\n';
@@ -725,7 +747,7 @@ namespace
         return 0;
     }
 
-    void applyOfflineStreakProgress( OfflineProgressSummary & summary, OfflineProgressData & data )
+    void applyOfflineStreakProgress( OfflineProgressSummary & summary, OfflineProgressData & data, const int64_t returnUnix )
     {
         const uint64_t elapsedSeconds = summary.elapsedSeconds > 0 ? static_cast<uint64_t>( summary.elapsedSeconds ) : 0;
         if ( std::numeric_limits<uint64_t>::max() - data.totalOfflineSeconds < elapsedSeconds ) {
@@ -736,14 +758,35 @@ namespace
         }
         summary.totalOfflineSeconds = data.totalOfflineSeconds;
 
-        if ( summary.elapsedSeconds < 6 * 60 * 60 || summary.productionRewards.GetValidItemsCount() == 0 ) {
+        if ( summary.elapsedSeconds < 6 * 60 * 60 || summary.productionRewards.GetValidItemsCount() == 0 || returnUnix <= 0 ) {
             summary.homecomingStreak = data.homecomingStreak;
             return;
         }
 
-        if ( data.homecomingStreak < std::numeric_limits<uint32_t>::max() ) {
-            ++data.homecomingStreak;
+        const int64_t returnDay = returnUnix / offlineSecondsPerDay;
+        if ( data.lastHomecomingStreakUnix > 0 ) {
+            const int64_t previousStreakDay = data.lastHomecomingStreakUnix / offlineSecondsPerDay;
+            if ( returnDay <= previousStreakDay ) {
+                // Same-day returns (and temporary clock rollbacks) must not farm the daily streak.
+                summary.homecomingStreak = data.homecomingStreak;
+                return;
+            }
+
+            if ( returnDay == previousStreakDay + 1 ) {
+                if ( data.homecomingStreak < std::numeric_limits<uint32_t>::max() ) {
+                    ++data.homecomingStreak;
+                }
+            }
+            else {
+                // Missing one or more real-world days breaks the consecutive homecoming streak.
+                data.homecomingStreak = 1;
+            }
         }
+        else {
+            data.homecomingStreak = 1;
+        }
+
+        data.lastHomecomingStreakUnix = returnUnix;
         summary.homecomingStreak = data.homecomingStreak;
         summary.milestonePercent = getHomecomingMilestonePercent( data.homecomingStreak );
 
@@ -1295,7 +1338,7 @@ namespace
         }
 
         applyOfflineHomecomingBonus( summary, data, previousLastSeenUnix );
-        applyOfflineStreakProgress( summary, data );
+        applyOfflineStreakProgress( summary, data, std::max( previousLastSeenUnix, now ) );
         applyOfflineRareDiscovery( summary, data, previousLastSeenUnix );
         applyOfflineContractProgress( summary, data );
         applyOfflineTreasureHunt( summary, data, previousLastSeenUnix );
