@@ -1482,7 +1482,7 @@ bool Heroes::PickupArtifact( const Artifact & art )
 
 void Heroes::IncreaseExperience( const uint32_t amount, const bool autoselect /* = false */ )
 {
-    fheroes2::RPG::addExperience( GetColor(), amount );
+    static_cast<void>( fheroes2::RPG::addExperience( GetColor(), amount ) );
     const int oldLevel = GetLevelFromExperience( _experience );
     const int newLevel = GetLevelFromExperience( _experience + amount );
 

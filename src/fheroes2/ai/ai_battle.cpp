@@ -66,6 +66,7 @@
 #include "speed.h"
 #include "spell.h"
 #include "spell_info.h"
+#include "game_rpg.h"
 #include "spell_storage.h"
 
 namespace
@@ -313,6 +314,22 @@ namespace
             assert( killTimeRatio <= 1 );
 
             attackValue += ( allEnemiesThreat / avgNumOfAttackers ) * avgBattleTurns * ( 1 - killTimeRatio );
+        }
+
+        const double lifeStealPercent = fheroes2::RPG::lifeStealPercent( attacker.GetColor() );
+        const double killHealPercent = fheroes2::RPG::killHealPercent( attacker.GetColor() );
+        if ( ( lifeStealPercent > 0.0 || killHealPercent > 0.0 ) && attacker.GetMissingHitPoints() > 0 ) {
+            const bool isExtraLogicAllowed = Difficulty::isBasicAIBattleLogicApplicable( Game::getDifficulty(), attacker.isControlHuman() );
+            if ( isExtraLogicAllowed ) {
+                const uint32_t futureKilled = target.HowManyWillBeKilled( potentialDamage );
+                const double healEstimate = static_cast<double>( potentialDamage ) * lifeStealPercent / 100.0
+                                            + static_cast<double>( futureKilled * target.Monster::GetHitPoints() ) * killHealPercent / 100.0;
+                const double healPoints = std::min( healEstimate, static_cast<double>( attacker.GetMissingHitPoints() ) );
+                if ( healPoints > 0.0 ) {
+                    constexpr double avgNumberOfPowerfulTargets{ 1.5 };
+                    attackValue += healPoints / avgNumberOfPowerfulTargets;
+                }
+            }
         }
 
         return attackValue;
@@ -661,7 +678,9 @@ namespace
                 continue;
             }
 
-            bestValue = std::max( bestValue, static_cast<double>( fheroes2::getSpellDamage( spell, commander.GetPower(), &commander ) ) );
+            const double baseDmg = static_cast<double>( fheroes2::getSpellDamage( spell, commander.GetPower(), &commander ) );
+            const double rpgMult = fheroes2::RPG::spellMultiplier( commander.GetColor(), PlayerColor::NONE, spell.GetID() );
+            bestValue = std::max( bestValue, baseDmg * rpgMult );
         }
 
         return bestValue;

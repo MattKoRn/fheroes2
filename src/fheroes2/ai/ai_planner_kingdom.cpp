@@ -46,6 +46,7 @@
 #include "game_interface.h"
 #include "game_mode.h"
 #include "game_over.h"
+#include "game_rpg.h"
 #include "game_static.h"
 #include "ground.h"
 #include "heroes.h"
@@ -784,6 +785,16 @@ fheroes2::GameMode AI::Planner::KingdomTurn( Kingdom & kingdom )
                     const int wisdomLevel = hero->GetLevelSkill( Skill::Secondary::WISDOM );
                     if ( wisdomLevel + 2 > stats.spellLevel ) {
                         stats.spellLevel = wisdomLevel + 2;
+                    }
+
+                    if ( wisdomLevel >= Skill::Level::ADVANCED && fheroes2::RPG::doctrineRank( myColor, fheroes2::RPG::CATACLYSM ) > 0 ) {
+                        stats.spellLevel = std::max( stats.spellLevel, 4 );
+                    }
+                    if ( wisdomLevel >= Skill::Level::EXPERT
+                         && ( fheroes2::RPG::doctrineRank( myColor, fheroes2::RPG::CATACLYSM ) > 1
+                              || ( fheroes2::RPG::doctrineRank( myColor, fheroes2::RPG::SORCERY ) > 0
+                                   && fheroes2::RPG::doctrineRank( myColor, fheroes2::RPG::ARCANE_PIERCING ) > 0 ) ) ) {
+                        stats.spellLevel = std::max( stats.spellLevel, 5 );
                     }
                 }
             }

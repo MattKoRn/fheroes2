@@ -1263,7 +1263,8 @@ namespace
                                             + ( static_cast<long double>( summary.bonusRewards.wood ) + summary.bonusRewards.ore ) * 100
                                             + ( static_cast<long double>( summary.bonusRewards.mercury ) + summary.bonusRewards.sulfur
                                                 + summary.bonusRewards.crystal + summary.bonusRewards.gems ) * 500;
-        const long double xpValue = dailyGoldEquivalent * summary.stateEfficiencyPercent / 100
+        const long double baselineDailyEquivalent = std::max<long double>( 2500.0L, dailyGoldEquivalent );
+        const long double xpValue = baselineDailyEquivalent * summary.stateEfficiencyPercent / 100
                                     * static_cast<long double>( summary.elapsedSeconds ) / offlineSecondsPerDay + bonusEquivalent;
         summary.xpEarned = static_cast<uint64_t>( std::min( xpValue, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) );
         summary.xpEarned = fheroes2::RPG::addExperience( kingdom.GetColor(), summary.xpEarned, fheroes2::RPG::ExperienceKind::OFFLINE );
@@ -1296,6 +1297,40 @@ namespace
         }
     }
 
+    std::string getOfflineContractName( const int contractId )
+    {
+        switch ( contractId ) {
+        case 0:
+            return _( "Watchman's Vigil" );
+        case 1:
+            return _( "Caravan Logistics" );
+        case 2:
+            return _( "Royal Emissary" );
+        case 3:
+            return _( "Alchemical Assay" );
+        case 4:
+            return _( "Grand Charter" );
+        default:
+            return _( "Royal Commission" );
+        }
+    }
+
+    std::string getOfflineTreasureMapName( const int mapId )
+    {
+        switch ( mapId ) {
+        case 0:
+            return _( "Corsair's Chart" );
+        case 1:
+            return _( "Crypt Map" );
+        case 2:
+            return _( "Sunken Galleon Route" );
+        case 3:
+            return _( "Archmage's Cache" );
+        default:
+            return _( "Ancient Parchment" );
+        }
+    }
+
     void showOfflineProgressPopup( const OfflineProgressSummary & summary )
     {
         if ( !summary.showPopup ) {
@@ -1308,15 +1343,40 @@ namespace
         const int64_t hours = seconds / ( 60 * 60 );
         const int64_t minutes = ( seconds % ( 60 * 60 ) ) / 60;
 
-        std::string message = _( "Away %{days}d %{hours}h %{minutes}m" );
-        StringReplace( message, "%{days}", std::to_string( days ) );
-        StringReplace( message, "%{hours}", std::to_string( hours ) );
-        StringReplace( message, "%{minutes}", std::to_string( minutes ) );
+        std::string message;
+        if ( days == 0 && hours == 0 && minutes == 0 ) {
+            message = _( "Away < 1m" );
+        }
+        else {
+            message = _( "Away %{days}d %{hours}h %{minutes}m" );
+            StringReplace( message, "%{days}", std::to_string( days ) );
+            StringReplace( message, "%{hours}", std::to_string( hours ) );
+            StringReplace( message, "%{minutes}", std::to_string( minutes ) );
+        }
+
+
+
 
         message += "\n";
 
         message += _( "RPG XP earned: " );
         message += fheroes2::RPG::formatExperience( summary.xpEarned );
+
+        std::string supplies;
+        for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
+            const int32_t amount = summary.rewards.*offlineFundMembers[i];
+            if ( amount > 0 ) {
+                if ( !supplies.empty() ) {
+                    supplies += ", ";
+                }
+                supplies += "+" + std::to_string( amount ) + " " + Resource::String( offlineResourceTypes[i] );
+            }
+        }
+        if ( !supplies.empty() ) {
+            message += "\n";
+            message += _( "Supplies: " );
+            message += supplies;
+        }
 
         if ( summary.homecomingTier > 0 ) {
             const std::string chestName = getHomecomingChestName( summary.homecomingTier );
@@ -1339,12 +1399,26 @@ namespace
 
         if ( summary.contractCompleted ) {
             message += "\n";
-            message += _( "Steward Contract Completed!" );
+            message += _( "Steward Contract Fulfilled: " );
+            message += getOfflineContractName( summary.contractId );
+        }
+        else if ( summary.contractProgressAfter > summary.contractProgressBefore ) {
+            message += "\n";
+            message += _( "Contract Progress: " );
+            message += getOfflineContractName( summary.contractId );
+            message += " (" + std::to_string( summary.contractProgressAfter ) + "/" + std::to_string( summary.contractTarget ) + ")";
         }
 
         if ( summary.treasureMapCompleted ) {
             message += "\n";
-            message += _( "Treasure Map Deciphered!" );
+            message += _( "Treasure Map Deciphered: " );
+            message += getOfflineTreasureMapName( summary.treasureMapId );
+        }
+        else if ( summary.treasureFragmentsEarned > 0 ) {
+            message += "\n";
+            message += _( "Map Fragments Found: " );
+            message += std::to_string( summary.treasureFragmentsAfter );
+            message += " / 5";
         }
 
         if ( summary.rareDiscovery ) {

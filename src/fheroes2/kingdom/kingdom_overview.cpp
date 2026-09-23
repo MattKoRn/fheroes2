@@ -40,6 +40,7 @@
 #include "game.h"
 #include "game_assets.h"
 #include "game_hotkeys.h"
+#include "game_rpg.h"
 #include "game_interface.h"
 #include "heroes.h"
 #include "heroes_base.h"
@@ -757,6 +758,13 @@ namespace
 
         const fheroes2::Sprite & lighthouse = Assets::getImage( ICN::OVERVIEW, 14 );
         fheroes2::Blit( lighthouse, 0, 0, display, pt.x + 100 - lighthouse.width(), pt.y + 459, lighthouse.width(), lighthouse.height() );
+
+        const uint64_t guildPoints = fheroes2::RPG::availablePoints();
+        const std::string guildLabel = guildPoints > 0
+                                           ? "Guild Lv " + std::to_string( fheroes2::RPG::kingdomLevel() ) + " (+" + std::to_string( guildPoints ) + ")"
+                                           : "Guild Lv " + std::to_string( fheroes2::RPG::kingdomLevel() );
+        text.set( guildLabel, guildPoints > 0 ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
+        text.draw( pt.x + 430, offsetY, display );
     }
 }
 
@@ -804,6 +812,7 @@ void Kingdom::openOverviewDialog()
 
     const fheroes2::Sprite & lighthouse = Assets::getImage( ICN::OVERVIEW, 14 );
     const fheroes2::Rect rectLighthouse( cur_pt.x + 100 - lighthouse.width(), cur_pt.y + 459, lighthouse.width() + 10, lighthouse.height() );
+    const fheroes2::Rect rectRpgGuild( cur_pt.x + 425, cur_pt.y + 458, 110, 18 );
 
     Interface::ListBasic * listStats = nullptr;
 
@@ -862,6 +871,14 @@ void Kingdom::openOverviewDialog()
         else if ( le.isMouseRightButtonPressedInArea( rectLighthouse ) ) {
             fheroes2::showLighthouseInfo( *this, Dialog::ZERO );
         }
+        else if ( le.isMouseRightButtonPressedInArea( rectRpgGuild ) ) {
+            const std::string stewardState = fheroes2::RPG::isStewardActive() ? _( "Active" ) : _( "Paused" );
+            std::string msg = _( "Royal Guild [F9]\n\nKingdom Level: %{level}\nAvailable Guild Points: %{points}\nSteward Auto-Buyer: %{steward}\n\nClick to open the Royal Guild doctrines menu. You can also press F9 at any time." );
+            StringReplace( msg, "%{level}", std::to_string( fheroes2::RPG::kingdomLevel() ) );
+            StringReplace( msg, "%{points}", std::to_string( fheroes2::RPG::availablePoints() ) );
+            StringReplace( msg, "%{steward}", stewardState );
+            fheroes2::showStandardTextMessage( _( "Royal Guild [F9]" ), std::move( msg ), Dialog::ZERO );
+        }
 
         // Exit this dialog.
         if ( le.MouseClickLeft( buttonExit.area() ) || Game::HotKeyCloseWindow() ) {
@@ -903,6 +920,16 @@ void Kingdom::openOverviewDialog()
             fheroes2::showLighthouseInfo( *this, Dialog::OK );
         }
 
+        if ( le.MouseClickLeft( rectRpgGuild ) ) {
+            fheroes2::RPG::showMenu();
+            redraw = true;
+        }
+
+        if ( HotKeyPressEvent( Game::HotKeyEvent::WORLD_RPG_MENU ) || le.isKeyPressed( fheroes2::Key::KEY_F9 ) ) {
+            fheroes2::RPG::showMenu();
+            redraw = true;
+        }
+
         if ( !listStats->IsNeedRedraw() && !redraw ) {
             continue;
         }
@@ -921,11 +948,7 @@ void Kingdom::openOverviewDialog()
         listStats->Redraw();
 
         RedrawIncomeInfo( cur_pt, *this );
-
-        if ( Modes( KINGDOM_OVERVIEW_CASTLE_SELECTION ) ) {
-            // Funds could be changed only after an action in the castle.
-            RedrawFundsInfo( cur_pt, *this );
-        }
+        RedrawFundsInfo( cur_pt, *this );
 
         if ( needFadeIn ) {
             needFadeIn = false;

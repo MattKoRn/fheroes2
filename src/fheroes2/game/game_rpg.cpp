@@ -16,7 +16,9 @@
 #include <string>
 #include <utility>
 
+#include "audio_manager.h"
 #include "color.h"
+#include "m82.h"
 #include "cursor.h"
 #include "dialog.h"
 #include "game_assets.h"
@@ -43,19 +45,10 @@
 namespace
 {
     constexpr size_t upgradeCount = 40;
+    constexpr size_t upgradesPerTab = 5;
     constexpr uint64_t pointsPerLevel = 5;
     constexpr int profileVersion = 6;
-    enum UpgradeId : size_t
-    {
-        ARMS_TRAINING, ARMOR_TRAINING, VETERAN_CORE, BLOOD_DRINKER, REAPER,
-        FEROCITY, MARKSMAN, BRAWLER, EXECUTIONER, OPENING_BLOW,
-        GIANT_SLAYER, OVERWHELM, FRENZY, DISCIPLINE, ARMOR_PIERCING,
-        IRON_SKIN, ARROW_WARD, MELEE_GUARD, LAST_STAND, BULWARK,
-        SORCERY, PYROMANCY, CRYOMANCY, STORMCRAFT, CATACLYSM,
-        SPELL_WARD, FIRE_WARD, COLD_WARD, STORM_WARD, CATACLYSM_WARD,
-        LEADERSHIP, FORTUNE, REGENERATION, CRITICAL_TRAINING, BRUTAL_CRITICALS,
-        EVASION, ARCANE_PIERCING, CLOSE_QUARTERS, UNYIELDING, RUTHLESS
-    };
+    using namespace fheroes2::RPG;
 
     struct UpgradeInfo
     {
@@ -88,6 +81,16 @@ namespace
         { "Evasion", "Chance to halve creature damage" }, { "Arcane Piercing", "Ignore RPG spell resistance" },
         { "Close Quarters", "Reduce ranged melee penalty" }, { "Unyielding", "Reduce damage while untouched" },
         { "Ruthless", "More damage to stacks below half health" }
+    };
+    constexpr std::array<const char *, upgradeCount> upgradeSigils{
+        "AT", "DF", "VC", "BD", "RP",
+        "FC", "MK", "BR", "EX", "OB",
+        "GS", "OW", "FZ", "DC", "AP",
+        "IS", "AW", "MG", "LS", "BW",
+        "SO", "PY", "CY", "ST", "CT",
+        "SW", "FW", "CW", "LW", "XW",
+        "LD", "FT", "RG", "CR", "BC",
+        "EV", "MP", "CQ", "UY", "RT"
     };
     constexpr std::array<const char *, upgradeCount> upgradeDetails{
         "Adds +1 Attack per rank to every creature stack controlled by this RPG profile, up to +8 Attack.",
@@ -759,6 +762,9 @@ namespace
         if ( invested > 0 ) {
             message += "\nPoints invested in doctrine: " + formatNumber( invested );
         }
+        if ( playerProfile.useCounts[id] > 0 ) {
+            message += "\nBattle triggers: " + formatNumber( playerProfile.useCounts[id] );
+        }
         message += "\nAvailable points: " + formatNumber( playerProfile.points );
         fheroes2::showStandardTextMessage( upgrades[id].name, std::move( message ), Dialog::ZERO );
     }
@@ -783,6 +789,11 @@ namespace
         std::string message = tabPanelNames[tabIndex];
         message += "\n\n";
         message += tabDescriptions[tabIndex];
+        message += "\n\nDOCTRINES:";
+        for ( size_t offset = 0; offset < upgradesPerTab; ++offset ) {
+            const size_t id = tabIndex * upgradesPerTab + offset;
+            message += "\n  " + std::string( upgrades[id].name ) + " (Rank " + formatNumber( playerProfile.ranks[id] ) + ")";
+        }
         fheroes2::showStandardTextMessage( tabNames[tabIndex], std::move( message ), Dialog::ZERO );
     }
 
@@ -797,6 +808,23 @@ namespace
         message += "\nKingdom Level: " + formatNumber( playerProfile.level );
         message += "\nAvailable Guild Points: " + formatNumber( playerProfile.points );
         message += "\nTotal Points Invested: " + formatNumber( totalInvested );
+
+        size_t activeDoctrines = 0;
+        for ( const uint64_t rank : playerProfile.ranks ) {
+            if ( rank > 0 ) {
+                ++activeDoctrines;
+            }
+        }
+        message += "\nActive Doctrines Unlocked: " + std::to_string( activeDoctrines ) + " / " + std::to_string( upgradeCount );
+        uint64_t totalTriggers = 0;
+        for ( const uint64_t uses : playerProfile.useCounts ) {
+            totalTriggers = saturatedAdd( totalTriggers, uses );
+        }
+        if ( totalTriggers > 0 ) {
+            message += "\nTotal Battle Triggers: " + formatNumber( totalTriggers );
+        }
+        message += "\nSteward Auto-Buyer: ";
+        message += playerProfile.autoBuy ? "Active (ON)" : "Paused (OFF)";
         message += "\n\nRENOWN (RPG EXPERIENCE)";
         message += "\nTotal Renown: " + formatNumber( playerProfile.experience );
         message += "\n  From Hero Experience: " + formatNumber( playerProfile.heroExperience );
@@ -959,6 +987,9 @@ uint64_t fheroes2::RPG::addExperience( const PlayerColor color, const uint64_t a
         playerProfile.points = saturatedAdd( playerProfile.points, low > std::numeric_limits<uint64_t>::max() / pointsPerLevel
                                                                   ? std::numeric_limits<uint64_t>::max()
                                                                   : low * pointsPerLevel );
+        if ( kind != ExperienceKind::OFFLINE ) {
+            AudioManager::PlaySound( M82::NWHEROLV );
+        }
     }
 
     if ( playerProfile.autoBuy ) {
@@ -1288,6 +1319,184 @@ std::string fheroes2::RPG::formatExperience( const uint64_t value )
     return formatNumber( value );
 }
 
+void fheroes2::RPG::recordDoctrineUse( const PlayerColor color, const size_t upgradeId, const uint64_t count )
+{
+    if ( color != activePlayerColor || color == PlayerColor::NONE || upgradeId >= upgradeCount || count == 0 ) {
+        return;
+    }
+
+    if ( playerProfile.ranks[upgradeId] == 0 ) {
+        return;
+    }
+
+    playerProfile.useCounts[upgradeId] = saturatedAdd( playerProfile.useCounts[upgradeId], count );
+}
+
+void fheroes2::RPG::recordSpellDoctrineUse( const PlayerColor attacker, const PlayerColor defender, const int spellId )
+{
+    const Profile * attackProfile = getProfile( attacker );
+    const Profile * defenseProfile = getProfile( defender );
+
+    if ( attacker == activePlayerColor && attackProfile != nullptr ) {
+        if ( attackProfile->ranks[SORCERY] > 0 ) {
+            recordDoctrineUse( attacker, SORCERY );
+        }
+        const size_t specialization = [spellId]() -> size_t {
+            switch ( spellId ) {
+            case Spell::FIREBALL:
+            case Spell::FIREBLAST:
+                return PYROMANCY;
+            case Spell::COLDRAY:
+            case Spell::COLDRING:
+                return CRYOMANCY;
+            case Spell::LIGHTNINGBOLT:
+            case Spell::CHAINLIGHTNING:
+                return STORMCRAFT;
+            case Spell::ELEMENTALSTORM:
+            case Spell::METEORSHOWER:
+            case Spell::ARMAGEDDON:
+                return CATACLYSM;
+            default:
+                return upgradeCount;
+            }
+        }();
+        if ( specialization != upgradeCount && attackProfile->ranks[specialization] > 0 ) {
+            recordDoctrineUse( attacker, specialization );
+        }
+        if ( defenseProfile != nullptr ) {
+            const size_t ward = specialization != upgradeCount ? specialization + ( FIRE_WARD - PYROMANCY ) : upgradeCount;
+            if ( defenseProfile->ranks[SPELL_WARD] > 0 || ( ward != upgradeCount && defenseProfile->ranks[ward] > 0 ) ) {
+                recordDoctrineUse( attacker, ARCANE_PIERCING );
+            }
+        }
+    }
+
+    if ( defender == activePlayerColor && defenseProfile != nullptr ) {
+        if ( defenseProfile->ranks[SPELL_WARD] > 0 ) {
+            recordDoctrineUse( defender, SPELL_WARD );
+        }
+        const size_t ward = [spellId]() -> size_t {
+            switch ( spellId ) {
+            case Spell::FIREBALL:
+            case Spell::FIREBLAST:
+                return FIRE_WARD;
+            case Spell::COLDRAY:
+            case Spell::COLDRING:
+                return COLD_WARD;
+            case Spell::LIGHTNINGBOLT:
+            case Spell::CHAINLIGHTNING:
+                return STORM_WARD;
+            case Spell::ELEMENTALSTORM:
+            case Spell::METEORSHOWER:
+            case Spell::ARMAGEDDON:
+                return CATACLYSM_WARD;
+            default:
+                return upgradeCount;
+            }
+        }();
+        if ( ward != upgradeCount && defenseProfile->ranks[ward] > 0 ) {
+            recordDoctrineUse( defender, ward );
+        }
+    }
+}
+
+void fheroes2::RPG::recordPhysicalDoctrineUse( const PlayerColor attacker, const PlayerColor defender, const bool ranged,
+                                               const bool attackerOutnumbered, const bool defenderOutnumbered,
+                                               const bool attackerFullHealth, const bool defenderFullHealth,
+                                               const bool attackerBelowHalf, const bool defenderBelowHalf,
+                                               const bool inMeleePenalty )
+{
+    if ( attacker == activePlayerColor ) {
+        recordDoctrineUse( attacker, FEROCITY );
+        if ( ranged ) {
+            recordDoctrineUse( attacker, MARKSMAN );
+        }
+        else {
+            recordDoctrineUse( attacker, BRAWLER );
+        }
+
+        if ( inMeleePenalty ) {
+            recordDoctrineUse( attacker, CLOSE_QUARTERS );
+        }
+
+        if ( !defenderFullHealth ) {
+            recordDoctrineUse( attacker, EXECUTIONER );
+        }
+        else {
+            recordDoctrineUse( attacker, OPENING_BLOW );
+        }
+
+        if ( attackerOutnumbered ) {
+            recordDoctrineUse( attacker, GIANT_SLAYER );
+        }
+        if ( defenderOutnumbered ) {
+            recordDoctrineUse( attacker, OVERWHELM );
+        }
+        if ( attackerBelowHalf ) {
+            recordDoctrineUse( attacker, FRENZY );
+        }
+        if ( attackerFullHealth ) {
+            recordDoctrineUse( attacker, DISCIPLINE );
+        }
+        if ( defenderBelowHalf ) {
+            recordDoctrineUse( attacker, RUTHLESS );
+        }
+
+        const Profile * defProfile = getProfile( defender );
+        if ( defProfile != nullptr && ( defProfile->ranks[IRON_SKIN] > 0 || defProfile->ranks[ranged ? ARROW_WARD : MELEE_GUARD] > 0
+                                        || ( defenderBelowHalf && defProfile->ranks[LAST_STAND] > 0 )
+                                        || ( defenderOutnumbered && defProfile->ranks[BULWARK] > 0 )
+                                        || ( defenderFullHealth && defProfile->ranks[UNYIELDING] > 0 ) ) ) {
+            recordDoctrineUse( attacker, ARMOR_PIERCING );
+        }
+    }
+
+    if ( defender == activePlayerColor ) {
+        recordDoctrineUse( defender, IRON_SKIN );
+        if ( ranged ) {
+            recordDoctrineUse( defender, ARROW_WARD );
+        }
+        else {
+            recordDoctrineUse( defender, MELEE_GUARD );
+        }
+
+        if ( defenderBelowHalf ) {
+            recordDoctrineUse( defender, LAST_STAND );
+        }
+        if ( defenderOutnumbered ) {
+            recordDoctrineUse( defender, BULWARK );
+        }
+        if ( defenderFullHealth ) {
+            recordDoctrineUse( defender, UNYIELDING );
+        }
+    }
+}
+
+uint64_t fheroes2::RPG::availablePoints()
+{
+    return playerProfile.points;
+}
+
+uint64_t fheroes2::RPG::kingdomLevel()
+{
+    return playerProfile.level;
+}
+
+bool fheroes2::RPG::isStewardActive()
+{
+    return playerProfile.autoBuy;
+}
+
+uint64_t fheroes2::RPG::doctrineRank( const PlayerColor color, const size_t upgradeId )
+{
+    if ( upgradeId >= upgradeCount ) {
+        return 0;
+    }
+
+    const Profile * profile = getProfile( color );
+    return profile != nullptr ? profile->ranks[upgradeId] : 0;
+}
+
 void fheroes2::RPG::showMenu()
 {
     if ( activePlayerColor == PlayerColor::NONE ) {
@@ -1300,7 +1509,7 @@ void fheroes2::RPG::showMenu()
     const fheroes2::Rect area = window.activeArea();
     const bool isEvilInterface = Settings::Get().isEvilInterfaceEnabled();
     const int scrollIcn = isEvilInterface ? ICN::SCROLLE : ICN::SCROLL;
-    constexpr size_t upgradesPerTab = 5;
+    // upgradesPerTab defined at namespace scope
     constexpr size_t visibleRows = 3;
     std::array<fheroes2::Rect, tabNames.size()> tabAreas{};
     std::array<fheroes2::Rect, visibleRows> visibleUpgradeAreas{};
@@ -1392,7 +1601,7 @@ void fheroes2::RPG::showMenu()
 
                 const fheroes2::Rect badgeArea{ rowArea.x + 7, rowArea.y + 8, 34, 34 };
                 drawBeveledPanel( badgeArea, true );
-                drawText( std::string( 1, upgrades[i].name[0] ), badgeArea.x + 2, badgeArea.y + 8, badgeArea.width - 4,
+                drawText( upgradeSigils[i], badgeArea.x + 2, badgeArea.y + 8, badgeArea.width - 4,
                           fheroes2::FontType::normalYellow() );
 
                 const int32_t textX = rowArea.x + 48;
@@ -1418,7 +1627,7 @@ void fheroes2::RPG::showMenu()
                           canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
 
-            drawText( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3   [1-8] Tabs  [S] Auto  [R] Respec  [B] Buy  [Esc] Close",
+            drawText( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3   [1-8] Tabs  [S] Auto  [R] Respec  [B/Enter] Buy  [O] Info  [Esc] Close",
                       area.x + 12, area.y + 337, area.width - 24, fheroes2::FontType::smallWhite() );
             window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
@@ -1477,6 +1686,17 @@ void fheroes2::RPG::showMenu()
         }
 
         size_t & scrollOffset = scrollOffsets[tab];
+        if ( ( event.isKeyPressed( fheroes2::Key::KEY_PAGE_UP ) || event.isKeyPressed( fheroes2::Key::KEY_HOME ) ) && scrollOffset > 0 ) {
+            scrollOffset = 0;
+            redraw = true;
+            continue;
+        }
+        if ( ( event.isKeyPressed( fheroes2::Key::KEY_PAGE_DOWN ) || event.isKeyPressed( fheroes2::Key::KEY_END ) )
+             && scrollOffset + visibleRows < upgradesPerTab ) {
+            scrollOffset = upgradesPerTab - visibleRows;
+            redraw = true;
+            continue;
+        }
         if ( ( event.isKeyPressed( fheroes2::Key::KEY_UP ) || event.isMouseWheelUpInArea( listArea ) || event.MouseClickLeft( scrollUp.area() ) )
              && scrollOffset > 0 ) {
             --scrollOffset;
@@ -1508,7 +1728,7 @@ void fheroes2::RPG::showMenu()
             }
         }
 
-        if ( event.isMouseRightButtonPressedInArea( statsArea ) || event.MouseLongPressLeft( statsArea )
+        if ( event.isKeyPressed( fheroes2::Key::KEY_O ) || event.isKeyPressed( fheroes2::Key::KEY_I ) || event.isMouseRightButtonPressedInArea( statsArea ) || event.MouseLongPressLeft( statsArea )
              || event.MouseClickLeft( statsArea ) ) {
             showKingdomOverview();
             redraw = true;
@@ -1539,7 +1759,7 @@ void fheroes2::RPG::showMenu()
             }
         }
 
-        if ( event.isKeyPressed( fheroes2::Key::KEY_B ) ) {
+        if ( event.isKeyPressed( fheroes2::Key::KEY_B ) || event.isKeyPressed( fheroes2::Key::KEY_ENTER ) || event.isKeyPressed( fheroes2::Key::KEY_SPACE ) ) {
             for ( size_t row = 0; row < visibleRows; ++row ) {
                 const size_t i = tab * upgradesPerTab + scrollOffset + row;
                 if ( buy( playerProfile, i ) ) {
@@ -1560,7 +1780,7 @@ void fheroes2::RPG::showMenu()
             redraw = true;
             continue;
         }
-        if ( event.MouseClickLeft( autoButton.area() ) || event.isKeyPressed( fheroes2::Key::KEY_S ) ) {
+        if ( event.MouseClickLeft( autoButton.area() ) || event.isKeyPressed( fheroes2::Key::KEY_S ) || event.isKeyPressed( fheroes2::Key::KEY_A ) ) {
             playerProfile.autoBuy = !playerProfile.autoBuy;
             if ( playerProfile.autoBuy ) {
                 autoBuy( playerProfile );

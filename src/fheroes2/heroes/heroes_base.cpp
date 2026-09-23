@@ -43,6 +43,7 @@
 #include "tools.h"
 #include "translations.h"
 #include "world.h"
+#include "game_rpg.h"
 
 HeroBase::HeroBase( const int type, const int race )
 {
@@ -369,7 +370,8 @@ double HeroBase::GetMagicStrategicValue( const double armyStrength ) const
     double bestValue = 0;
     for ( const Spell & spell : spells ) {
         if ( spell.isCombat() ) {
-            bestValue = std::max( bestValue, spell.getStrategicValue( armyStrength, currentSpellPoints, spellPower ) );
+            const double rpgMult = spell.isDamage() ? fheroes2::RPG::spellMultiplier( GetColor(), PlayerColor::NONE, spell.GetID() ) : 1.0;
+            bestValue = std::max( bestValue, spell.getStrategicValue( armyStrength, currentSpellPoints, spellPower ) * rpgMult );
         }
     }
 

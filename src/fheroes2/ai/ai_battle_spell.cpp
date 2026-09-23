@@ -43,6 +43,7 @@
 #include "speed.h"
 #include "spell.h"
 #include "spell_info.h"
+#include "game_rpg.h"
 #include "spell_storage.h"
 
 namespace
@@ -189,7 +190,8 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
 
     const auto damageHeuristic = [this, spellDamage, &spell, retreating, &currentEnemies]( const Battle::Unit * unit, const double armyStrength,
                                                                                            const double armySpeed ) {
-        const uint32_t damage = spellDamage * ( 100 - unit->GetMagicResist( spell, _commander ) ) / 100;
+        const double rpgMultiplier = fheroes2::RPG::spellMultiplier( _commander->GetColor(), unit->GetColor(), spell.GetID() );
+        const uint32_t damage = static_cast<uint32_t>( static_cast<double>( spellDamage * ( 100 - unit->GetMagicResist( spell, _commander ) ) / 100 ) * rpgMultiplier );
 
         // If the unit is immune to this spell, then no one will be killed, no strength will be lost and the unit will not be woken up if it is disabled
         if ( damage == 0 ) {

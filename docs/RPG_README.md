@@ -19,21 +19,23 @@ The upgrade tree is now built around direct RPG combat mechanics instead of reso
 
 **Life steal and Reaper healing never resurrect dead creatures.** They can only repair the currently surviving stack. Regeneration follows the same rule. Critical hits and Evasion use independent combat rolls. Towers do not receive the creature-specific RPG affixes.
 
-Left-click or tap the **BUY** plaque to purchase a rank. Left-click anywhere on an upgrade row (or right-click/hold it) to inspect its exact current effect, next-rank effect, cost, points needed, prerequisites, points already invested, and available guild points. High-impact primary stats, Morale/Luck, proc chances, and sustain effects use steeper costs than ordinary percentage upgrades. The **Steward** auto-buyer compares approximate expected combat value per point instead of treating +1 Attack and +1% chance as equivalent, and it skips capped or locked upgrades. Press **S** to toggle Steward.
+Left-click or tap the **BUY** plaque to purchase a rank. Left-click anywhere on an upgrade row (or right-click/hold it) to inspect its exact current effect, next-rank effect, cost, points needed, prerequisites, points already invested, battle triggers recorded, and available guild points. Battle trigger tracking actively records combat events across physical, spellcraft, morale, luck, and sustain disciplines: Ferocity, Marksman, Brawler, Executioner, Opening Blow, Giant Slayer, Overwhelm, Frenzy, Discipline, Ruthless, Close Quarters, Armor Piercing, Iron Skin, Arrow Ward, Melee Guard, Last Stand, Bulwark, Unyielding, Sorcery, Pyromancy, Cryomancy, Stormcraft, Cataclysm, Arcane Piercing, Spell Ward, elemental wards, Leadership, Fortune, Critical Training, Brutal Criticals, Evasion, Regeneration, Blood Drinker, and Reaper. High-impact primary stats, Morale/Luck, proc chances, and sustain effects use steeper costs than ordinary percentage upgrades. The **Steward** auto-buyer compares approximate expected combat value per point instead of treating +1 Attack and +1% chance as equivalent, and it skips capped or locked upgrades. Press **S** or **A** to toggle Steward.
 
 You can freely reallocate your build at any time using the **Respec** button (or **R** key). Confirming a respec refunds 100% of all guild points spent across every doctrine, resets all ranks to zero, pauses Steward auto-buy, and saves immediately.
 
-Right-click or hold any of the 8 category tabs to inspect that guild hall's doctrinal focus. Click or right-click the top header panel to view the **Royal Guild Overview** modal, which breaks down your total Renown across Hero, Battle, Adventure, and Offline experience, tracks visited adventure sites, and shows total points invested.
+Right-click or hold any of the 8 category tabs to inspect that guild hall's doctrinal focus. Click or right-click the top header panel (or press **O** / **I**) to view the **Royal Guild Overview** modal, which breaks down your total Renown across Hero, Battle, Adventure, and Offline experience, tracks visited adventure sites, shows total points invested, active doctrine count, and cumulative battle triggers recorded across all doctrines. The Royal Guild menu can also be opened directly while inside the Kingdom Overview dialog by pressing **F9**.
 
 The menu supports full keyboard and touch controls:
 - **F9** or **Esc**: Toggle / close menu
 - **1 – 8** (or numpad **1 – 8**): Jump directly to that doctrine tab
 - **Left / Right** arrows or **Tab**: Cycle tabs
 - **Up / Down** arrows or mouse wheel: Scroll doctrine rows
+- **PageUp / PageDown / Home / End**: Jump scroll to top or bottom
 - **Scrollbar track**: Click above or below the thumb to page scroll
-- **S**: Toggle Steward auto-buyer
+- **S** or **A**: Toggle Steward auto-buyer
 - **R**: Respec doctrines with confirmation prompt
-- **B**: Quick-buy first affordable doctrine in current view
+- **B**, **Enter**, or **Space**: Quick-buy first affordable doctrine in current view
+- **O** or **I**: Open Royal Guild Overview modal
 
 ## XP and economy
 
@@ -43,7 +45,17 @@ The menu shows total RPG XP and XP needed for the next level with algorithmicall
 
 Opposing kingdoms receive deterministic temporary RPG profiles derived only from combat ranks the local profile has actually purchased. Enemy players vary around the player's purchased ranks; neutral monsters use a weaker 60–90% copy and do not receive free rank-1 perks or locked perks without prerequisites. This keeps reloads stable and prevents a fresh profile from facing hidden bonuses simply because its RPG level increased. Temporary profiles are discarded when the map ends.
 
-Offline progress still grants RPG XP for the full elapsed interval with no duration cap. It does not grant normal game resources or recruit creatures. The game's normal economy, armies, and map rules remain in control of those systems. When returning to the game, the offline progress notification provides an expanded event report detailing any Homecoming Chests, consecutive day streaks with milestone bonuses, fulfilled Steward contracts, deciphered treasure maps, rare discoveries, supply rushes, and Steward rank promotions.
+Offline progress still grants RPG XP for the full elapsed interval with no duration cap. It does not grant normal game resources or recruit creatures. The game's normal economy, armies, and map rules remain in control of those systems. A guaranteed baseline daily equivalent ensures that even Day-1 profiles and new maps advance persistently while offline. When returning to the game, the offline progress notification provides an expanded event report detailing accumulated supplies and gold, Homecoming Chests, consecutive day streaks with milestone bonuses, fulfilled Steward contracts, deciphered treasure maps, rare discoveries, supply rushes, and Steward rank promotions.
+
+## AI integration
+
+Adventure and combat AI are fully aware of RPG doctrines and stats:
+- **Adventure AI:** Evaluates army strength on the adventure map and in pathfinding using kingdom-wide creature Attack, Defense, Morale, and Luck bonuses, ensuring tactical decisions and combat engagements accurately reflect real force power.
+- **Combat AI:** Accounts for Sorcery and elemental spell doctrines, evaluates target spell resistances and wards, factors expected critical strike damage multipliers and evasion damage reductions into tactical target selection, and values stack sustain from Blood Drinker and Reaper when healing wounded troops.
+- **Strategic Magic Power:** Hero strategic value on the adventure map and in combat threat estimation directly scales damaging spell power by active kingdom spell multipliers (Sorcery, Pyromancy, Cryomancy, Stormcraft, Cataclysm).
+- **Castle & Guild Planning:** AI kingdom town development recognizes when a kingdom specializes in Cataclysm or Sorcery and accelerates higher Mage Guild levels (levels 4 and 5) in safe regions to unlock devastating high-tier magic for its heroes.
+- **Hero Development & Auto-Play Synergy:** Secondary skill evaluation dynamically responds to kingdom doctrine specializations. Wisdom and Mysticism prioritize magic when spell doctrines are trained, Archery values scale with Marksman, Luck scales with Fortune and Critical Training, and Leadership scales with morale doctrines.
+- **Kingdom Overview Integration:** An interactive Royal Guild status badge on the Kingdom Overview screen displays kingdom level and unspent points (`Guild Lv X (+pts)`), offering one-click access to the doctrines menu and right-click tooltip inspection.
 
 ## Saves
 

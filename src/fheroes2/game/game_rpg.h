@@ -46,6 +46,28 @@ namespace fheroes2::RPG
     [[nodiscard]] double evasionChance( PlayerColor color );
     [[nodiscard]] double rangedMeleePenaltyRecoveryPercent( PlayerColor color );
 
+    enum UpgradeId : size_t
+    {
+        ARMS_TRAINING, ARMOR_TRAINING, VETERAN_CORE, BLOOD_DRINKER, REAPER,
+        FEROCITY, MARKSMAN, BRAWLER, EXECUTIONER, OPENING_BLOW,
+        GIANT_SLAYER, OVERWHELM, FRENZY, DISCIPLINE, ARMOR_PIERCING,
+        IRON_SKIN, ARROW_WARD, MELEE_GUARD, LAST_STAND, BULWARK,
+        SORCERY, PYROMANCY, CRYOMANCY, STORMCRAFT, CATACLYSM,
+        SPELL_WARD, FIRE_WARD, COLD_WARD, STORM_WARD, CATACLYSM_WARD,
+        LEADERSHIP, FORTUNE, REGENERATION, CRITICAL_TRAINING, BRUTAL_CRITICALS,
+        EVASION, ARCANE_PIERCING, CLOSE_QUARTERS, UNYIELDING, RUTHLESS
+    };
+
+    void recordDoctrineUse( PlayerColor color, size_t upgradeId, uint64_t count = 1 );
+    void recordSpellDoctrineUse( PlayerColor attacker, PlayerColor defender, int spellId );
+    void recordPhysicalDoctrineUse( PlayerColor attacker, PlayerColor defender, bool ranged, bool attackerOutnumbered, bool defenderOutnumbered,
+                                    bool attackerFullHealth, bool defenderFullHealth, bool attackerBelowHalf, bool defenderBelowHalf,
+                                    bool inMeleePenalty = false );
+    [[nodiscard]] uint64_t availablePoints();
+    [[nodiscard]] uint64_t kingdomLevel();
+    [[nodiscard]] bool isStewardActive();
+    [[nodiscard]] uint64_t doctrineRank( PlayerColor color, size_t upgradeId );
+
     [[nodiscard]] double damageMultiplier( PlayerColor attacker, PlayerColor defender, bool ranged, bool attackerOutnumbered, bool defenderOutnumbered,
                                            bool attackerFullHealth, bool defenderFullHealth, bool attackerBelowHalf, bool defenderBelowHalf );
     [[nodiscard]] double spellMultiplier( PlayerColor attacker, PlayerColor defender, int spellId );

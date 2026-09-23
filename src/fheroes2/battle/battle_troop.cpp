@@ -310,6 +310,9 @@ void Battle::Unit::SetRandomMorale( Rand::PCG32 & randomGenerator )
 
     if ( morale > 0 && static_cast<int>( Rand::GetWithGen( 1, 24, randomGenerator ) ) <= morale ) {
         SetModes( MORALE_GOOD );
+        if ( !Modes( CAP_TOWER ) ) {
+            fheroes2::RPG::recordDoctrineUse( GetColor(), fheroes2::RPG::LEADERSHIP );
+        }
     }
     else if ( morale < 0 && static_cast<int>( Rand::GetWithGen( 1, 12, randomGenerator ) ) <= -morale ) {
         // AI is given a cheeky 25% chance to avoid it - because they build armies from random troops
@@ -326,6 +329,9 @@ void Battle::Unit::SetRandomLuck( Rand::PCG32 & randomGenerator )
 
     if ( luck > 0 && chance <= luck ) {
         SetModes( LUCK_GOOD );
+        if ( !Modes( CAP_TOWER ) ) {
+            fheroes2::RPG::recordDoctrineUse( GetColor(), fheroes2::RPG::FORTUNE );
+        }
     }
     else if ( luck < 0 && chance <= -luck ) {
         SetModes( LUCK_BAD );
@@ -403,6 +409,7 @@ void Battle::Unit::NewTurn()
             const uint64_t restored = std::max<uint64_t>(
                 1, static_cast<uint64_t>( static_cast<long double>( Monster::GetHitPoints() ) * regenerationPercent / 100.0L ) );
             _hitPoints = static_cast<uint32_t>( std::min<uint64_t>( maxAliveHitPoints, static_cast<uint64_t>( _hitPoints ) + restored ) );
+            fheroes2::RPG::recordDoctrineUse( GetColor(), fheroes2::RPG::REGENERATION );
         }
     }
 
@@ -519,17 +526,35 @@ uint32_t Battle::Unit::CalculateMaxDamage( const Unit & enemy ) const
 
 uint32_t Battle::Unit::getPotentialDamage( const Unit & enemy ) const
 {
+    uint32_t res = 0;
     if ( Modes( Battle::SP_CURSE ) ) {
-        return CalculateMinDamage( enemy );
+        res = CalculateMinDamage( enemy );
+    }
+    else if ( Modes( Battle::SP_BLESS ) ) {
+        res = CalculateMaxDamage( enemy );
+    }
+    else {
+        const uint32_t minimum = CalculateMinDamage( enemy );
+        const uint32_t maximum = CalculateMaxDamage( enemy );
+        res = minimum + ( maximum - minimum ) / 2;
     }
 
-    if ( Modes( Battle::SP_BLESS ) ) {
-        return CalculateMaxDamage( enemy );
+    if ( !Modes( CAP_TOWER ) ) {
+        const double critChance = fheroes2::RPG::criticalChance( GetColor() );
+        const double critBonus = fheroes2::RPG::criticalDamageBonusPercent( GetColor() );
+        const double critFactor = 1.0 + ( critChance / 100.0 ) * ( critBonus / 100.0 );
+
+        double evasionFactor = 1.0;
+        if ( !enemy.Modes( CAP_TOWER ) ) {
+            const double evasion = fheroes2::RPG::evasionChance( enemy.GetColor() );
+            evasionFactor = 1.0 - ( evasion / 100.0 ) * 0.5;
+        }
+
+        const double expected = static_cast<double>( res ) * critFactor * evasionFactor;
+        res = static_cast<uint32_t>( std::clamp<double>( expected, 1.0, static_cast<double>( std::numeric_limits<uint32_t>::max() ) ) );
     }
 
-    const uint32_t minimum = CalculateMinDamage( enemy );
-    const uint32_t maximum = CalculateMaxDamage( enemy );
-    return minimum + ( maximum - minimum ) / 2;
+    return res;
 }
 
 uint32_t Battle::Unit::CalculateDamageUnit( const Unit & enemy, double dmg ) const
@@ -647,11 +672,28 @@ uint32_t Battle::Unit::GetDamage( const Unit & enemy, Rand::PCG32 & randomGenera
 
     long double adjustedDamage = res;
     if ( !Modes( CAP_TOWER ) ) {
+        const bool rangedAttack = isArchers() && !isHandFighting() && !isHandFighting( *this, enemy );
+        const bool inMelee = isArchers() && ( isHandFighting() || isHandFighting( *this, enemy ) );
+        const uint64_t attackerStartingHitPoints = static_cast<uint64_t>( GetInitialCount() ) * Monster::GetHitPoints();
+        const uint64_t defenderStartingHitPoints = static_cast<uint64_t>( enemy.GetInitialCount() ) * enemy.Monster::GetHitPoints();
+        const bool attackerFullHealth = attackerStartingHitPoints > 0 && static_cast<uint64_t>( GetHitPoints() ) >= attackerStartingHitPoints;
+        const bool defenderFullHealth = defenderStartingHitPoints > 0 && static_cast<uint64_t>( enemy.GetHitPoints() ) >= defenderStartingHitPoints;
+        const bool attackerBelowHalf = attackerStartingHitPoints > 0 && static_cast<uint64_t>( GetHitPoints() ) * 2 < attackerStartingHitPoints;
+        const bool defenderBelowHalf = defenderStartingHitPoints > 0 && static_cast<uint64_t>( enemy.GetHitPoints() ) * 2 < defenderStartingHitPoints;
+
+        fheroes2::RPG::recordPhysicalDoctrineUse( GetColor(), enemy.Modes( CAP_TOWER ) ? PlayerColor::NONE : enemy.GetColor(), rangedAttack,
+                                                  GetCount() < enemy.GetCount(), enemy.GetCount() < GetCount(), attackerFullHealth,
+                                                  defenderFullHealth, attackerBelowHalf, defenderBelowHalf, inMelee );
+
         const double criticalChance = fheroes2::RPG::criticalChance( GetColor() );
         const uint32_t criticalBasisPoints
             = static_cast<uint32_t>( std::clamp( criticalChance * 100.0 + 0.5, 0.0, 10000.0 ) );
         if ( criticalBasisPoints > 0 && Rand::GetWithGen( 1, 10000, randomGenerator ) <= criticalBasisPoints ) {
             adjustedDamage *= 1.0L + fheroes2::RPG::criticalDamageBonusPercent( GetColor() ) / 100.0L;
+            fheroes2::RPG::recordDoctrineUse( GetColor(), fheroes2::RPG::CRITICAL_TRAINING );
+            if ( fheroes2::RPG::criticalDamageBonusPercent( GetColor() ) > 0.0 ) {
+                fheroes2::RPG::recordDoctrineUse( GetColor(), fheroes2::RPG::BRUTAL_CRITICALS );
+            }
         }
 
         if ( !enemy.Modes( CAP_TOWER ) ) {
@@ -660,6 +702,7 @@ uint32_t Battle::Unit::GetDamage( const Unit & enemy, Rand::PCG32 & randomGenera
                 = static_cast<uint32_t>( std::clamp( evasionChance * 100.0 + 0.5, 0.0, 10000.0 ) );
             if ( evasionBasisPoints > 0 && Rand::GetWithGen( 1, 10000, randomGenerator ) <= evasionBasisPoints ) {
                 adjustedDamage *= 0.5L;
+                fheroes2::RPG::recordDoctrineUse( enemy.GetColor(), fheroes2::RPG::EVASION );
             }
         }
     }
@@ -846,8 +889,17 @@ uint32_t Battle::Unit::ApplyDamage( Unit & enemy, const uint32_t dmg, uint32_t &
             const uint64_t maxAliveHitPoints
                 = std::min<uint64_t>( static_cast<uint64_t>( enemy.GetCount() ) * enemy.Monster::GetHitPoints(), std::numeric_limits<uint32_t>::max() );
             const uint64_t restored = static_cast<uint64_t>( healPoints );
+            const uint32_t previousHitPoints = enemy._hitPoints;
             enemy._hitPoints
                 = static_cast<uint32_t>( std::min<uint64_t>( maxAliveHitPoints, static_cast<uint64_t>( enemy._hitPoints ) + restored ) );
+            if ( enemy._hitPoints > previousHitPoints ) {
+                if ( lifeSteal > 0.0 ) {
+                    fheroes2::RPG::recordDoctrineUse( enemy.GetColor(), fheroes2::RPG::BLOOD_DRINKER );
+                }
+                if ( killHeal > 0.0 && killed > 0 ) {
+                    fheroes2::RPG::recordDoctrineUse( enemy.GetColor(), fheroes2::RPG::REAPER );
+                }
+            }
         }
     }
 
@@ -1504,6 +1556,7 @@ uint32_t Battle::Unit::CalculateSpellDamage( const Spell & spell, uint32_t spell
         const double adjustedDamage = static_cast<double>( dmg ) * fheroes2::RPG::spellMultiplier( applyingHero->GetColor(), GetColor(), spell.GetID() );
         const double boundedDamage = std::min( adjustedDamage, static_cast<double>( std::numeric_limits<uint32_t>::max() ) );
         dmg = dmg == 0 ? 0 : std::max<uint32_t>( 1, static_cast<uint32_t>( boundedDamage ) );
+        fheroes2::RPG::recordSpellDoctrineUse( applyingHero->GetColor(), GetColor(), spell.GetID() );
     }
 
     return dmg;

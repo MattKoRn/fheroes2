@@ -43,6 +43,7 @@
 #include "castle.h"
 #include "color.h"
 #include "game_io.h"
+#include "game_rpg.h"
 #include "heroes.h"
 #include "heroes_base.h"
 #include "kingdom.h"
@@ -1294,10 +1295,16 @@ double Army::GetStrength() const
 
     const uint32_t heroArchery = ( commander != nullptr ) ? commander->GetSecondarySkillValue( Skill::Secondary::ARCHERY ) : 0;
 
-    const int bonusAttack = ( commander ? commander->GetAttack() : 0 );
-    const int bonusDefense = ( commander ? commander->GetDefense() : 0 );
-    const int armyMorale = GetMorale();
-    const int armyLuck = GetLuck();
+    const PlayerColor armyColor = GetColor();
+    const int rpgAttackBonus = static_cast<int>( fheroes2::RPG::creatureAttackBonus( armyColor ) );
+    const int rpgDefenseBonus = static_cast<int>( fheroes2::RPG::creatureDefenseBonus( armyColor ) );
+    const int rpgMoraleBonus = fheroes2::RPG::moraleBonus( armyColor );
+    const int rpgLuckBonus = fheroes2::RPG::luckBonus( armyColor );
+
+    const int bonusAttack = ( commander ? commander->GetAttack() : 0 ) + rpgAttackBonus;
+    const int bonusDefense = ( commander ? commander->GetDefense() : 0 ) + rpgDefenseBonus;
+    const int armyMorale = Morale::Normalize( GetMorale() + rpgMoraleBonus );
+    const int armyLuck = std::clamp( GetLuck() + rpgLuckBonus, -3, 3 );
 
     bool troopsExist = false;
 

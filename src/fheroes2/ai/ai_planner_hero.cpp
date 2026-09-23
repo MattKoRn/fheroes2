@@ -49,6 +49,7 @@
 #include "game_interface.h"
 #include "game_mode.h"
 #include "game_over.h"
+#include "game_rpg.h"
 #include "game_static.h"
 #include "ground.h"
 #include "heroes.h"
@@ -1196,13 +1197,24 @@ namespace
         }
 
         switch ( type ) {
-        case Skill::Secondary::WISDOM:
+        case Skill::Secondary::WISDOM: {
             // wouldn't check castles/spell availability since high wisdom drives building priority
-            return level == Skill::Level::BASIC ? 2500.0 : 1000.0;
+            const uint64_t spellDoctrines = fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::SORCERY )
+                                            + fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::PYROMANCY )
+                                            + fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::CRYOMANCY )
+                                            + fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::STORMCRAFT )
+                                            + fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::CATACLYSM );
+            const double baseWisdom = level == Skill::Level::BASIC ? 2500.0 : 1000.0;
+            return baseWisdom + std::min( 1500.0, static_cast<double>( spellDoctrines ) * 150.0 );
+        }
         case Skill::Secondary::LOGISTICS:
             return 1500.0;
-        case Skill::Secondary::LEADERSHIP:
-            return hero.GetArmy().AllTroopsAreUndead() ? 100.0 : 1000.0;
+        case Skill::Secondary::LEADERSHIP: {
+            if ( hero.GetArmy().AllTroopsAreUndead() ) {
+                return 100.0;
+            }
+            return 1000.0 + static_cast<double>( fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::LEADERSHIP ) ) * 150.0;
+        }
         case Skill::Secondary::NECROMANCY:
             return hero.GetArmy().AllTroopsAreUndead() ? 1000.0 : 100.0;
         case Skill::Secondary::LUCK: {
@@ -1210,7 +1222,9 @@ namespace
             if ( role == Heroes::Role::COURIER || role == Heroes::Role::SCOUT ) {
                 return 100.0;
             }
-            return 500.0;
+            const uint64_t critRanks = fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::CRITICAL_TRAINING )
+                                       + fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::FORTUNE );
+            return 500.0 + static_cast<double>( critRanks ) * 125.0;
         }
         case Skill::Secondary::BALLISTICS: {
             const Heroes::Role role = hero.getAIRole();
@@ -1224,7 +1238,8 @@ namespace
             if ( role == Heroes::Role::COURIER || role == Heroes::Role::SCOUT ) {
                 return 100.0;
             }
-            return hero.GetArmy().isMeleeDominantArmy() ? 100.0 : 500.0;
+            const double baseArchery = hero.GetArmy().isMeleeDominantArmy() ? 100.0 : 500.0;
+            return baseArchery + static_cast<double>( fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::MARKSMAN ) ) * 150.0;
         }
         case Skill::Secondary::ESTATES: {
             const Heroes::Role role = hero.getAIRole();
@@ -1248,8 +1263,12 @@ namespace
             }
             return hero.getAIRole() == Heroes::Role::SCOUT ? 1250.0 : 100.0;
         }
-        case Skill::Secondary::MYSTICISM:
-            return hero.HaveSpellBook() ? 500.0 : 100.0;
+        case Skill::Secondary::MYSTICISM: {
+            const double baseMysticism = hero.HaveSpellBook() ? 500.0 : 100.0;
+            const uint64_t spellDoctrines = fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::SORCERY )
+                                            + fheroes2::RPG::doctrineRank( hero.GetColor(), fheroes2::RPG::ARCANE_PIERCING );
+            return baseMysticism + ( hero.HaveSpellBook() ? std::min( 600.0, static_cast<double>( spellDoctrines ) * 100.0 ) : 0.0 );
+        }
         case Skill::Secondary::EAGLE_EYE:
             return hero.HaveSpellBook() ? 250.0 : 0.0;
         case Skill::Secondary::DIPLOMACY:
