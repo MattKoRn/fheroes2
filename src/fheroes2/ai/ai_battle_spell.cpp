@@ -860,9 +860,13 @@ bool AI::BattlePlanner::isSpellcastUselessForUnit( const Battle::Unit & unit, co
         return unit.Modes( Battle::SP_SLOW ) || ( unit.GetSpeed() == Speed::CRAWLING );
 
     case Spell::STONESKIN:
-    case Spell::STEELSKIN:
-        // TODO: this is not always true. Steel Skin gives higher defense so applying it makes sense.
+        // Stone Skin would replace Steel Skin with the weaker effect, so never cast it over
+        // either existing skin spell.
         return unit.Modes( Battle::SP_STONESKIN | Battle::SP_STEELSKIN );
+
+    case Spell::STEELSKIN:
+        // Steel Skin legitimately upgrades an active Stone Skin effect.
+        return unit.Modes( Battle::SP_STEELSKIN );
 
     case Spell::BLIND:
     case Spell::PARALYZE:
