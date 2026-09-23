@@ -550,15 +550,9 @@ void Game::globalKeyDownEvent( const fheroes2::Key key, const int32_t modifier )
                         player->setAIAutoControlMode( false );
                     }
                 }
-                else {
-                    if ( fheroes2::showStandardTextMessage(
-                             _( "Auto-play" ),
-                             _( "Enable auto-play? The AI controls your adventure-map turns and battles. Battles are shown in full at normal speed." ),
-                             Dialog::YES | Dialog::NO )
-                         == Dialog::YES ) {
-                        player->setAIAutoControlMode( true );
-                    }
-                }
+                // Enabling auto-play is intentionally handled by the adventure-map HumanTurn loop.
+                // Doing it from this global hook would allow F8 to switch control while a town,
+                // hero or other blocking dialog is open.
             }
         }
     }
