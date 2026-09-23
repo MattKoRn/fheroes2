@@ -647,14 +647,18 @@ uint32_t Battle::Unit::GetDamage( const Unit & enemy, Rand::PCG32 & randomGenera
 
     long double adjustedDamage = res;
     if ( !Modes( CAP_TOWER ) ) {
-        const uint32_t criticalChance = fheroes2::RPG::criticalChance( GetColor() );
-        if ( criticalChance > 0 && Rand::GetWithGen( 1, 100, randomGenerator ) <= criticalChance ) {
+        const double criticalChance = fheroes2::RPG::criticalChance( GetColor() );
+        const uint32_t criticalBasisPoints
+            = static_cast<uint32_t>( std::clamp( criticalChance * 100.0 + 0.5, 0.0, 10000.0 ) );
+        if ( criticalBasisPoints > 0 && Rand::GetWithGen( 1, 10000, randomGenerator ) <= criticalBasisPoints ) {
             adjustedDamage *= 1.0L + fheroes2::RPG::criticalDamageBonusPercent( GetColor() ) / 100.0L;
         }
 
         if ( !enemy.Modes( CAP_TOWER ) ) {
-            const uint32_t evasionChance = fheroes2::RPG::evasionChance( enemy.GetColor() );
-            if ( evasionChance > 0 && Rand::GetWithGen( 1, 100, randomGenerator ) <= evasionChance ) {
+            const double evasionChance = fheroes2::RPG::evasionChance( enemy.GetColor() );
+            const uint32_t evasionBasisPoints
+                = static_cast<uint32_t>( std::clamp( evasionChance * 100.0 + 0.5, 0.0, 10000.0 ) );
+            if ( evasionBasisPoints > 0 && Rand::GetWithGen( 1, 10000, randomGenerator ) <= evasionBasisPoints ) {
                 adjustedDamage *= 0.5L;
             }
         }
