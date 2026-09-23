@@ -883,8 +883,20 @@ Battle::Actions AI::BattlePlanner::planUnitTurn( Battle::Arena & arena, const Ba
 
             const int gameDifficulty = Game::getDifficulty();
 
-            // TODO: consider taking speed/turn order into account in the future
-            if ( _myArmyStrength * Difficulty::getArmyStrengthRatioForAIRetreat( gameDifficulty ) >= _enemyArmyStrength ) {
+            double speedModifier = 1.0;
+            if ( _myArmyAverageSpeed > 0.0 && _enemyAverageSpeed > 0.0 ) {
+                const double maxAverageSpeed = std::max( _myArmyAverageSpeed, _enemyAverageSpeed );
+                const double relativeSpeedAdvantage = ( _myArmyAverageSpeed - _enemyAverageSpeed ) / maxAverageSpeed;
+
+                // Speed affects how much of the remaining nominal strength can actually be used.
+                // Faster armies get a modest continuation bonus; slower armies retreat a little
+                // earlier instead of waiting for another unfavorable exchange.
+                speedModifier += std::clamp( relativeSpeedAdvantage * 0.20, -0.12, 0.12 );
+            }
+
+            const double effectiveStrengthForRetreat
+                = _myArmyStrength * Difficulty::getArmyStrengthRatioForAIRetreat( gameDifficulty ) * speedModifier;
+            if ( effectiveStrengthForRetreat >= _enemyArmyStrength ) {
                 return Outcome::ContinueBattle;
             }
 
