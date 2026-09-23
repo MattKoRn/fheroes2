@@ -12,29 +12,43 @@ The upgrade tree is now built around direct RPG combat mechanics instead of reso
 | OFFENSE | **Ferocity:** all creature damage; **Marksman:** ranged damage; **Brawler:** melee damage; **Executioner:** bonus damage against wounded stacks; **Opening Blow:** bonus damage against untouched stacks |
 | TACTICS | **Giant Slayer:** bonus damage while outnumbered; **Overwhelm:** bonus damage while outnumbering the target; **Frenzy:** bonus damage below half starting HP; **Discipline:** bonus damage at full starting HP; **Armor Piercing:** ignores part of RPG physical damage reduction |
 | DEFENSE | **Iron Skin:** all physical reduction; **Arrow Ward:** ranged reduction; **Melee Guard:** melee reduction; **Last Stand:** extra reduction below half starting HP; **Bulwark:** extra reduction while outnumbered. Combined RPG physical reduction is capped at 70% before Armor Piercing |
-| MAGIC | **Sorcery:** all damaging spells; **Pyromancy:** Fireball/Fireblast; **Cryomancy:** Cold Ray/Cold Ring; **Stormcraft:** Lightning Bolt/Chain Lightning; **Cataclysm:** Elemental Storm/Armageddon |
-| WARDS | **Spell Ward:** all spell reduction; **Fire Ward:** fire reduction; **Cold Ward:** cold reduction; **Storm Ward:** lightning reduction; **Chaos Ward:** Elemental Storm/Armageddon reduction. Combined RPG spell reduction is capped at 70% before Arcane Piercing |
+| MAGIC | **Sorcery:** all damaging spells; **Pyromancy:** Fireball/Fireblast; **Cryomancy:** Cold Ray/Cold Ring; **Stormcraft:** Lightning Bolt/Chain Lightning; **Cataclysm:** Elemental Storm/Meteor Shower/Armageddon |
+| WARDS | **Spell Ward:** all spell reduction; **Fire Ward:** fire reduction; **Cold Ward:** cold reduction; **Storm Ward:** lightning reduction; **Chaos Ward:** Elemental Storm/Meteor Shower/Armageddon reduction. Combined RPG spell reduction is capped at 70% before Arcane Piercing |
 | COMMAND | **Leadership:** up to +3 Morale; **Fortune:** up to +3 Luck; **Regeneration:** heals the wounded top creature at the start of its turn, capped at 15%; **Critical Training:** up to 20% critical chance; **Brutal Criticals:** increases critical bonus damage beyond the base +50% and requires Critical Training |
 | MASTERY | **Evasion:** up to 15% chance to halve incoming creature-attack damage; **Arcane Piercing:** ignores up to 60% of RPG spell reduction; **Close Quarters:** recovers part of a ranged creature's normal melee penalty; **Unyielding:** extra reduction while untouched; **Ruthless:** bonus damage against targets below half starting HP |
 
 **Life steal and Reaper healing never resurrect dead creatures.** They can only repair the currently surviving stack. Regeneration follows the same rule. Critical hits and Evasion use independent combat rolls. Towers do not receive the creature-specific RPG affixes.
 
-Left-click or tap the **BUY** plaque to purchase a rank. Hold an upgrade row (or right-click it) to see the exact current effect, next-rank effect, cost, prerequisites, and available guild points. High-impact primary stats, Morale/Luck, proc chances, and sustain effects use steeper costs than ordinary percentage upgrades. The **Steward** auto-buyer compares approximate expected combat value per point instead of treating +1 Attack and +1% chance as equivalent, and it skips capped or locked upgrades.
+Left-click or tap the **BUY** plaque to purchase a rank. Left-click anywhere on an upgrade row (or right-click/hold it) to inspect its exact current effect, next-rank effect, cost, points needed, prerequisites, points already invested, and available guild points. High-impact primary stats, Morale/Luck, proc chances, and sustain effects use steeper costs than ordinary percentage upgrades. The **Steward** auto-buyer compares approximate expected combat value per point instead of treating +1 Attack and +1% chance as equivalent, and it skips capped or locked upgrades. Press **S** to toggle Steward.
+
+You can freely reallocate your build at any time using the **Respec** button (or **R** key). Confirming a respec refunds 100% of all guild points spent across every doctrine, resets all ranks to zero, pauses Steward auto-buy, and saves immediately.
+
+Right-click or hold any of the 8 category tabs to inspect that guild hall's doctrinal focus. Click or right-click the top header panel to view the **Royal Guild Overview** modal, which breaks down your total Renown across Hero, Battle, Adventure, and Offline experience, tracks visited adventure sites, and shows total points invested.
+
+The menu supports full keyboard and touch controls:
+- **F9** or **Esc**: Toggle / close menu
+- **1 – 8** (or numpad **1 – 8**): Jump directly to that doctrine tab
+- **Left / Right** arrows or **Tab**: Cycle tabs
+- **Up / Down** arrows or mouse wheel: Scroll doctrine rows
+- **Scrollbar track**: Click above or below the thumb to page scroll
+- **S**: Toggle Steward auto-buyer
+- **R**: Respec doctrines with confirmation prompt
+- **B**: Quick-buy first affordable doctrine in current view
 
 ## XP and economy
 
 RPG XP is now only the progression currency that earns levels and guild points. **Upgrade ranks do not multiply RPG XP and no upgrade pays resource bundles.** Hero XP awards, battles, and first-time adventure actions still feed the persistent RPG profile so ordinary play advances the combat tree.
 
-The menu shows total RPG XP and XP needed for the next level with algorithmically generated number suffixes. Battle activity adds a modest RPG XP bonus that scales with battle experience, outcome, and the opposing profile's level. Normal hero experience still contributes RPG XP as well, so the battle-specific coefficient is intentionally smaller to avoid excessive double progression. Adventure XP scales with RPG level and is awarded once per map tile for each profile, preventing repeated farming of the same site.
+The menu shows total RPG XP and XP needed for the next level with algorithmically generated number suffixes. Battle activity adds a modest RPG XP bonus that scales with battle experience, outcome, and the opposing profile's level. Victorious castle sieges grant an additional +25% bonus experience, and winning defensive stands grant a +10% bonus. Normal hero experience still contributes RPG XP as well, so the battle-specific coefficient is intentionally smaller to avoid excessive double progression. Adventure XP scales with RPG level and is awarded once per map tile for each profile, preventing repeated farming of the same site.
 
-Opposing kingdoms receive deterministic temporary RPG profiles derived only from combat ranks the local profile has actually purchased. Enemy players vary around the player's purchased ranks; neutral monsters use a weaker 60–90% copy and do not receive free rank-1 perks. This keeps reloads stable and prevents a fresh profile from facing hidden bonuses simply because its RPG level increased. Temporary profiles are discarded when the map ends.
+Opposing kingdoms receive deterministic temporary RPG profiles derived only from combat ranks the local profile has actually purchased. Enemy players vary around the player's purchased ranks; neutral monsters use a weaker 60–90% copy and do not receive free rank-1 perks or locked perks without prerequisites. This keeps reloads stable and prevents a fresh profile from facing hidden bonuses simply because its RPG level increased. Temporary profiles are discarded when the map ends.
 
-Offline progress still grants RPG XP for the full elapsed interval with no duration cap. It does not grant normal game resources or recruit creatures. The game's normal economy, armies, and map rules remain in control of those systems.
+Offline progress still grants RPG XP for the full elapsed interval with no duration cap. It does not grant normal game resources or recruit creatures. The game's normal economy, armies, and map rules remain in control of those systems. When returning to the game, the offline progress notification provides an expanded event report detailing any Homecoming Chests, consecutive day streaks with milestone bonuses, fulfilled Steward contracts, deciphered treasure maps, rare discoveries, supply rushes, and Steward rank promotions.
 
 ## Saves
 
 Profile format version 6 performs a one-time respec when loading older RPG profiles: points spent under the previous upgrade-price curve are refunded, old slot ranks are cleared, and Steward auto-buy is disabled so the refunded points are not immediately spent for you. The migrated profile is saved immediately.
 
-On Windows, RPG data, offline state, and standard game saves live in **Documents\\Homm2RPG**. `rpg_profile.dat` contains the RPG profile and the adventure tiles already rewarded. `offline_progress.dat` contains the offline timestamp and state. Normal game save files are in the same folder. The game copies older RPG and save files into this folder on first use without overwriting files already there. RPG profile writes use a temporary file and backup during replacement. The kingdom profile persists across maps and loaded saves.
+On Windows, RPG data, offline state, and standard game saves live in **Documents\\Homm2RPG**. `rpg_profile.dat` contains the RPG profile and the adventure tiles already rewarded. `offline_progress.dat` contains the offline timestamp and state. Normal game save files are in the same folder. The game copies older RPG and save files into this folder on first use without overwriting files already there. Both RPG profile and offline progress writes use temporary files and preserve persistent `.bak` backups (`rpg_profile.dat.bak` and `offline_progress.dat.bak`) during replacement for crash resilience. The kingdom profile persists across maps and loaded saves.
 
 The RPG profile uses 64-bit counters, while individual bounded combat mechanics stop accepting ranks once another rank would no longer increase their effect. The suffix formatter itself has no fixed suffix list. The game's original hero levels and resources retain their own engine limits. Older offline snapshots with creature-roster fields remain readable, but those fields are ignored and are omitted from new snapshots.

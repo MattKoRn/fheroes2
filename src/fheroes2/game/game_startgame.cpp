@@ -516,10 +516,7 @@ namespace
             return;
         }
 
-        // The backup is only transactional. Once the new primary is installed successfully,
-        // remove the older snapshot so a future unrelated corruption cannot replay already-claimed
-        // offline time or restore stale resources.
-        System::Unlink( backupFilePath );
+        // Keep the previous valid offline snapshot at backupFilePath as a resilient fallback in case of corruption or crash.
     }
 
     PlayerColor getPersistentResourcePlayerColor( Settings & conf )
@@ -1320,6 +1317,52 @@ namespace
 
         message += _( "RPG XP earned: " );
         message += fheroes2::RPG::formatExperience( summary.xpEarned );
+
+        if ( summary.homecomingTier > 0 ) {
+            const std::string chestName = getHomecomingChestName( summary.homecomingTier );
+            if ( !chestName.empty() ) {
+                message += "\n";
+                message += _( "Homecoming Chest: " );
+                message += chestName;
+            }
+        }
+
+        if ( summary.homecomingStreak > 0 ) {
+            message += "\n";
+            message += _( "Homecoming Streak: " );
+            message += std::to_string( summary.homecomingStreak );
+            message += _( " d" );
+            if ( summary.milestonePercent > 0 ) {
+                message += " (+" + std::to_string( summary.milestonePercent ) + "% bonus)";
+            }
+        }
+
+        if ( summary.contractCompleted ) {
+            message += "\n";
+            message += _( "Steward Contract Completed!" );
+        }
+
+        if ( summary.treasureMapCompleted ) {
+            message += "\n";
+            message += _( "Treasure Map Deciphered!" );
+        }
+
+        if ( summary.rareDiscovery ) {
+            message += "\n";
+            message += _( "Rare Discovery Uncovered!" );
+        }
+
+        if ( summary.supplyRushTriggered ) {
+            message += "\n";
+            message += _( "Supply Rush Triggered!" );
+        }
+
+        if ( summary.rankAfter > summary.rankBefore ) {
+            message += "\n";
+            message += _( "Steward Promoted: " );
+            message += getOfflineRankName( summary.rankAfter );
+        }
+
         fheroes2::showStandardTextMessage( _( "Offline Progress" ), std::move( message ), Dialog::OK );
     }
 

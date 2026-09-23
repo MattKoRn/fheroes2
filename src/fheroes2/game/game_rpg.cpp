@@ -118,13 +118,13 @@ namespace
         "Adds damage to Fireball and Fireblast.",
         "Adds damage to Cold Ray and Cold Ring.",
         "Adds damage to Lightning Bolt and Chain Lightning.",
-        "Adds damage to Elemental Storm and Armageddon.",
+        "Adds damage to Elemental Storm, Meteor Shower, and Armageddon.",
 
         "Reduces damage received from every damaging spell. Combined RPG spell reduction is capped at 70% before Arcane Piercing.",
         "Adds RPG resistance against Fireball and Fireblast.",
         "Adds RPG resistance against Cold Ray and Cold Ring.",
         "Adds RPG resistance against Lightning Bolt and Chain Lightning.",
-        "Adds RPG resistance against Elemental Storm and Armageddon.",
+        "Adds RPG resistance against Elemental Storm, Meteor Shower, and Armageddon.",
 
         "Adds Morale to your creature stacks during combat, up to +3 from this upgrade.",
         "Adds Luck to your creature stacks during combat, up to +3 from this upgrade.",
@@ -565,7 +565,7 @@ namespace
             System::Unlink( tempPath );
             return;
         }
-        System::Unlink( backupPath );
+        // Keep the previous valid profile at backupPath as a resilient fallback in case of corruption or crash.
     }
 
     const Profile * getProfile( const PlayerColor color )
@@ -696,6 +696,38 @@ namespace
         }
     }
 
+    uint64_t totalSpentPoints( const Profile & profile )
+    {
+        uint64_t total = 0;
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            for ( uint64_t r = 0; r < profile.ranks[id]; ++r ) {
+                total = saturatedAdd( total, cost( id, r ) );
+            }
+        }
+        return total;
+    }
+
+    uint64_t totalSpentPointsOnUpgrade( const Profile & profile, const size_t id )
+    {
+        if ( id >= upgradeCount ) {
+            return 0;
+        }
+        uint64_t total = 0;
+        for ( uint64_t r = 0; r < profile.ranks[id]; ++r ) {
+            total = saturatedAdd( total, cost( id, r ) );
+        }
+        return total;
+    }
+
+    void respecProfile( Profile & profile )
+    {
+        const uint64_t refund = totalSpentPoints( profile );
+        profile.points = saturatedAdd( profile.points, refund );
+        profile.ranks.fill( 0 );
+        profile.autoBuy = false;
+        saveProfile();
+    }
+
     void showUpgradeDetails( const size_t id )
     {
         const uint64_t rank = playerProfile.ranks[id];
@@ -706,16 +738,75 @@ namespace
         message += "\nCurrent: " + shortEffectSummary( id, rank );
         if ( canAdvance ) {
             message += "\nNext rank: " + shortEffectSummary( id, rank + 1 );
-            message += "\nNext rank costs: " + formatNumber( cost( id, rank ) ) + " points";
+            const uint64_t price = cost( id, rank );
+            message += "\nNext rank costs: " + formatNumber( price ) + " points";
+            if ( playerProfile.points < price ) {
+                message += " (need " + formatNumber( price - playerProfile.points ) + " more)";
+            }
         }
-        if ( id == BRUTAL_CRITICALS && playerProfile.ranks[CRITICAL_TRAINING] == 0 ) {
-            message += "\nRequires: Critical Training rank 1";
+        if ( id == BRUTAL_CRITICALS ) {
+            if ( playerProfile.ranks[CRITICAL_TRAINING] == 0 ) {
+                message += "\nRequires: Critical Training rank 1 (Locked)";
+            }
+            else {
+                message += "\nRequires: Critical Training rank 1 (Met)";
+            }
         }
         if ( !canAdvance ) {
             message += "\nMaximum effective rank reached.";
         }
+        const uint64_t invested = totalSpentPointsOnUpgrade( playerProfile, id );
+        if ( invested > 0 ) {
+            message += "\nPoints invested in doctrine: " + formatNumber( invested );
+        }
         message += "\nAvailable points: " + formatNumber( playerProfile.points );
         fheroes2::showStandardTextMessage( upgrades[id].name, std::move( message ), Dialog::ZERO );
+    }
+
+    void showTabDetails( const size_t tabIndex )
+    {
+        if ( tabIndex >= tabNames.size() ) {
+            return;
+        }
+
+        constexpr std::array<const char *, 8> tabDescriptions{
+            "Fundamental martial training for your forces. Direct creature Attack and Defense bonuses, and sustaining stacks through lifesteal and battle triage.",
+            "Core physical doctrines for dealing damage. Increases all creature strikes, specialized melee or ranged weapons, and target opportunism against wounded or untouched foes.",
+            "Battlefield tactics and positional doctrines. Capitalizes on numbers, morale discipline, desperate frenzy below half health, and armor penetration.",
+            "Defensive guard doctrines. Fortifies stacks against physical strikes, ranged volleys, and establishes resilient last stands and outnumbered bulwarks.",
+            "Arcane spellcasting doctrines for spellcasting heroes. Empowers damage from all spells and specialized elemental disciplines: Fire, Cold, Lightning, and Cataclysm.",
+            "Arcane warding doctrines. Shields friendly creature stacks against hero spell damage, specialized elemental damage, and devastating area storms.",
+            "Command and morale doctrines. Blesses your army with high Morale, Luck, start-of-turn regeneration, and deadly Critical strikes.",
+            "Advanced martial and arcane mastery. Grants agility to Evade creature attacks, Arcane Piercing through spell wards, Close Quarters melee recovery for archers, and Ruthless strikes."
+        };
+
+        std::string message = tabPanelNames[tabIndex];
+        message += "\n\n";
+        message += tabDescriptions[tabIndex];
+        fheroes2::showStandardTextMessage( tabNames[tabIndex], std::move( message ), Dialog::ZERO );
+    }
+
+    void showKingdomOverview()
+    {
+        const uint64_t remainingXP = xpToNextLevel( playerProfile.level ) > playerProfile.progress
+                                         ? xpToNextLevel( playerProfile.level ) - playerProfile.progress
+                                         : 0;
+        const uint64_t totalInvested = totalSpentPoints( playerProfile );
+
+        std::string message = "KINGDOM RPG SUMMARY\n";
+        message += "\nKingdom Level: " + formatNumber( playerProfile.level );
+        message += "\nAvailable Guild Points: " + formatNumber( playerProfile.points );
+        message += "\nTotal Points Invested: " + formatNumber( totalInvested );
+        message += "\n\nRENOWN (RPG EXPERIENCE)";
+        message += "\nTotal Renown: " + formatNumber( playerProfile.experience );
+        message += "\n  From Hero Experience: " + formatNumber( playerProfile.heroExperience );
+        message += "\n  From Battles: " + formatNumber( playerProfile.battleExperience );
+        message += "\n  From Adventure Sites: " + formatNumber( playerProfile.adventureExperience );
+        message += "\n  From Offline Progress: " + formatNumber( playerProfile.offlineExperience );
+        message += "\n\nRenown to Next Level: " + formatNumber( remainingXP );
+        message += "\nUnique Map Sites Visited: " + formatNumber( visitedActionTiles.size() );
+
+        fheroes2::showStandardTextMessage( "Royal Guild Overview", std::move( message ), Dialog::ZERO );
     }
 }
 
@@ -800,8 +891,12 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
             const int percent = variation( rng );
             const long double scaledRank = static_cast<long double>( playerProfile.ranks[id] ) * percent / 100.0L;
             const long double roundedRank = roundUpSmallRanks ? std::floor( scaledRank + 0.5L ) : std::floor( scaledRank );
-            temporary.ranks[id]
-                = static_cast<uint64_t>( std::min<long double>( std::numeric_limits<uint64_t>::max(), std::max<long double>( 0.0L, roundedRank ) ) );
+            temporary.ranks[id] = static_cast<uint64_t>( std::min<long double>(
+                static_cast<long double>( std::numeric_limits<uint64_t>::max() ), std::max<long double>( 0.0L, roundedRank ) ) );
+        }
+
+        if ( temporary.ranks[CRITICAL_TRAINING] == 0 ) {
+            temporary.ranks[BRUTAL_CRITICALS] = 0;
         }
 
         return temporary;
@@ -874,7 +969,7 @@ uint64_t fheroes2::RPG::addExperience( const PlayerColor color, const uint64_t a
 }
 
 void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor opponent, const uint32_t battleExperience, const bool won,
-                                  const bool /* defending */, const bool /* siege */ )
+                                  const bool defending, const bool siege )
 {
     if ( color != activePlayerColor ) {
         return;
@@ -886,10 +981,16 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
                                       : std::clamp( static_cast<long double>( opponentProfile->level )
                                                         / std::max<long double>( 1.0L, static_cast<long double>( playerProfile.level ) ),
                                                     0.5L, 2.0L );
-    const long double base = ( won ? 200.0L : 75.0L ) + static_cast<long double>( battleExperience ) * ( won ? 0.2L : 0.08L );
+    long double base = ( won ? 200.0L : 75.0L ) + static_cast<long double>( battleExperience ) * ( won ? 0.2L : 0.08L );
+    if ( won && siege ) {
+        base *= 1.25L;
+    }
+    else if ( won && defending ) {
+        base *= 1.10L;
+    }
     const long double earned = base * challenge;
-    addExperience( color, static_cast<uint64_t>( std::min( earned, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) ),
-                   ExperienceKind::BATTLE );
+    static_cast<void>( addExperience( color, static_cast<uint64_t>( std::min( earned, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) ),
+                                      ExperienceKind::BATTLE ) );
 }
 
 void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int objectType, const int32_t tileIndex )
@@ -995,7 +1096,7 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
     }
 
     const long double levelScale = 1.0L + std::log1p( static_cast<long double>( playerProfile.level ) ) / 5.0L;
-    addExperience( color, static_cast<uint64_t>( static_cast<long double>( base ) * levelScale ), ExperienceKind::ADVENTURE );
+    static_cast<void>( addExperience( color, static_cast<uint64_t>( static_cast<long double>( base ) * levelScale ), ExperienceKind::ADVENTURE ) );
 }
 
 uint32_t fheroes2::RPG::creatureAttackBonus( const PlayerColor color )
@@ -1151,6 +1252,7 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
         case Spell::CHAINLIGHTNING:
             return STORMCRAFT;
         case Spell::ELEMENTALSTORM:
+        case Spell::METEORSHOWER:
         case Spell::ARMAGEDDON:
             return CATACLYSM;
         default:
@@ -1210,6 +1312,7 @@ void fheroes2::RPG::showMenu()
     fheroes2::Button scrollUp( scrollbarX + 1, listArea.y + 1, scrollIcn, 0, 1 );
     fheroes2::Button scrollDown( scrollbarX + 1, listArea.y + listArea.height - 15, scrollIcn, 2, 3 );
     fheroes2::ButtonSprite autoButton;
+    fheroes2::ButtonSprite respecButton;
     fheroes2::ButtonSprite closeButton;
     size_t tab = 0;
     bool redraw = true;
@@ -1315,26 +1418,42 @@ void fheroes2::RPG::showMenu()
                           canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
 
-            drawText( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3   Wheel: scroll   Hold/right-click: inspect",
+            drawText( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3   [1-8] Tabs  [S] Auto  [R] Respec  [B] Buy  [Esc] Close",
                       area.x + 12, area.y + 337, area.width - 24, fheroes2::FontType::smallWhite() );
             window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
+            window.renderTextAdaptedButtonSprite( respecButton, "Respec", { 0, 6 }, fheroes2::StandardWindow::Padding::BOTTOM_CENTER );
             window.renderTextAdaptedButtonSprite( closeButton, "Close", { 18, 6 }, fheroes2::StandardWindow::Padding::BOTTOM_RIGHT );
             display.render( window.totalArea() );
             redraw = false;
         }
 
         autoButton.drawOnState( event.isMouseLeftButtonPressedAndHeldInArea( autoButton.area() ) );
+        respecButton.drawOnState( event.isMouseLeftButtonPressedAndHeldInArea( respecButton.area() ) );
         closeButton.drawOnState( event.isMouseLeftButtonPressedAndHeldInArea( closeButton.area() ) );
         scrollUp.drawOnState( event.isMouseLeftButtonPressedAndHeldInArea( scrollUp.area() ) );
         scrollDown.drawOnState( event.isMouseLeftButtonPressedAndHeldInArea( scrollDown.area() ) );
 
-        if ( Game::HotKeyCloseWindow() || event.MouseClickLeft( closeButton.area() ) ) {
+        if ( Game::HotKeyCloseWindow() || event.isKeyPressed( fheroes2::Key::KEY_F9 ) || event.MouseClickLeft( closeButton.area() ) ) {
             break;
         }
 
         bool tabChanged = false;
         for ( size_t i = 0; i < tabNames.size(); ++i ) {
+            const auto numKey = static_cast<fheroes2::Key>( static_cast<int32_t>( fheroes2::Key::KEY_1 ) + i );
+            const auto kpKey = static_cast<fheroes2::Key>( static_cast<int32_t>( fheroes2::Key::KEY_KP_1 ) + i );
+            if ( event.isKeyPressed( numKey ) || event.isKeyPressed( kpKey ) ) {
+                tab = i;
+                redraw = true;
+                tabChanged = true;
+                break;
+            }
+            if ( event.isMouseRightButtonPressedInArea( tabAreas[i] ) || event.MouseLongPressLeft( tabAreas[i] ) ) {
+                showTabDetails( i );
+                redraw = true;
+                tabChanged = true;
+                break;
+            }
             if ( event.MouseClickLeft( tabAreas[i] ) ) {
                 tab = i;
                 redraw = true;
@@ -1346,14 +1465,52 @@ void fheroes2::RPG::showMenu()
             continue;
         }
 
+        if ( event.isKeyPressed( fheroes2::Key::KEY_LEFT ) ) {
+            tab = ( tab + tabNames.size() - 1 ) % tabNames.size();
+            redraw = true;
+            continue;
+        }
+        if ( event.isKeyPressed( fheroes2::Key::KEY_RIGHT ) || event.isKeyPressed( fheroes2::Key::KEY_TAB ) ) {
+            tab = ( tab + 1 ) % tabNames.size();
+            redraw = true;
+            continue;
+        }
+
         size_t & scrollOffset = scrollOffsets[tab];
-        if ( ( event.isMouseWheelUpInArea( listArea ) || event.MouseClickLeft( scrollUp.area() ) ) && scrollOffset > 0 ) {
+        if ( ( event.isKeyPressed( fheroes2::Key::KEY_UP ) || event.isMouseWheelUpInArea( listArea ) || event.MouseClickLeft( scrollUp.area() ) )
+             && scrollOffset > 0 ) {
             --scrollOffset;
             redraw = true;
             continue;
         }
-        if ( ( event.isMouseWheelDownInArea( listArea ) || event.MouseClickLeft( scrollDown.area() ) ) && scrollOffset + visibleRows < upgradesPerTab ) {
+        if ( ( event.isKeyPressed( fheroes2::Key::KEY_DOWN ) || event.isMouseWheelDownInArea( listArea ) || event.MouseClickLeft( scrollDown.area() ) )
+             && scrollOffset + visibleRows < upgradesPerTab ) {
             ++scrollOffset;
+            redraw = true;
+            continue;
+        }
+
+        const fheroes2::Sprite & scrollThumb = Assets::getImage( scrollIcn, 4 );
+        const int32_t thumbTravel = std::max( 0, listArea.height - 38 - scrollThumb.height() );
+        const int32_t thumbY = listArea.y + 19 + static_cast<int32_t>( scrollOffsets[tab] * thumbTravel / ( upgradesPerTab - visibleRows ) );
+        const fheroes2::Rect scrollTrack( scrollbarX, listArea.y + 16, 16, listArea.height - 32 );
+        if ( event.MouseClickLeft( scrollTrack ) ) {
+            const Point & cursor = event.getMouseCursorPos();
+            if ( cursor.y < thumbY && scrollOffset > 0 ) {
+                --scrollOffset;
+                redraw = true;
+                continue;
+            }
+            if ( cursor.y > thumbY + scrollThumb.height() && scrollOffset + visibleRows < upgradesPerTab ) {
+                ++scrollOffset;
+                redraw = true;
+                continue;
+            }
+        }
+
+        if ( event.isMouseRightButtonPressedInArea( statsArea ) || event.MouseLongPressLeft( statsArea )
+             || event.MouseClickLeft( statsArea ) ) {
+            showKingdomOverview();
             redraw = true;
             continue;
         }
@@ -1365,10 +1522,34 @@ void fheroes2::RPG::showMenu()
                 redraw = true;
                 break;
             }
-            if ( event.MouseClickLeft( buyAreas[row] ) && buy( playerProfile, i ) ) {
-                saveProfile();
+            if ( event.MouseClickLeft( buyAreas[row] ) ) {
+                if ( buy( playerProfile, i ) ) {
+                    saveProfile();
+                }
+                else {
+                    showUpgradeDetails( i );
+                }
                 redraw = true;
                 break;
+            }
+            if ( event.MouseClickLeft( visibleUpgradeAreas[row] ) ) {
+                showUpgradeDetails( i );
+                redraw = true;
+                break;
+            }
+        }
+
+        if ( event.isKeyPressed( fheroes2::Key::KEY_B ) ) {
+            for ( size_t row = 0; row < visibleRows; ++row ) {
+                const size_t i = tab * upgradesPerTab + scrollOffset + row;
+                if ( buy( playerProfile, i ) ) {
+                    saveProfile();
+                    redraw = true;
+                    break;
+                }
+            }
+            if ( redraw ) {
+                continue;
             }
         }
 
@@ -1379,13 +1560,37 @@ void fheroes2::RPG::showMenu()
             redraw = true;
             continue;
         }
-        if ( event.MouseClickLeft( autoButton.area() ) ) {
+        if ( event.MouseClickLeft( autoButton.area() ) || event.isKeyPressed( fheroes2::Key::KEY_S ) ) {
             playerProfile.autoBuy = !playerProfile.autoBuy;
             if ( playerProfile.autoBuy ) {
                 autoBuy( playerProfile );
             }
             saveProfile();
             redraw = true;
+        }
+
+        if ( event.isMouseRightButtonPressedInArea( respecButton.area() ) || event.MouseLongPressLeft( respecButton.area() ) ) {
+            fheroes2::showStandardTextMessage(
+                "Respec Doctrines",
+                "Refund all guild points spent on doctrines and reset ranks to zero, allowing you to freely reallocate your build.",
+                Dialog::ZERO );
+            redraw = true;
+            continue;
+        }
+        if ( event.MouseClickLeft( respecButton.area() ) || event.isKeyPressed( fheroes2::Key::KEY_R ) ) {
+            const uint64_t refund = totalSpentPoints( playerProfile );
+            if ( refund == 0 ) {
+                fheroes2::showStandardTextMessage( "Respec Doctrines", "No guild points have been spent yet.", Dialog::OK );
+                redraw = true;
+            }
+            else {
+                const std::string prompt = "Reset all upgrade ranks and refund " + formatNumber( refund )
+                                           + " guild points?\n\nSteward auto-buy will be paused so you can redistribute your points.";
+                if ( fheroes2::showStandardTextMessage( "Respec Doctrines", prompt, Dialog::YES | Dialog::NO ) == Dialog::YES ) {
+                    respecProfile( playerProfile );
+                    redraw = true;
+                }
+            }
         }
     }
 }

@@ -609,10 +609,10 @@ uint32_t Battle::Unit::CalculateDamageUnit( const Unit & enemy, double dmg ) con
         const bool rangedAttack = isArchers() && !isHandFighting() && !isHandFighting( *this, enemy );
         const uint64_t attackerStartingHitPoints = static_cast<uint64_t>( GetInitialCount() ) * Monster::GetHitPoints();
         const uint64_t defenderStartingHitPoints = static_cast<uint64_t>( enemy.GetInitialCount() ) * enemy.Monster::GetHitPoints();
-        const bool attackerFullHealth = static_cast<uint64_t>( GetHitPoints() ) == attackerStartingHitPoints;
-        const bool defenderFullHealth = static_cast<uint64_t>( enemy.GetHitPoints() ) == defenderStartingHitPoints;
-        const bool attackerBelowHalf = static_cast<uint64_t>( GetHitPoints() ) * 2 < attackerStartingHitPoints;
-        const bool defenderBelowHalf = static_cast<uint64_t>( enemy.GetHitPoints() ) * 2 < defenderStartingHitPoints;
+        const bool attackerFullHealth = attackerStartingHitPoints > 0 && static_cast<uint64_t>( GetHitPoints() ) >= attackerStartingHitPoints;
+        const bool defenderFullHealth = defenderStartingHitPoints > 0 && static_cast<uint64_t>( enemy.GetHitPoints() ) >= defenderStartingHitPoints;
+        const bool attackerBelowHalf = attackerStartingHitPoints > 0 && static_cast<uint64_t>( GetHitPoints() ) * 2 < attackerStartingHitPoints;
+        const bool defenderBelowHalf = defenderStartingHitPoints > 0 && static_cast<uint64_t>( enemy.GetHitPoints() ) * 2 < defenderStartingHitPoints;
 
         dmg = std::min(
             dmg * fheroes2::RPG::damageMultiplier( GetColor(), enemy.Modes( CAP_TOWER ) ? PlayerColor::UNUSED : enemy.GetColor(), rangedAttack,
