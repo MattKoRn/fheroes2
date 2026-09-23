@@ -180,6 +180,62 @@ namespace
         return a > std::numeric_limits<uint64_t>::max() / b ? std::numeric_limits<uint64_t>::max() : a * b;
     }
 
+    uint64_t saturatedTriangular( const uint64_t value )
+    {
+        if ( value < 2 ) {
+            return 0;
+        }
+
+        uint64_t first = value;
+        uint64_t second = value - 1;
+        if ( first % 2 == 0 ) {
+            first /= 2;
+        }
+        else {
+            second /= 2;
+        }
+        return saturatedMultiply( first, second );
+    }
+
+    uint64_t linearRankInvestment( const uint64_t rank, const uint64_t baseCost, const uint64_t rankCost )
+    {
+        return saturatedAdd( saturatedMultiply( rank, baseCost ), saturatedMultiply( saturatedTriangular( rank ), rankCost ) );
+    }
+
+    uint64_t steppedRankInvestment( const uint64_t rank, const uint64_t baseCost, const uint64_t groupSize )
+    {
+        assert( groupSize > 0 );
+        const uint64_t completeGroups = rank / groupSize;
+        const uint64_t remainder = rank % groupSize;
+        const uint64_t completedGroupSteps = saturatedMultiply( groupSize, saturatedTriangular( completeGroups ) );
+        const uint64_t remainderSteps = saturatedMultiply( completeGroups, remainder );
+        return saturatedAdd( saturatedMultiply( rank, baseCost ), saturatedAdd( completedGroupSteps, remainderSteps ) );
+    }
+
+    uint64_t rankInvestment( const size_t id, const uint64_t rank )
+    {
+        switch ( id ) {
+        case ARMS_TRAINING:
+        case ARMOR_TRAINING:
+            return linearRankInvestment( rank, 2, 1 );
+        case VETERAN_CORE:
+            return linearRankInvestment( rank, 3, 2 );
+        case LEADERSHIP:
+        case FORTUNE:
+            return linearRankInvestment( rank, 2, 2 );
+        case BLOOD_DRINKER:
+        case REAPER:
+        case REGENERATION:
+            return steppedRankInvestment( rank, 1, 4 );
+        case CRITICAL_TRAINING:
+        case BRUTAL_CRITICALS:
+        case EVASION:
+            return steppedRankInvestment( rank, 2, 3 );
+        default:
+            return steppedRankInvestment( rank, 1, 5 );
+        }
+    }
+
     uint64_t legacyRankInvestment( const uint64_t rank )
     {
         // Profiles up to version 5 used cost(rank) = 1 + rank / 10.
@@ -703,9 +759,7 @@ namespace
     {
         uint64_t total = 0;
         for ( size_t id = 0; id < upgradeCount; ++id ) {
-            for ( uint64_t r = 0; r < profile.ranks[id]; ++r ) {
-                total = saturatedAdd( total, cost( id, r ) );
-            }
+            total = saturatedAdd( total, rankInvestment( id, profile.ranks[id] ) );
         }
         return total;
     }
@@ -715,11 +769,7 @@ namespace
         if ( id >= upgradeCount ) {
             return 0;
         }
-        uint64_t total = 0;
-        for ( uint64_t r = 0; r < profile.ranks[id]; ++r ) {
-            total = saturatedAdd( total, cost( id, r ) );
-        }
-        return total;
+        return rankInvestment( id, profile.ranks[id] );
     }
 
     void respecProfile( Profile & profile )
@@ -889,8 +939,24 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     }
 
     const std::string path = profilePath();
-    if ( !readProfile( path, playerProfile ) && !readProfile( path + ".tmp", playerProfile ) ) {
-        readProfile( path + ".bak", playerProfile );
+    std::array<std::string, 3> profileCandidates{ path, path + ".tmp", path + ".bak" };
+    std::stable_sort( profileCandidates.begin(), profileCandidates.end(), []( const std::string & first, const std::string & second ) {
+        std::error_code firstError;
+        std::error_code secondError;
+        const auto firstTime = std::filesystem::last_write_time( first, firstError );
+        const auto secondTime = std::filesystem::last_write_time( second, secondError );
+        if ( firstError ) {
+            return false;
+        }
+        if ( secondError ) {
+            return true;
+        }
+        return firstTime > secondTime;
+    } );
+    for ( const std::string & candidate : profileCandidates ) {
+        if ( readProfile( candidate, playerProfile ) ) {
+            break;
+        }
     }
 
     // Persist migrations immediately. In particular, this prevents a version-5 profile

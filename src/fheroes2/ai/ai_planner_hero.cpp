@@ -738,6 +738,18 @@ namespace
                 return false;
             }
 
+            double cursedArtifactValue = 0.0;
+            for ( const Artifact & artifact : bag ) {
+                if ( artifact.containsCurses() ) {
+                    cursedArtifactValue += artifact.getArtifactValue();
+                }
+            }
+            if ( !std::isfinite( cursedArtifactValue ) || cursedArtifactValue >= 0.0 ) {
+                // The tower destroys cursed artifacts rather than merely removing their curses.
+                // Keep artifacts whose bonuses still outweigh their drawbacks.
+                return false;
+            }
+
             const Funds payment = PaymentConditions::ForAlchemist();
             return kingdom.AllowPayment( payment );
         }
@@ -954,7 +966,7 @@ namespace
     {
         const double heroStrength = hero.GetArmy().GetStrength();
         const double enemyStrength = enemyHero.GetArmy().GetStrength();
-        if ( heroStrength <= 0.0 || enemyStrength <= 0.0 ) {
+        if ( heroStrength <= 0.0 || enemyStrength <= 0.0 || !std::isfinite( heroStrength ) || !std::isfinite( enemyStrength ) ) {
             return 1.0;
         }
 
@@ -980,7 +992,7 @@ namespace
     {
         const double heroStrength = hero.GetArmy().GetStrength();
         const double defenderStrength = castle.GetGarrisonStrength( hero );
-        if ( heroStrength <= 0.0 || defenderStrength <= 0.0 ) {
+        if ( heroStrength <= 0.0 || defenderStrength <= 0.0 || !std::isfinite( heroStrength ) || !std::isfinite( defenderStrength ) ) {
             return 1.0;
         }
 
@@ -1506,7 +1518,7 @@ double AI::Planner::getGeneralObjectValue( const Heroes & hero, const int32_t in
 
         const double heroStrength = hero.GetArmy().GetStrength();
         const double monsterStrength = monsters.GetStrength();
-        if ( heroStrength <= 0.0 || monsterStrength <= 0.0 ) {
+        if ( heroStrength <= 0.0 || monsterStrength <= 0.0 || !std::isfinite( heroStrength ) || !std::isfinite( monsterStrength ) ) {
             return valueToIgnore;
         }
 
@@ -1948,8 +1960,19 @@ double AI::Planner::getGeneralObjectValue( const Heroes & hero, const int32_t in
             return -dangerousTaskPenalty;
         }
 
-        // TODO: evaluate this object properly.
-        return 0;
+        double cursedArtifactValue = 0.0;
+        for ( const Artifact & artifact : bag ) {
+            if ( artifact.containsCurses() ) {
+                cursedArtifactValue += artifact.getArtifactValue();
+            }
+        }
+        if ( !std::isfinite( cursedArtifactValue ) || cursedArtifactValue >= 0.0 ) {
+            return -dangerousTaskPenalty;
+        }
+
+        const Funds payment = PaymentConditions::ForAlchemist();
+        const double purgeBenefit = -cursedArtifactValue * 1500.0 + cursed * 500.0 - std::max( 0, payment.gold );
+        return std::max( 100.0, purgeBenefit );
     }
     case MP2::OBJ_EYE_OF_MAGI:
     case MP2::OBJ_ORACLE:
@@ -2173,7 +2196,7 @@ double AI::Planner::getFighterObjectValue( const Heroes & hero, const int32_t in
 
         const double heroStrength = hero.GetArmy().GetStrength();
         const double monsterStrength = monsters.GetStrength();
-        if ( heroStrength <= 0.0 || monsterStrength <= 0.0 ) {
+        if ( heroStrength <= 0.0 || monsterStrength <= 0.0 || !std::isfinite( heroStrength ) || !std::isfinite( monsterStrength ) ) {
             return valueToIgnore;
         }
 
@@ -2357,8 +2380,31 @@ double AI::Planner::getCourierObjectValue( const Heroes & hero, const int32_t in
             return -dangerousTaskPenalty;
         }
 
-        // TODO: we should add logic to compare monsters and hero army strengths.
-        return twoTiles + monsters.getTotalHP() / 100.0;
+        const double heroStrength = hero.GetArmy().GetStrength();
+        const double monsterStrength = monsters.GetStrength();
+        if ( heroStrength <= 0.0 || monsterStrength <= 0.0 || !std::isfinite( heroStrength ) || !std::isfinite( monsterStrength ) ) {
+            return valueToIgnore;
+        }
+
+        const double strengthRatio = heroStrength / monsterStrength;
+        if ( strengthRatio < 1.25 ) {
+            // Couriers carry reinforcements and resources for the main army. Do not gamble them on
+            // fights that are likely to consume the delivery or strand the hero.
+            return -dangerousTaskPenalty;
+        }
+
+        double value = twoTiles + monsters.getTotalHP() / 100.0;
+        if ( strengthRatio >= 5.0 ) {
+            value *= 1.25;
+        }
+        else if ( strengthRatio >= 3.0 ) {
+            value *= 1.10;
+        }
+        else if ( strengthRatio < 1.75 ) {
+            value *= 0.25;
+        }
+
+        return value;
     }
     case MP2::OBJ_ALCHEMIST_LAB:
     case MP2::OBJ_MINE:

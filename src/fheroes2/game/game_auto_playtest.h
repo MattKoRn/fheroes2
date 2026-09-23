@@ -21,7 +21,6 @@
 #pragma once
 
 #include <algorithm>
-#include <cassert>
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -45,7 +44,7 @@ namespace fheroes2
         {
             PlayerColor color{ PlayerColor::NONE };
             PlayerState state{ PlayerState::WINNER };
-            uint32_t dayOfState{ 1 };
+            uint32_t dayOfState{ 0 };
         };
 
         static constexpr int32_t playthroughLimit{ 100 };
@@ -108,8 +107,14 @@ namespace fheroes2
         {
             _playthroughResults.clear();
 
+            if ( colors == 0 ) {
+                return;
+            }
+
             auto & infos = _playthroughResults.emplace_back();
-            for ( const auto color : PlayerColorsVector( colors ) ) {
+            const PlayerColorsVector playerColors{ colors };
+            infos.reserve( playerColors.size() );
+            for ( const auto color : playerColors ) {
                 auto & info = infos.emplace_back();
                 info.color = color;
             }
@@ -117,7 +122,9 @@ namespace fheroes2
 
         void nextPlaythrough()
         {
-            assert( !_playthroughResults.empty() );
+            if ( _playthroughResults.empty() ) {
+                return;
+            }
 
             std::vector<PlayerInfo> lastResult = _playthroughResults.back();
             for ( auto & state : lastResult ) {
@@ -128,21 +135,39 @@ namespace fheroes2
             _playthroughResults.emplace_back( std::move( lastResult ) );
         }
 
+        void finalizePlaythrough( const uint32_t day )
+        {
+            if ( _playthroughResults.empty() ) {
+                return;
+            }
+
+            for ( auto & info : _playthroughResults.back() ) {
+                if ( info.state == PlayerState::WINNER ) {
+                    info.dayOfState = day;
+                }
+            }
+        }
+
         void setDefeatedPlayer( const PlayerColor color, const uint32_t day )
         {
-            assert( !_playthroughResults.empty() );
+            if ( _playthroughResults.empty() ) {
+                return;
+            }
 
             for ( auto & info : _playthroughResults.back() ) {
                 if ( info.color == color ) {
                     info.dayOfState = day;
                     info.state = PlayerState::LOSER;
+                    break;
                 }
             }
         }
 
         void markTimeLimit()
         {
-            assert( !_playthroughResults.empty() );
+            if ( _playthroughResults.empty() ) {
+                return;
+            }
 
             for ( auto & info : _playthroughResults.back() ) {
                 if ( info.state != PlayerState::LOSER ) {
@@ -154,7 +179,9 @@ namespace fheroes2
 
         void interrupt( const uint32_t day )
         {
-            assert( !_playthroughResults.empty() );
+            if ( _playthroughResults.empty() ) {
+                return;
+            }
 
             for ( auto & info : _playthroughResults.back() ) {
                 if ( info.state != PlayerState::LOSER ) {
@@ -166,7 +193,9 @@ namespace fheroes2
 
         bool isInterrupted() const
         {
-            assert( !_playthroughResults.empty() );
+            if ( _playthroughResults.empty() ) {
+                return false;
+            }
 
             for ( const auto & info : _playthroughResults.back() ) {
                 if ( info.state == PlayerState::INTERRUPTED ) {
@@ -184,7 +213,9 @@ namespace fheroes2
 
         void popLastResults()
         {
-            _playthroughResults.pop_back();
+            if ( !_playthroughResults.empty() ) {
+                _playthroughResults.pop_back();
+            }
         }
 
     private:

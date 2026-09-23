@@ -64,6 +64,11 @@
 
 namespace
 {
+    uint32_t getBoundedHitPointProduct( const uint32_t count, const uint32_t hitPoints )
+    {
+        return static_cast<uint32_t>( std::min<uint64_t>( static_cast<uint64_t>( count ) * hitPoints, std::numeric_limits<uint32_t>::max() ) );
+    }
+
     Artifact getImmunityArtifactForSpell( const HeroBase * hero, const Spell & spell )
     {
         if ( hero == nullptr ) {
@@ -686,12 +691,13 @@ uint32_t Battle::Unit::GetDamage( const Unit & enemy, Rand::PCG32 & randomGenera
                                                   defenderFullHealth, attackerBelowHalf, defenderBelowHalf, inMelee );
 
         const double criticalChance = fheroes2::RPG::criticalChance( GetColor() );
+        const double criticalDamageBonus = fheroes2::RPG::criticalDamageBonusPercent( GetColor() );
         const uint32_t criticalBasisPoints
             = static_cast<uint32_t>( std::clamp( criticalChance * 100.0 + 0.5, 0.0, 10000.0 ) );
         if ( criticalBasisPoints > 0 && Rand::GetWithGen( 1, 10000, randomGenerator ) <= criticalBasisPoints ) {
-            adjustedDamage *= 1.0L + fheroes2::RPG::criticalDamageBonusPercent( GetColor() ) / 100.0L;
+            adjustedDamage *= 1.0L + criticalDamageBonus / 100.0L;
             fheroes2::RPG::recordDoctrineUse( GetColor(), fheroes2::RPG::CRITICAL_TRAINING );
-            if ( fheroes2::RPG::criticalDamageBonusPercent( GetColor() ) > 0.0 ) {
+            if ( fheroes2::RPG::doctrineRank( GetColor(), fheroes2::RPG::BRUTAL_CRITICALS ) > 0 ) {
                 fheroes2::RPG::recordDoctrineUse( GetColor(), fheroes2::RPG::BRUTAL_CRITICALS );
             }
         }
@@ -868,10 +874,10 @@ uint32_t Battle::Unit::ApplyDamage( Unit & enemy, const uint32_t dmg, uint32_t &
 
     if ( killed > 0 ) {
         if ( enemy.isAbilityPresent( fheroes2::MonsterAbilityType::SOUL_EATER ) ) {
-            resurrected = enemy._resurrect( killed * enemy.Monster::GetHitPoints(), true, false );
+            resurrected = enemy._resurrect( getBoundedHitPointProduct( killed, enemy.Monster::GetHitPoints() ), true, false );
         }
         else if ( enemy.isAbilityPresent( fheroes2::MonsterAbilityType::HP_DRAIN ) ) {
-            resurrected = enemy._resurrect( killed * Monster::GetHitPoints(), false, false );
+            resurrected = enemy._resurrect( getBoundedHitPointProduct( killed, Monster::GetHitPoints() ), false, false );
         }
 
         if ( resurrected > 0 ) {

@@ -172,27 +172,27 @@ namespace
         uint64_t renownTotal{ 0 };
         int rankBefore{ 0 };
         int rankAfter{ 0 };
-        int rankUpPercent{ 0 };
-        int rankUpResource{ Resource::UNKNOWN };
-        int32_t rankUpBonus{ 0 };
+        uint32_t ranksEarned{ 0 };
+        Funds rankRewards;
         int contractId{ -1 };
         uint64_t contractProgressBefore{ 0 };
         uint64_t contractProgressAfter{ 0 };
         uint64_t contractTarget{ 0 };
         bool contractCompleted{ false };
-        int contractRewardResource{ Resource::UNKNOWN };
-        int32_t contractRewardBonus{ 0 };
+        uint32_t contractsCompletedThisSession{ 0 };
+        Funds contractRewards;
         uint32_t contractsCompleted{ 0 };
         int nextContractId{ -1 };
+        uint64_t nextContractProgress{ 0 };
         uint64_t nextContractTarget{ 0 };
         uint32_t treasureFragmentsBefore{ 0 };
         uint32_t treasureFragmentsEarned{ 0 };
         uint32_t treasureFragmentsAfter{ 0 };
         uint32_t treasureMapsCompleted{ 0 };
         bool treasureMapCompleted{ false };
+        uint32_t treasureMapsCompletedThisSession{ 0 };
         int treasureMapId{ -1 };
-        int treasureRewardResource{ Resource::UNKNOWN };
-        int32_t treasureRewardBonus{ 0 };
+        Funds treasureRewards;
         uint32_t stateCastles{ 0 };
         uint32_t stateTowns{ 0 };
         uint32_t stateHeroes{ 0 };
@@ -203,6 +203,8 @@ namespace
         uint32_t supplyRushEarned{ 0 };
         uint32_t supplyRushAfter{ 0 };
         bool supplyRushTriggered{ false };
+        uint32_t supplyRushesTriggered{ 0 };
+        Funds supplyRushRewards;
         bool showPopup{ false };
     };
 
@@ -406,25 +408,48 @@ namespace
               || ( version == 10 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
                    && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
                    && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter );
-        return ( version >= 1 && version <= 10 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && candidate.lastSeenUnix > 0;
+        if ( !( version >= 1 && version <= 10 ) || !hasVersionSpecificFields || !hasTimestamp || !hasResources || !hasIncome || !hasCarry
+             || candidate.lastSeenUnix <= 0 ) {
+            return false;
+        }
+
+        // Normalize persistent counters before any arithmetic uses them. These limits are
+        // structural invariants of the current format, not progression caps.
+        candidate.treasureFragments = std::min<uint32_t>( candidate.treasureFragments, 4 );
+        candidate.stateCastles = std::min<uint32_t>( candidate.stateCastles, 255 );
+        candidate.stateTowns = std::min<uint32_t>( candidate.stateTowns, 255 );
+        candidate.stateHeroes = std::min<uint32_t>( candidate.stateHeroes, 255 );
+        candidate.stateMines = std::min<uint32_t>( candidate.stateMines, 255 );
+        candidate.stateArtifacts = std::min<uint32_t>( candidate.stateArtifacts, 255 );
+
+        constexpr uint64_t maximumContractTarget = 48;
+        if ( candidate.contractId < 0 || candidate.contractId >= 5 || candidate.contractTarget == 0
+             || candidate.contractTarget > maximumContractTarget ) {
+            candidate.contractId = -1;
+            candidate.contractProgress = 0;
+            candidate.contractTarget = 0;
+        }
+        return true;
 
         };
 
         const std::string filePath = getOfflineProgressFilePath();
-        // A crash can occur after the old primary was moved to .bak but before the fully-written
-        // .tmp was promoted. In that state .tmp is the newest valid snapshot, so try it before
-        // the older backup whenever the primary cannot be used.
+        // A crash can leave more than one valid snapshot. Select the newest timestamp rather
+        // than trusting a stale primary merely because it still parses.
         const std::array<std::string, 3> candidatePaths{ filePath, filePath + ".tmp", filePath + ".bak" };
 
+        bool foundSnapshot = false;
+        int64_t newestTimestamp = 0;
         for ( const std::string & candidatePath : candidatePaths ) {
             OfflineProgressData candidate;
-            if ( loadFromPath( candidatePath, candidate ) ) {
+            if ( loadFromPath( candidatePath, candidate ) && ( !foundSnapshot || candidate.lastSeenUnix > newestTimestamp ) ) {
                 data = std::move( candidate );
-                return true;
+                newestTimestamp = data.lastSeenUnix;
+                foundSnapshot = true;
             }
         }
 
-        return false;
+        return foundSnapshot;
     }
 
     void saveOfflineProgressData( const OfflineProgressData & data )
@@ -537,7 +562,9 @@ namespace
     {
         uint32_t mineCount = 0;
         for ( const int resourceType : offlineResourceTypes ) {
-            mineCount += world.CountCapturedMines( resourceType, kingdom.GetColor() );
+            const uint32_t resourceMineCount = world.CountCapturedMines( resourceType, kingdom.GetColor() );
+            mineCount = resourceMineCount > std::numeric_limits<uint32_t>::max() - mineCount ? std::numeric_limits<uint32_t>::max()
+                                                                                              : mineCount + resourceMineCount;
         }
 
         return mineCount;
@@ -546,11 +573,11 @@ namespace
     uint32_t getOfflineStateEfficiencyPercent( const uint32_t castles, const uint32_t towns, const uint32_t heroes, const uint32_t mines,
                                                const uint32_t artifacts )
     {
-        const uint32_t castleBonus = std::min<uint32_t>( 16, castles * 4 );
-        const uint32_t townBonus = std::min<uint32_t>( 8, towns * 2 );
-        const uint32_t heroBonus = std::min<uint32_t>( 12, heroes * 2 );
+        const uint32_t castleBonus = std::min<uint32_t>( 4, castles ) * 4;
+        const uint32_t townBonus = std::min<uint32_t>( 4, towns ) * 2;
+        const uint32_t heroBonus = std::min<uint32_t>( 6, heroes ) * 2;
         const uint32_t mineBonus = std::min<uint32_t>( 12, mines );
-        const uint32_t artifactBonus = std::min<uint32_t>( 2, artifacts / 5 );
+        const uint32_t artifactBonus = std::min<uint32_t>( 10, artifacts ) / 5;
 
         return std::min<uint32_t>( 150, 100 + castleBonus + townBonus + heroBonus + mineBonus + artifactBonus );
     }
@@ -916,6 +943,8 @@ namespace
 
     void applyOfflineContractProgress( OfflineProgressSummary & summary, OfflineProgressData & data )
     {
+        constexpr uint32_t maximumContractCompletionsPerSession = 3;
+
         initializeOfflineContract( data );
 
         summary.contractId = data.contractId;
@@ -933,13 +962,10 @@ namespace
             }
         }
 
-        summary.contractProgressAfter = std::min( data.contractProgress, data.contractTarget );
-
         if ( data.contractProgress < data.contractTarget ) {
+            summary.contractProgressAfter = data.contractProgress;
             return;
         }
-
-        summary.contractCompleted = true;
 
         size_t bestIndex = offlineFundMembers.size();
         int32_t bestProduction = 0;
@@ -951,32 +977,38 @@ namespace
             }
         }
 
-        if ( data.contractsCompleted < std::numeric_limits<uint32_t>::max() ) {
-            ++data.contractsCompleted;
-        }
-        summary.contractsCompleted = data.contractsCompleted;
+        while ( data.contractProgress >= data.contractTarget && summary.contractsCompletedThisSession < maximumContractCompletionsPerSession ) {
+            data.contractProgress -= data.contractTarget;
+            summary.contractCompleted = true;
+            ++summary.contractsCompletedThisSession;
 
-        if ( bestIndex != offlineFundMembers.size() ) {
-            const int rewardPercent = 20 + static_cast<int>( ( data.contractsCompleted - 1 ) % 4 ) * 5;
-            const FundsMember member = offlineFundMembers[bestIndex];
-            const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
-            const int64_t calculatedBonus = std::max<int64_t>( 1, ( static_cast<int64_t>( bestProduction ) * rewardPercent ) / 100 );
-            const int64_t grantedBonus = std::min<int64_t>( calculatedBonus, capacity );
-
-            if ( grantedBonus > 0 ) {
-                summary.contractRewardResource = offlineResourceTypes[bestIndex];
-                summary.contractRewardBonus = static_cast<int32_t>( grantedBonus );
-                summary.bonusRewards.*member += summary.contractRewardBonus;
-                summary.rewards.*member += summary.contractRewardBonus;
-                data.resources.*member += summary.contractRewardBonus;
+            if ( data.contractsCompleted < std::numeric_limits<uint32_t>::max() ) {
+                ++data.contractsCompleted;
             }
+
+            if ( bestIndex != offlineFundMembers.size() ) {
+                const int rewardPercent = 20 + static_cast<int>( ( data.contractsCompleted - 1 ) % 4 ) * 5;
+                const FundsMember member = offlineFundMembers[bestIndex];
+                const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
+                const int64_t calculatedBonus = std::max<int64_t>( 1, ( static_cast<int64_t>( bestProduction ) * rewardPercent ) / 100 );
+                const int32_t grantedBonus = static_cast<int32_t>( std::min<int64_t>( calculatedBonus, capacity ) );
+
+                if ( grantedBonus > 0 ) {
+                    summary.contractRewards.*member += grantedBonus;
+                    summary.bonusRewards.*member += grantedBonus;
+                    summary.rewards.*member += grantedBonus;
+                    data.resources.*member += grantedBonus;
+                }
+            }
+
+            data.contractId = getOfflineContractId( data.contractsCompleted );
+            data.contractTarget = getOfflineContractTarget( data.contractId, data.contractsCompleted );
         }
 
-        data.contractId = getOfflineContractId( data.contractsCompleted );
-        data.contractProgress = 0;
-        data.contractTarget = getOfflineContractTarget( data.contractId, data.contractsCompleted );
-
+        summary.contractsCompleted = data.contractsCompleted;
+        summary.contractProgressAfter = std::min( data.contractProgress, data.contractTarget );
         summary.nextContractId = data.contractId;
+        summary.nextContractProgress = summary.contractProgressAfter;
         summary.nextContractTarget = data.contractTarget;
     }
 
@@ -990,6 +1022,8 @@ namespace
 
     void applyOfflineTreasureHunt( OfflineProgressSummary & summary, OfflineProgressData & data, const int64_t previousLastSeenUnix )
     {
+        constexpr uint32_t maximumMapsPerSession = 2;
+
         summary.treasureFragmentsBefore = data.treasureFragments;
         summary.treasureFragmentsAfter = data.treasureFragments;
         summary.treasureMapsCompleted = data.treasureMapsCompleted;
@@ -998,27 +1032,20 @@ namespace
             return;
         }
 
-        uint32_t fragmentsEarned = 1;
-        if ( summary.elapsedSeconds >= offlineSecondsPerDay ) {
-            ++fragmentsEarned;
-        }
-        if ( summary.rareDiscovery || summary.contractCompleted ) {
-            ++fragmentsEarned;
-        }
-        fragmentsEarned = std::min<uint32_t>( fragmentsEarned, 3 );
+        const uint32_t offlineDays
+            = static_cast<uint32_t>( std::min<int64_t>( 4, std::max<int64_t>( 0, summary.elapsedSeconds / offlineSecondsPerDay ) ) );
+        uint32_t fragmentsEarned = 1 + offlineDays;
+        fragmentsEarned += summary.rareDiscovery ? 1 : 0;
+        fragmentsEarned += summary.contractsCompletedThisSession;
+        fragmentsEarned = std::min<uint32_t>( fragmentsEarned, 8 );
 
         summary.treasureFragmentsEarned = fragmentsEarned;
-        data.treasureFragments = std::min<uint32_t>( 8, data.treasureFragments + fragmentsEarned );
+        data.treasureFragments += fragmentsEarned;
         summary.treasureFragmentsAfter = data.treasureFragments;
 
         if ( data.treasureFragments < 5 ) {
             return;
         }
-
-        data.treasureFragments -= 5;
-        summary.treasureFragmentsAfter = data.treasureFragments;
-        summary.treasureMapCompleted = true;
-        summary.treasureMapId = static_cast<int>( data.treasureMapsCompleted % 4 );
 
         std::array<size_t, 7> eligibleIndices{};
         size_t eligibleCount = 0;
@@ -1029,34 +1056,48 @@ namespace
             }
         }
 
-        if ( eligibleCount > 0 ) {
-            const uint64_t seed = getOfflineEventSeed( previousLastSeenUnix,
-                                                        summary.elapsedSeconds + static_cast<int64_t>( data.treasureMapsCompleted + 1 ) * 7919 );
-            const size_t selectedIndex = eligibleIndices[( seed >> 24 ) % eligibleCount];
-            const FundsMember member = offlineFundMembers[selectedIndex];
-            const int rewardPercent = getTreasureMapRewardPercent( summary.treasureMapId );
-            const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
-            const int64_t baseReward = summary.productionRewards.*member;
-            const int64_t calculatedBonus = std::max<int64_t>( 1, ( baseReward * rewardPercent ) / 100 );
-            const int64_t grantedBonus = std::min<int64_t>( calculatedBonus, capacity );
+        while ( data.treasureFragments >= 5 && summary.treasureMapsCompletedThisSession < maximumMapsPerSession ) {
+            data.treasureFragments -= 5;
+            summary.treasureMapCompleted = true;
+            ++summary.treasureMapsCompletedThisSession;
 
-            if ( grantedBonus > 0 ) {
-                summary.treasureRewardResource = offlineResourceTypes[selectedIndex];
-                summary.treasureRewardBonus = static_cast<int32_t>( grantedBonus );
-                summary.bonusRewards.*member += summary.treasureRewardBonus;
-                summary.rewards.*member += summary.treasureRewardBonus;
-                data.resources.*member += summary.treasureRewardBonus;
+            const int mapId = static_cast<int>( data.treasureMapsCompleted % 4 );
+            if ( summary.treasureMapId < 0 ) {
+                summary.treasureMapId = mapId;
+            }
+
+            if ( eligibleCount > 0 ) {
+                const uint64_t seed = getOfflineEventSeed( previousLastSeenUnix,
+                                                            summary.elapsedSeconds + static_cast<int64_t>( data.treasureMapsCompleted + 1 ) * 7919 );
+                const size_t selectedIndex = eligibleIndices[( seed >> 24 ) % eligibleCount];
+                const FundsMember member = offlineFundMembers[selectedIndex];
+                const int rewardPercent = getTreasureMapRewardPercent( mapId );
+                const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
+                const int64_t baseReward = summary.productionRewards.*member;
+                const int64_t calculatedBonus = std::max<int64_t>( 1, ( baseReward * rewardPercent ) / 100 );
+                const int32_t grantedBonus = static_cast<int32_t>( std::min<int64_t>( calculatedBonus, capacity ) );
+
+                if ( grantedBonus > 0 ) {
+                    summary.treasureRewards.*member += grantedBonus;
+                    summary.bonusRewards.*member += grantedBonus;
+                    summary.rewards.*member += grantedBonus;
+                    data.resources.*member += grantedBonus;
+                }
+            }
+
+            if ( data.treasureMapsCompleted < std::numeric_limits<uint32_t>::max() ) {
+                ++data.treasureMapsCompleted;
             }
         }
 
-        if ( data.treasureMapsCompleted < std::numeric_limits<uint32_t>::max() ) {
-            ++data.treasureMapsCompleted;
-        }
+        summary.treasureFragmentsAfter = data.treasureFragments;
         summary.treasureMapsCompleted = data.treasureMapsCompleted;
     }
 
     void applyOfflineSupplyRush( OfflineProgressSummary & summary, OfflineProgressData & data )
     {
+        constexpr uint32_t maximumRushesPerSession = 2;
+
         summary.supplyRushBefore = data.supplyRushMeter;
         summary.supplyRushAfter = data.supplyRushMeter;
 
@@ -1069,17 +1110,20 @@ namespace
         const uint32_t statePoints = ( summary.stateEfficiencyPercent - 100 ) / 5;
         const uint32_t tierPoints = static_cast<uint32_t>( summary.homecomingTier * 3 );
 
-        summary.supplyRushEarned = 5 + timePoints + statePoints + tierPoints;
+        const uint32_t achievementPoints = summary.contractsCompletedThisSession * 8 + summary.treasureMapsCompletedThisSession * 10
+                                           + ( summary.rareDiscovery ? 10 : 0 ) + ( summary.milestoneBonus > 0 ? 10 : 0 );
+        summary.supplyRushEarned = 5 + timePoints + statePoints + tierPoints + achievementPoints;
 
-        const uint32_t accumulated = data.supplyRushMeter + summary.supplyRushEarned;
+        const uint64_t accumulated = static_cast<uint64_t>( data.supplyRushMeter ) + summary.supplyRushEarned;
         if ( accumulated < 100 ) {
-            data.supplyRushMeter = accumulated;
+            data.supplyRushMeter = static_cast<uint32_t>( accumulated );
             summary.supplyRushAfter = data.supplyRushMeter;
             return;
         }
 
         summary.supplyRushTriggered = true;
-        data.supplyRushMeter = accumulated - 100;
+        summary.supplyRushesTriggered = std::min<uint32_t>( maximumRushesPerSession, static_cast<uint32_t>( accumulated / 100 ) );
+        data.supplyRushMeter = static_cast<uint32_t>( accumulated - static_cast<uint64_t>( summary.supplyRushesTriggered ) * 100 );
         summary.supplyRushAfter = data.supplyRushMeter;
 
         constexpr int rushBonusPercent = 20;
@@ -1091,13 +1135,15 @@ namespace
             }
 
             const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
-            const int64_t calculatedBonus = std::max<int64_t>( 1, ( baseReward * rushBonusPercent ) / 100 );
+            const int64_t calculatedBonus
+                = std::max<int64_t>( 1, ( baseReward * rushBonusPercent * summary.supplyRushesTriggered ) / 100 );
             const int64_t grantedBonus = std::min<int64_t>( calculatedBonus, capacity );
             if ( grantedBonus <= 0 ) {
                 continue;
             }
 
             const int32_t bonus = static_cast<int32_t>( grantedBonus );
+            summary.supplyRushRewards.*member += bonus;
             summary.bonusRewards.*member += bonus;
             summary.rewards.*member += bonus;
             data.resources.*member += bonus;
@@ -1124,13 +1170,13 @@ namespace
             earned += 10;
         }
         if ( summary.contractCompleted ) {
-            earned += 8;
+            earned += static_cast<uint64_t>( summary.contractsCompletedThisSession ) * 8;
         }
         if ( summary.treasureMapCompleted ) {
-            earned += 12;
+            earned += static_cast<uint64_t>( summary.treasureMapsCompletedThisSession ) * 12;
         }
         if ( summary.supplyRushTriggered ) {
-            earned += 10;
+            earned += static_cast<uint64_t>( summary.supplyRushesTriggered ) * 10;
         }
 
         summary.renownEarned = earned;
@@ -1163,21 +1209,26 @@ namespace
             return;
         }
 
-        summary.rankUpPercent = 10 + summary.rankAfter * 5;
         const FundsMember member = offlineFundMembers[bestIndex];
-        const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
-        const int64_t calculatedBonus = std::max<int64_t>( 1, ( static_cast<int64_t>( bestProduction ) * summary.rankUpPercent ) / 100 );
-        const int64_t grantedBonus = std::min<int64_t>( calculatedBonus, capacity );
+        summary.ranksEarned = static_cast<uint32_t>( summary.rankAfter - summary.rankBefore );
 
-        if ( grantedBonus <= 0 ) {
-            return;
+        // Grant every promotion crossed during a long offline interval. Previously only the final
+        // rank paid out, making a large homecoming less rewarding than several short ones.
+        for ( int rank = summary.rankBefore + 1; rank <= summary.rankAfter; ++rank ) {
+            const int rewardPercent = 10 + rank * 5;
+            const int64_t capacity = std::numeric_limits<int32_t>::max() - static_cast<int64_t>( data.resources.*member );
+            const int64_t calculatedBonus = std::max<int64_t>( 1, ( static_cast<int64_t>( bestProduction ) * rewardPercent ) / 100 );
+            const int32_t grantedBonus = static_cast<int32_t>( std::min<int64_t>( calculatedBonus, capacity ) );
+
+            if ( grantedBonus <= 0 ) {
+                break;
+            }
+
+            summary.rankRewards.*member += grantedBonus;
+            summary.bonusRewards.*member += grantedBonus;
+            summary.rewards.*member += grantedBonus;
+            data.resources.*member += grantedBonus;
         }
-
-        summary.rankUpResource = offlineResourceTypes[bestIndex];
-        summary.rankUpBonus = static_cast<int32_t>( grantedBonus );
-        summary.bonusRewards.*member += summary.rankUpBonus;
-        summary.rewards.*member += summary.rankUpBonus;
-        data.resources.*member += summary.rankUpBonus;
     }
 
     OfflineProgressSummary applyOfflineProgress( Kingdom & kingdom, const int64_t elapsedOverrideSeconds = -1 )
@@ -1331,6 +1382,72 @@ namespace
         }
     }
 
+    std::string getOfflineHomecomingEventName( const int eventId )
+    {
+        switch ( eventId ) {
+        case 0:
+            return _( "Returning Caravan" );
+        case 1:
+            return _( "Forgotten Cache" );
+        case 2:
+            return _( "Grateful Settlers" );
+        case 3:
+            return _( "Veteran Patrol" );
+        case 4:
+            return _( "Merchant Windfall" );
+        case 5:
+            return _( "Recovered Tribute" );
+        case 6:
+            return _( "Guild Shipment" );
+        case 7:
+            return _( "Royal Bounty" );
+        default:
+            return _( "Homecoming Gift" );
+        }
+    }
+
+    std::string getOfflineRareDiscoveryName( const int discoveryId )
+    {
+        switch ( discoveryId ) {
+        case 0:
+            return _( "Hidden Vein" );
+        case 1:
+            return _( "Alchemist's Cache" );
+        case 2:
+            return _( "Buried Tribute" );
+        case 3:
+            return _( "Ancient Storehouse" );
+        default:
+            return _( "Rare Discovery" );
+        }
+    }
+
+    std::string formatOfflineReward( const int resource, const int32_t amount )
+    {
+        if ( resource == Resource::UNKNOWN || amount <= 0 ) {
+            return {};
+        }
+
+        return "+" + std::to_string( amount ) + " " + Resource::String( resource );
+    }
+
+    std::string formatOfflineRewards( const Funds & rewards )
+    {
+        std::string result;
+        for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
+            const std::string reward = formatOfflineReward( offlineResourceTypes[i], rewards.*offlineFundMembers[i] );
+            if ( reward.empty() ) {
+                continue;
+            }
+            if ( !result.empty() ) {
+                result += ", ";
+            }
+            result += reward;
+        }
+
+        return result;
+    }
+
     void showOfflineProgressPopup( const OfflineProgressSummary & summary )
     {
         if ( !summary.showPopup ) {
@@ -1362,16 +1479,7 @@ namespace
         message += _( "RPG XP earned: " );
         message += fheroes2::RPG::formatExperience( summary.xpEarned );
 
-        std::string supplies;
-        for ( size_t i = 0; i < offlineFundMembers.size(); ++i ) {
-            const int32_t amount = summary.rewards.*offlineFundMembers[i];
-            if ( amount > 0 ) {
-                if ( !supplies.empty() ) {
-                    supplies += ", ";
-                }
-                supplies += "+" + std::to_string( amount ) + " " + Resource::String( offlineResourceTypes[i] );
-            }
-        }
+        const std::string supplies = formatOfflineRewards( summary.rewards );
         if ( !supplies.empty() ) {
             message += "\n";
             // Offline progression intentionally does not modify the active map's treasury.
@@ -1390,6 +1498,17 @@ namespace
                 message += "\n";
                 message += _( "Homecoming Chest: " );
                 message += chestName;
+                if ( summary.eventCount > 0 ) {
+                    message += " (";
+                    for ( size_t i = 0; i < summary.eventCount; ++i ) {
+                        if ( i != 0 ) {
+                            message += ", ";
+                        }
+                        message += getOfflineHomecomingEventName( summary.events[i].eventId ) + " "
+                                   + formatOfflineReward( summary.events[i].resource, summary.events[i].bonus );
+                    }
+                    message += ")";
+                }
             }
         }
 
@@ -1400,13 +1519,35 @@ namespace
             message += _( " d" );
             if ( summary.milestonePercent > 0 ) {
                 message += " (+" + std::to_string( summary.milestonePercent ) + "% bonus)";
+                const std::string milestoneReward = formatOfflineReward( summary.milestoneResource, summary.milestoneBonus );
+                if ( !milestoneReward.empty() ) {
+                    message += ": " + milestoneReward;
+                }
             }
         }
 
         if ( summary.contractCompleted ) {
             message += "\n";
-            message += _( "Steward Contract Fulfilled: " );
-            message += getOfflineContractName( summary.contractId );
+            if ( summary.contractsCompletedThisSession == 1 ) {
+                message += _( "Steward Contract Fulfilled: " );
+                message += getOfflineContractName( summary.contractId );
+            }
+            else {
+                message += _( "Steward Contracts Fulfilled: " );
+                message += std::to_string( summary.contractsCompletedThisSession );
+                message += _( " (starting with " );
+                message += getOfflineContractName( summary.contractId ) + ")";
+            }
+            const std::string contractReward = formatOfflineRewards( summary.contractRewards );
+            if ( !contractReward.empty() ) {
+                message += " (" + contractReward + ")";
+            }
+            if ( summary.nextContractId >= 0 && summary.nextContractTarget > 0 ) {
+                message += "\n";
+                message += _( "Next Contract: " );
+                message += getOfflineContractName( summary.nextContractId ) + " (" + std::to_string( summary.nextContractProgress ) + "/"
+                           + std::to_string( summary.nextContractTarget ) + ")";
+            }
         }
         else if ( summary.contractProgressAfter > summary.contractProgressBefore ) {
             message += "\n";
@@ -1417,31 +1558,81 @@ namespace
 
         if ( summary.treasureMapCompleted ) {
             message += "\n";
-            message += _( "Treasure Map Deciphered: " );
-            message += getOfflineTreasureMapName( summary.treasureMapId );
+            if ( summary.treasureMapsCompletedThisSession == 1 ) {
+                message += _( "Treasure Map Deciphered: " );
+                message += getOfflineTreasureMapName( summary.treasureMapId );
+            }
+            else {
+                message += _( "Treasure Maps Deciphered: " );
+                message += std::to_string( summary.treasureMapsCompletedThisSession );
+                message += _( " (starting with " );
+                message += getOfflineTreasureMapName( summary.treasureMapId ) + ")";
+            }
+            const std::string treasureReward = formatOfflineRewards( summary.treasureRewards );
+            if ( !treasureReward.empty() ) {
+                message += " (" + treasureReward + ")";
+            }
+            message += "; " + std::to_string( summary.treasureMapsCompleted ) + _( " total maps" );
+            message += _( "; fragments: " ) + std::to_string( summary.treasureFragmentsAfter ) + "/5";
         }
         else if ( summary.treasureFragmentsEarned > 0 ) {
             message += "\n";
             message += _( "Map Fragments Found: " );
-            message += std::to_string( summary.treasureFragmentsAfter );
+            message += "+" + std::to_string( summary.treasureFragmentsEarned ) + " (" + std::to_string( summary.treasureFragmentsAfter );
             message += " / 5";
+            message += ")";
         }
 
         if ( summary.rareDiscovery ) {
             message += "\n";
-            message += _( "Rare Discovery Uncovered!" );
+            message += getOfflineRareDiscoveryName( summary.rareDiscoveryId ) + ": "
+                       + formatOfflineReward( summary.rareDiscoveryResource, summary.rareDiscoveryBonus );
         }
 
         if ( summary.supplyRushTriggered ) {
             message += "\n";
-            message += _( "Supply Rush Triggered!" );
+            const std::string rushRewards = formatOfflineRewards( summary.supplyRushRewards );
+            if ( summary.supplyRushesTriggered == 1 ) {
+                message += rushRewards.empty() ? _( "Supply Rush triggered; virtual stores were full." ) : _( "Supply Rush: " ) + rushRewards;
+            }
+            else {
+                message += _( "Supply Rushes: " ) + std::to_string( summary.supplyRushesTriggered );
+                message += rushRewards.empty() ? _( "; virtual stores were full." ) : " (" + rushRewards + ")";
+            }
+        }
+        if ( summary.supplyRushEarned > 0 ) {
+            message += "\n";
+            message += _( "Supply Rush Meter: " );
+            message += std::to_string( summary.supplyRushAfter ) + "/100 (+" + std::to_string( summary.supplyRushEarned ) + ")";
+        }
+
+        if ( summary.renownEarned > 0 ) {
+            message += "\n";
+            message += _( "Steward Renown: " );
+            message += "+" + std::to_string( summary.renownEarned ) + " (" + std::to_string( summary.renownTotal ) + ")";
         }
 
         if ( summary.rankAfter > summary.rankBefore ) {
             message += "\n";
-            message += _( "Steward Promoted: " );
+            if ( summary.ranksEarned > 1 ) {
+                message += _( "Steward Promotions: " );
+                message += std::to_string( summary.ranksEarned ) + _( ", now " );
+            }
+            else {
+                message += _( "Steward Promoted: " );
+            }
             message += getOfflineRankName( summary.rankAfter );
+            const std::string rankReward = formatOfflineRewards( summary.rankRewards );
+            if ( !rankReward.empty() ) {
+                message += " (" + rankReward + ")";
+            }
         }
+
+        message += "\n";
+        message += _( "Realm Readiness: " );
+        message += std::to_string( summary.stateEfficiencyPercent ) + "% (" + std::to_string( summary.stateCastles ) + " castles, "
+                   + std::to_string( summary.stateTowns ) + " towns, " + std::to_string( summary.stateHeroes ) + " heroes, "
+                   + std::to_string( summary.stateMines ) + " mines)";
 
         fheroes2::showStandardTextMessage( _( "Offline Progress" ), std::move( message ), Dialog::OK );
     }

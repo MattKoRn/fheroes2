@@ -1301,6 +1301,32 @@ double Army::GetStrength() const
     const int rpgMoraleBonus = fheroes2::RPG::moraleBonus( armyColor );
     const int rpgLuckBonus = fheroes2::RPG::luckBonus( armyColor );
 
+    // Strategic strength should reflect the same expected RPG combat value that the battle AI
+    // sees. Conditional doctrines use a fixed mix of common battle states so estimates stay
+    // deterministic without pretending that every doctrine is active on every attack.
+    const double criticalFactor = 1.0 + fheroes2::RPG::criticalChance( armyColor ) / 100.0
+                                                  * fheroes2::RPG::criticalDamageBonusPercent( armyColor ) / 100.0;
+    const double evasionDamageTakenFactor = 1.0 - fheroes2::RPG::evasionChance( armyColor ) / 200.0;
+    const auto expectedDamageTakenFactor = [armyColor]( const bool ranged ) {
+        const auto scenario = [armyColor, ranged]( const bool defenderOutnumbered, const bool defenderFullHealth,
+                                                   const bool defenderBelowHalf ) {
+            return fheroes2::RPG::damageMultiplier( PlayerColor::UNUSED, armyColor, ranged, false, defenderOutnumbered, false,
+                                                    defenderFullHealth, false, defenderBelowHalf );
+        };
+
+        return scenario( false, true, false ) * 0.25 + scenario( false, false, false ) * 0.40
+               + scenario( false, false, true ) * 0.20 + scenario( true, false, false ) * 0.15;
+    };
+    const double meleeDamageTakenFactor = expectedDamageTakenFactor( false );
+    const double rangedDamageTakenFactor = expectedDamageTakenFactor( true );
+    const double averageDamageTakenFactor
+        = std::max( 0.30, ( meleeDamageTakenFactor + rangedDamageTakenFactor ) * 0.5 * evasionDamageTakenFactor );
+    const double durabilityFactor = 1.0 / averageDamageTakenFactor;
+
+    const double sustainPercent = fheroes2::RPG::lifeStealPercent( armyColor ) + fheroes2::RPG::killHealPercent( armyColor ) * 0.5
+                                  + fheroes2::RPG::regenerationPercent( armyColor );
+    const double sustainFactor = 1.0 + std::min( 0.20, sustainPercent / 200.0 );
+
     const int bonusAttack = ( commander ? commander->GetAttack() : 0 ) + rpgAttackBonus;
     const int bonusDefense = ( commander ? commander->GetDefense() : 0 ) + rpgDefenseBonus;
     const int armyMorale = Morale::Normalize( GetMorale() + rpgMoraleBonus );
@@ -1322,6 +1348,27 @@ double Army::GetStrength() const
         if ( heroArchery > 0 && troop->isArchers() ) {
             strength *= sqrt( 1 + static_cast<double>( heroArchery ) / 100 );
         }
+
+        const bool isRangedTroop = troop->isArchers();
+        const auto offenseScenario = [armyColor, isRangedTroop]( const bool attackerOutnumbered, const bool defenderOutnumbered,
+                                                                 const bool attackerFullHealth, const bool defenderFullHealth,
+                                                                 const bool attackerBelowHalf, const bool defenderBelowHalf ) {
+            return fheroes2::RPG::damageMultiplier( armyColor, PlayerColor::UNUSED, isRangedTroop, attackerOutnumbered, defenderOutnumbered,
+                                                    attackerFullHealth, defenderFullHealth, attackerBelowHalf, defenderBelowHalf );
+        };
+        double offenseFactor = ( offenseScenario( false, false, true, true, false, false ) * 0.20
+                                 + offenseScenario( false, false, false, false, false, false ) * 0.30
+                                 + offenseScenario( false, false, false, false, false, true ) * 0.15
+                                 + offenseScenario( true, false, false, false, false, false ) * 0.15
+                                 + offenseScenario( false, true, false, false, false, false ) * 0.15
+                                 + offenseScenario( false, false, false, false, true, false ) * 0.05 )
+                               * criticalFactor;
+        if ( isRangedTroop ) {
+            // Close Quarters only matters when a shooter is engaged, so use a conservative
+            // strategic average rather than valuing every attack as point-blank combat.
+            offenseFactor *= 1.0 + fheroes2::RPG::rangedMeleePenaltyRecoveryPercent( armyColor ) / 400.0;
+        }
+        strength *= std::sqrt( std::max( 0.10, offenseFactor ) * durabilityFactor ) * sustainFactor;
 
         if ( troop->isAffectedByMorale() ) {
             strength *= 1 + ( ( armyMorale < 0 ) ? armyMorale / 12.0 : armyMorale / 24.0 );

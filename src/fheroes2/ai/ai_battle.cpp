@@ -281,23 +281,23 @@ namespace
 
             const uint32_t futureKilled = target.HowManyWillBeKilled( attacker.getPotentialDamage( target ) );
 
-            uint32_t ressurectPoints{ 0 };
+            double resurrectPoints{ 0.0 };
             if ( attacker.isAbilityPresent( fheroes2::MonsterAbilityType::SOUL_EATER ) ) {
-                ressurectPoints = futureKilled * attacker.Monster::GetHitPoints();
+                resurrectPoints = static_cast<double>( futureKilled ) * attacker.Monster::GetHitPoints();
             }
             else {
                 // If this assertion blows up then you changed the above logic without changing it here.
                 assert( attacker.isAbilityPresent( fheroes2::MonsterAbilityType::HP_DRAIN ) );
 
-                ressurectPoints = futureKilled * target.Monster::GetHitPoints();
-                ressurectPoints = std::min( ressurectPoints, attacker.GetMissingHitPoints() );
+                resurrectPoints = static_cast<double>( futureKilled ) * target.Monster::GetHitPoints();
+                resurrectPoints = std::min( resurrectPoints, static_cast<double>( attacker.GetMissingHitPoints() ) );
             }
 
             // The Soul Eater and HP Drain abilities affect the course of the battle in two ways:
             // 1. During the turn, the target (and other powerful troops) would need to
             //    attack the current monster (attacker) that is going to be resurrected.
             constexpr double avgNumberOfPowerfulTargets{ 1.5 };
-            attackValue += ressurectPoints / avgNumberOfPowerfulTargets;
+            attackValue += resurrectPoints / avgNumberOfPowerfulTargets;
 
             // 2. The attacker would become stronger and during the next turn would be able to make more damage.
             //    As a result, the defender's army would make less turns.
@@ -309,7 +309,8 @@ namespace
             constexpr double avgBattleTurns{ 5.0 };
 
             // *0.5 is to get average hit points of the troop in the battle.
-            const double powerRatio = 1 + std::max( ressurectPoints - allEnemiesThreat / avgNumOfAttackers, 0.0 ) / ( attacker.GetHitPoints() * 0.5 );
+            const double powerRatio
+                = 1 + std::max( resurrectPoints - allEnemiesThreat / avgNumOfAttackers, 0.0 ) / ( attacker.GetHitPoints() * 0.5 );
             const double killTimeRatio = 1 / powerRatio;
             assert( killTimeRatio <= 1 );
 
@@ -322,8 +323,10 @@ namespace
             const bool isExtraLogicAllowed = Difficulty::isBasicAIBattleLogicApplicable( Game::getDifficulty(), attacker.isControlHuman() );
             if ( isExtraLogicAllowed ) {
                 const uint32_t futureKilled = target.HowManyWillBeKilled( potentialDamage );
-                const double healEstimate = static_cast<double>( potentialDamage ) * lifeStealPercent / 100.0
-                                            + static_cast<double>( futureKilled * target.Monster::GetHitPoints() ) * killHealPercent / 100.0;
+                const uint32_t actualDamageEstimate = std::min( potentialDamage, target.GetHitPoints() );
+                const double slainHitPoints = static_cast<double>( futureKilled ) * target.Monster::GetHitPoints();
+                const double healEstimate
+                    = static_cast<double>( actualDamageEstimate ) * lifeStealPercent / 100.0 + slainHitPoints * killHealPercent / 100.0;
                 const double healPoints = std::min( healEstimate, static_cast<double>( attacker.GetMissingHitPoints() ) );
                 if ( healPoints > 0.0 ) {
                     constexpr double avgNumberOfPowerfulTargets{ 1.5 };

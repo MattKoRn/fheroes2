@@ -23,6 +23,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <ostream>
 #include <vector>
 
@@ -58,14 +59,16 @@ namespace
         const uint32_t result = Battle::Board::GetDistanceFromBoardEdgeAlongXAxis( unit.GetHeadIndex(), unit.isReflect() );
         assert( result > 0 );
 
-        return result;
+        return std::max<uint32_t>( 1, result );
     }
 
     int32_t getSpellPower( const HeroBase * hero )
     {
         assert( hero != nullptr );
 
-        return hero->GetPower() + hero->GetBagArtifacts().getTotalArtifactEffectValue( fheroes2::ArtifactBonusType::EVERY_COMBAT_SPELL_DURATION );
+        const int64_t duration = static_cast<int64_t>( hero->GetPower() )
+                                 + hero->GetBagArtifacts().getTotalArtifactEffectValue( fheroes2::ArtifactBonusType::EVERY_COMBAT_SPELL_DURATION );
+        return static_cast<int32_t>( std::clamp<int64_t>( duration, 0, std::numeric_limits<int32_t>::max() ) );
     }
 }
 
@@ -87,6 +90,11 @@ AI::SpellSelection AI::BattlePlanner::selectBestSpell( Battle::Arena & arena, co
     const Battle::Units trueFriendly( arena.getForce( _myColor ).getUnits(), Battle::Units::REMOVE_INVALID_UNITS_AND_UNITS_THAT_CHANGED_SIDES );
     const Battle::Units trueEnemies( arena.getEnemyForce( _myColor ).getUnits(), Battle::Units::REMOVE_INVALID_UNITS_AND_UNITS_THAT_CHANGED_SIDES );
 
+    if ( friendly.empty() || enemies.empty() || _myArmyStrength <= 0.0 || _enemyArmyStrength <= 0.0 || !std::isfinite( _myArmyStrength )
+         || !std::isfinite( _enemyArmyStrength ) ) {
+        return bestSpell;
+    }
+
     // Hero should conserve spellpoints if already spent more than half or his army is stronger
     // Threshold is 0.04 when armies are equal (= 20% of single unit)
     double spellValueThreshold = _myArmyStrength * _myArmyStrength / _enemyArmyStrength * 0.04;
@@ -101,7 +109,11 @@ AI::SpellSelection AI::BattlePlanner::selectBestSpell( Battle::Arena & arena, co
         // Diminish spell effectiveness based on spell point cost
         // 1. Divide cost by 3 to make level 1 spells a baseline (1:1)
         // 2. Use square root to make sure relationship isn't linear for high-level spells
-        const double spellPointValue = retreating ? outcome.value : outcome.value / sqrt( spell.spellPoints( _commander ) / 3.0 );
+        const double spellPointCost = std::max<uint32_t>( 1, spell.spellPoints( _commander ) );
+        const double spellPointValue = retreating ? outcome.value : outcome.value / sqrt( spellPointCost / 3.0 );
+        if ( !std::isfinite( spellPointValue ) ) {
+            return;
+        }
         const bool ignoreThreshold = retreating || spell.isResurrect();
 
         DEBUG_LOG( DBG_BATTLE, DBG_TRACE, spell.GetName() << " value is " << spellPointValue << ", best target is " << outcome.cell )
@@ -190,8 +202,14 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
 
     const auto damageHeuristic = [this, spellDamage, &spell, retreating, &currentEnemies]( const Battle::Unit * unit, const double armyStrength,
                                                                                            const double armySpeed ) {
+        const int32_t resistancePercent = std::clamp<int32_t>( unit->GetMagicResist( spell, _commander ), 0, 100 );
+        const double resistedDamage = static_cast<double>( spellDamage ) * ( 100 - resistancePercent ) / 100.0;
         const double rpgMultiplier = fheroes2::RPG::spellMultiplier( _commander->GetColor(), unit->GetColor(), spell.GetID() );
-        const uint32_t damage = static_cast<uint32_t>( static_cast<double>( spellDamage * ( 100 - unit->GetMagicResist( spell, _commander ) ) / 100 ) * rpgMultiplier );
+        if ( !std::isfinite( rpgMultiplier ) || rpgMultiplier <= 0.0 ) {
+            return 0.0;
+        }
+        const uint32_t damage = static_cast<uint32_t>(
+            std::clamp( resistedDamage * rpgMultiplier, 0.0, static_cast<double>( std::numeric_limits<uint32_t>::max() ) ) );
 
         // If the unit is immune to this spell, then no one will be killed, no strength will be lost and the unit will not be woken up if it is disabled
         if ( damage == 0 ) {
@@ -230,11 +248,15 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
                 return 0.0;
             }
 
-            return unit->GetMonsterStrength() * unit->HowManyWillBeKilled( damage );
+            const double value = unit->GetMonsterStrength() * unit->HowManyWillBeKilled( damage );
+            return std::isfinite( value ) && value > 0.0 ? value : 0.0;
         }
 
         // If the unit will be completely destroyed, then use its full strength plus a bonus for destroying the stack.
         const uint32_t hitPoints = unit->Modes( Battle::CAP_MIRRORIMAGE ) ? 1 : unit->GetHitPoints();
+        if ( hitPoints == 0 ) {
+            return 0.0;
+        }
         if ( damage >= hitPoints ) {
             double overallStrength = unit->GetStrength();
             const double bonus = ( unit->GetSpeed() > armySpeed ) ? 0.07 : 0.035;
@@ -249,7 +271,8 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
                 }
             }
 
-            return applyTacticalPriority( overallStrength + armyStrength * bonus );
+            const double value = applyTacticalPriority( overallStrength + armyStrength * bonus );
+            return std::isfinite( value ) && value > 0.0 ? value : 0.0;
         }
 
         // Otherwise use the amount of strength lost (% of the total unit's strength)
@@ -260,7 +283,8 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
             unitPercentageLost += unitPercentageLost - 1.0;
         }
 
-        return applyTacticalPriority( unitPercentageLost * unit->GetStrength() );
+        const double value = applyTacticalPriority( unitPercentageLost * unit->GetStrength() );
+        return std::isfinite( value ) ? value : 0.0;
     };
 
     SpellcastOutcome bestOutcome;
@@ -388,7 +412,10 @@ double AI::BattlePlanner::getSpellSlowRatio( const Battle::Unit & target ) const
     }
     const uint32_t currentSpeed = target.GetSpeed( false, true );
     const uint32_t newSpeed = Speed::getSlowSpeedFromSpell( currentSpeed );
-    const uint32_t lostSpeed = currentSpeed - newSpeed; // usually 2
+    const uint32_t lostSpeed = currentSpeed > newSpeed ? currentSpeed - newSpeed : 0; // usually 2
+    if ( lostSpeed == 0 ) {
+        return 0.0;
+    }
     double ratio = 0.1 * lostSpeed;
 
     if ( currentSpeed < _myArmyAverageSpeed ) {
@@ -408,7 +435,10 @@ double AI::BattlePlanner::getSpellHasteRatio( const Battle::Unit & target ) cons
 {
     const uint32_t currentSpeed = target.GetSpeed( false, true );
     const uint32_t newSpeed = Speed::getHasteSpeedFromSpell( currentSpeed );
-    const uint32_t gainedSpeed = newSpeed - currentSpeed; // usually 2
+    const uint32_t gainedSpeed = newSpeed > currentSpeed ? newSpeed - currentSpeed : 0; // usually 2
+    if ( gainedSpeed == 0 ) {
+        return 0.0;
+    }
     double ratio = 0.05 * gainedSpeed;
 
     if ( currentSpeed < _enemyAverageSpeed ) {
@@ -496,7 +526,9 @@ double AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::U
             // It is useless to apply Curse spell as the monster already has minimal damage.
             return 0;
         }
-        ratio = 0.15;
+        ratio = std::clamp( static_cast<double>( target.GetDamageMax() - target.GetDamageMin() )
+                                / ( static_cast<double>( target.GetDamageMax() ) + target.GetDamageMin() ),
+                            0.0, 0.5 );
         break;
     case Spell::BERSERKER: {
         if ( targetIsLast ) {
@@ -568,7 +600,9 @@ double AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::U
             // It is useless to apply Bless spell as the monster already has maximum damage.
             return 0;
         }
-        ratio = 0.15;
+        ratio = std::clamp( static_cast<double>( target.GetDamageMax() - target.GetDamageMin() )
+                                / ( static_cast<double>( target.GetDamageMax() ) + target.GetDamageMin() ),
+                            0.0, 0.5 );
         break;
     }
     case Spell::STONESKIN:
@@ -607,7 +641,7 @@ double AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::U
         }
 
         // Convert 0...5000 range into 0.0 to 0.9 ratio and clamp it
-        ratio = std::min( _enemySpellStrength / antimagicLowLimit * 0.036, ratioLimit );
+        ratio = std::clamp( _enemySpellStrength / antimagicLowLimit * 0.036, 0.0, ratioLimit );
 
         // Hero is stronger than its army, possible hit and run tactic
         if ( _enemySpellStrength > _enemyArmyStrength ) {
@@ -635,14 +669,15 @@ double AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::U
         ratio /= ReduceEffectivenessByDistance( target );
     }
     else if ( spellID == Spell::SHIELD || spellID == Spell::MASSSHIELD ) {
-        ratio = _enemyRangedUnitsOnly / _enemyArmyStrength * 0.3;
+        ratio = _enemyArmyStrength > 0.0 ? std::clamp( _enemyRangedUnitsOnly / _enemyArmyStrength, 0.0, 1.0 ) * 0.3 : 0.0;
 
         if ( target.isArchers() ) {
             ratio *= 1.25;
         }
     }
 
-    return target.GetStrength() * ratio * getEffectiveDurationMultiplier();
+    const double value = target.GetStrength() * ratio * getEffectiveDurationMultiplier();
+    return std::isfinite( value ) && value > 0.0 ? value : 0.0;
 }
 
 AI::SpellcastOutcome AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::Units & targets, const Battle::Units & enemies ) const
@@ -715,10 +750,15 @@ AI::SpellcastOutcome AI::BattlePlanner::spellResurrectValue( const Spell & spell
     SpellcastOutcome bestOutcome;
 
     const auto updateBestOutcome = [this, &spell, &bestOutcome, hpRestored]( const Battle::Unit * unit ) {
+        const uint32_t monsterHitPoints = unit->Monster::GetHitPoints();
+        if ( monsterHitPoints == 0 ) {
+            return;
+        }
+
         uint32_t missingHP = unit->GetMissingHitPoints();
         missingHP = ( missingHP < hpRestored ) ? missingHP : hpRestored;
 
-        double spellValue = missingHP * unit->GetMonsterStrength() / unit->Monster::GetHitPoints();
+        double spellValue = missingHP * unit->GetMonsterStrength() / monsterHitPoints;
 
         // Prefer restoring a stack that has not acted yet. A unit killed before its turn retains
         // that turn state when resurrected, so restoring it can immediately add another action to
@@ -738,7 +778,9 @@ AI::SpellcastOutcome AI::BattlePlanner::spellResurrectValue( const Spell & spell
             spellValue *= 2;
         }
 
-        bestOutcome.updateOutcome( spellValue, unit->GetHeadIndex() );
+        if ( std::isfinite( spellValue ) && spellValue > 0.0 ) {
+            bestOutcome.updateOutcome( spellValue, unit->GetHeadIndex() );
+        }
     };
 
     // First consider the still alive stacks
@@ -781,11 +823,19 @@ AI::SpellcastOutcome AI::BattlePlanner::spellSummonValue( const Spell & spell, c
         return {};
     }
 
-    const Troop summon( Monster( spell ), fheroes2::getSummonMonsterCount( spell, _commander->GetPower(), _commander ) );
+    const uint32_t summonCount = fheroes2::getSummonMonsterCount( spell, _commander->GetPower(), _commander );
+    if ( summonCount == 0 ) {
+        return {};
+    }
+
+    const Troop summon( Monster( spell ), summonCount );
 
     SpellcastOutcome bestOutcome;
 
     bestOutcome.value = summon.GetStrengthWithBonus( _commander->GetAttack(), _commander->GetDefense() );
+    if ( !std::isfinite( bestOutcome.value ) || bestOutcome.value <= 0.0 ) {
+        return {};
+    }
 
     // Spell is less effective if we already winning this battle
     if ( _myArmyStrength > _enemyArmyStrength * 2 ) {
@@ -817,7 +867,8 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDragonSlayerValue( const Spell & sp
         enemyArmyStrength += strength;
     }
 
-    if ( numOfSlotsWithEnemyDragons == 0 ) {
+    if ( numOfSlotsWithEnemyDragons == 0 || enemyArmyStrength <= 0.0 || dragonsStrength <= 0.0 || !std::isfinite( enemyArmyStrength )
+         || !std::isfinite( dragonsStrength ) ) {
         // This spell is useless as no Dragons exist in the enemy army.
         return {};
     }
@@ -833,6 +884,9 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDragonSlayerValue( const Spell & sp
     // If the enemy army consists of other monsters that are not Dragons then Dragon Slayer spell isn't that valuable anymore.
     const double bloodlustAttackBonus = getSpellAttackBonus( Spell::BLOODLUST );
     const double dragonSlayerAttackBonus = getSpellAttackBonus( spell );
+    if ( bloodlustAttackBonus <= 0.0 || dragonSlayerAttackBonus <= 0.0 ) {
+        return {};
+    }
 
     const double dragonSlayerRatio = bloodLustRatio * dragonSlayerAttackBonus / bloodlustAttackBonus * dragonsStrength / enemyArmyStrength;
 
@@ -1057,10 +1111,18 @@ AI::SpellcastOutcome AI::BattlePlanner::spellEarthquakeValue( const Battle::Aren
 
     const auto [minDamage, maxDamage] = Battle::Arena::getEarthquakeDamageRange( _commander );
 
-    const double enemyShooterRatio = _enemyShootersStrength / _enemyArmyStrength;
-    const double targetRatio = targetsToDestroy * 1.0 / totalTargets;
-    const double averageDamage = ( maxDamage - minDamage ) / 2.0;
-    const double meleeRatio = meleeStrength / _myArmyStrength;
+    if ( totalTargets <= 0 || targetsToDestroy <= 0 || _enemyArmyStrength <= 0.0 || _myArmyStrength <= 0.0 ) {
+        return {};
+    }
+
+    const double enemyShooterRatio = std::clamp( _enemyShootersStrength / _enemyArmyStrength, 0.0, 1.0 );
+    const double targetRatio = std::clamp( targetsToDestroy * 1.0 / totalTargets, 0.0, 1.0 );
+    const double averageDamage = ( static_cast<double>( minDamage ) + maxDamage ) / 2.0;
+    const double meleeRatio = std::clamp( meleeStrength / _myArmyStrength, 0.0, 1.0 );
+
+    if ( averageDamage <= 0.0 || enemyShooterRatio <= 0.0 || meleeRatio <= 0.0 ) {
+        return {};
+    }
 
     return { 0, meleeUnits * meleeStrength * meleeRatio * targetRatio * averageDamage * enemyShooterRatio * 0.2 };
 }
