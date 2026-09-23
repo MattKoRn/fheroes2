@@ -52,6 +52,7 @@
 #include "settings.h"
 #include "skill.h"
 #include "statusbar.h"
+#include "timing.h"
 #include "tools.h"
 #include "translations.h"
 #include "ui_button.h"
@@ -138,6 +139,10 @@ int Castle::DialogBuyHero( const Heroes * hero ) const
     display.render();
 
     LocalEvent & le = LocalEvent::Get();
+
+    const bool autoDismiss = fheroes2::isAutoPlayPopupTimeoutEnabled();
+    fheroes2::TimeDelay autoDismissDelay( fheroes2::autoPlayPopupDisplayTimeMs );
+
     while ( le.HandleEvents() ) {
         const int result = buttonGroup.processEvents();
         if ( result != Dialog::ZERO ) {
@@ -156,6 +161,10 @@ int Castle::DialogBuyHero( const Heroes * hero ) const
         }
         else if ( le.isMouseRightButtonPressedInArea( buttonCancel.area() ) ) {
             fheroes2::showStandardTextMessage( _( "Cancel" ), _( "Exit this menu without doing anything." ), Dialog::ZERO );
+        }
+
+        if ( autoDismiss && autoDismissDelay.isPassed() ) {
+            return buttonOkay.isEnabled() ? Dialog::OK : Dialog::CANCEL;
         }
     }
 
