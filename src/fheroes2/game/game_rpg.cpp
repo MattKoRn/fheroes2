@@ -1791,9 +1791,10 @@ void fheroes2::RPG::showMenu()
                           canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
 
-            drawSingleLine( "Page " + std::to_string( scrollOffsets[tab] + 1 )
-                                + "/3  [Up/Down] Select  [B/Enter] Buy  [I] Details  [O] Overview  [S] Auto  [R] Respec  [Esc] Close",
-                            area.x + 12, area.y + 337, area.width - 24, fheroes2::FontType::smallWhite() );
+            drawSingleLine( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3   Up/Down Select   B/Enter Buy   I Details   O Overview",
+                            area.x + 12, area.y + 333, area.width - 24, fheroes2::FontType::smallWhite() );
+            drawSingleLine( "S/A Steward   R Respec   Esc Close", area.x + 12, area.y + 344, area.width - 24,
+                            fheroes2::FontType::smallWhite() );
             window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
             window.renderTextAdaptedButtonSprite( respecButton, "Respec", { 0, 6 }, fheroes2::StandardWindow::Padding::BOTTOM_CENTER );
