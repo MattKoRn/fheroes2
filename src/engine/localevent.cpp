@@ -341,12 +341,11 @@ namespace EventProcessing
             setEventProcessingState( SDL_AUDIODEVICEREMOVED, false ); // supported from SDL 2.0.4
             setEventProcessingState( SDL_SENSORUPDATE, false );
 
-            // TODO: we don't process these events. Add the logic.
             setEventProcessingState( SDL_APP_TERMINATING, false );
-            setEventProcessingState( SDL_APP_WILLENTERBACKGROUND, false );
-            setEventProcessingState( SDL_APP_DIDENTERBACKGROUND, false );
-            setEventProcessingState( SDL_APP_WILLENTERFOREGROUND, false );
-            setEventProcessingState( SDL_APP_DIDENTERFOREGROUND, false );
+            setEventProcessingState( SDL_APP_WILLENTERBACKGROUND, true );
+            setEventProcessingState( SDL_APP_DIDENTERBACKGROUND, true );
+            setEventProcessingState( SDL_APP_WILLENTERFOREGROUND, true );
+            setEventProcessingState( SDL_APP_DIDENTERFOREGROUND, true );
             setEventProcessingState( SDL_DISPLAYEVENT, false );
 
             // SDL_LOCALECHANGED is supported from SDL 2.0.14
@@ -446,6 +445,13 @@ namespace EventProcessing
                         continue;
                     }
 
+                    if ( event.window.event == SDL_WINDOWEVENT_FOCUS_LOST ) {
+                        eventHandler.onApplicationFocusEvent( false );
+                    }
+                    else if ( event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED ) {
+                        eventHandler.onApplicationFocusEvent( true );
+                    }
+
                     if ( onWindowEvent( event.window ) ) {
                         updateDisplay = true;
                     }
@@ -527,6 +533,16 @@ namespace EventProcessing
                         throw ::fheroes2::UserRequestedApplicationClosure{};
                     }
                     processImmediately = false;
+                    break;
+                case SDL_APP_WILLENTERBACKGROUND:
+                case SDL_APP_DIDENTERBACKGROUND:
+                    eventHandler.onApplicationFocusEvent( false );
+                    processImmediately = false;
+                    break;
+                case SDL_APP_WILLENTERFOREGROUND:
+                case SDL_APP_DIDENTERFOREGROUND:
+                    eventHandler.onApplicationFocusEvent( true );
+                    updateDisplay = true;
                     break;
                 case SDL_APP_LOWMEMORY:
                     // According to SDL this event can only happen on Android or iOS.
@@ -1266,6 +1282,19 @@ bool LocalEvent::HandleEvents( const bool sleepAfterEventProcessing /* = true */
         return false;
     }
 
+    // Freeze game simulation while the app is not focused. Keep pumping SDL events so a
+    // foreground/focus event or quit request can still be handled.
+    while ( !_isApplicationFocused ) {
+        EventProcessing::EventEngine::sleep( 20 );
+
+        bool refreshRequired = false;
+        if ( !_engine->handleEvents( *this, allowExit, refreshRequired ) ) {
+            return false;
+        }
+
+        isDisplayRefreshRequired = isDisplayRefreshRequired || refreshRequired;
+    }
+
     if ( _engine->isControllerValid() ) {
         ProcessControllerAxisMotion();
     }
@@ -1653,6 +1682,19 @@ void LocalEvent::onRenderDeviceResetEvent()
     fheroes2::Copy( display, temp );
     display.release();
     fheroes2::Copy( temp, display );
+}
+
+void LocalEvent::onApplicationFocusEvent( const bool isFocused )
+{
+    if ( _isApplicationFocused == isFocused ) {
+        return;
+    }
+
+    _isApplicationFocused = isFocused;
+
+    if ( _globalApplicationFocusEventHook ) {
+        _globalApplicationFocusEventHook( isFocused );
+    }
 }
 
 void LocalEvent::onKeyboardEvent( const fheroes2::Key key, const int32_t keyModifier, const KeyboardEventState keyState )
