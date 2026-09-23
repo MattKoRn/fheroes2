@@ -2747,7 +2747,10 @@ int AI::Planner::getPriorityTarget( Heroes & hero, double & maxPriority )
                     assert( path.back().GetIndex() == pair.first );
 
                     const int32_t daysToReachObject = completedDaysToTarget( path, hero );
-                    if ( daysToReachObject < dayToBecomeValid ) {
+                    if ( daysToReachObject >= dayToBecomeValid ) {
+                        // Count the refreshed object's value only when the hero reaches it on or
+                        // after the day it becomes valid. Arriving earlier would still find the
+                        // object exhausted, so rewarding that route would be misleading.
                         extraValue = valueStorage.futureValue( pair, 0 );
                     }
                 }
