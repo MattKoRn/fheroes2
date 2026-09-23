@@ -31,9 +31,9 @@ namespace fheroes2::RPG
     double lifeStealPercent( PlayerColor color );
     double killHealPercent( PlayerColor color );
     double regenerationPercent( PlayerColor color );
-    uint32_t criticalChance( PlayerColor color );
+    double criticalChance( PlayerColor color );
     double criticalDamageBonusPercent( PlayerColor color );
-    uint32_t evasionChance( PlayerColor color );
+    double evasionChance( PlayerColor color );
     double rangedMeleePenaltyRecoveryPercent( PlayerColor color );
 
     double damageMultiplier( PlayerColor attacker, PlayerColor defender, bool ranged, bool attackerOutnumbered, bool defenderOutnumbered,
