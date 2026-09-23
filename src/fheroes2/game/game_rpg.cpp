@@ -563,7 +563,7 @@ namespace
         return System::concatPath( fheroes2::RPG::dataDirectory(), "rpg_profile.dat" );
     }
 
-    bool readProfile( const std::string & path, Profile & profile )
+    bool readProfile( const std::string & path, Profile & profile, std::set<uint64_t> & visitedTiles )
     {
         std::ifstream input( path );
         int version = 0;
@@ -640,12 +640,12 @@ namespace
         }
 
         candidate.autoBuy = version < profileVersion ? false : autoBuyValue != 0;
-        profile = candidate;
-        visitedActionTiles = std::move( candidateVisited );
+        profile = std::move( candidate );
+        visitedTiles = std::move( candidateVisited );
         return true;
     }
 
-    void saveProfile()
+    void saveProfile( const bool discardInvalidPrimary = false )
     {
         const std::string path = profilePath();
         const std::string tempPath = path + ".tmp";
@@ -679,19 +679,33 @@ namespace
         }
 
         const bool hadOriginal = System::IsFile( path );
+        bool movedOriginalToBackup = false;
         if ( hadOriginal ) {
-            System::Unlink( backupPath );
-            if ( std::rename( path.c_str(), backupPath.c_str() ) != 0 ) {
-                System::Unlink( tempPath );
-                return;
+            if ( discardInvalidPrimary ) {
+                // Recovery loaded a valid fallback while the primary file itself is corrupt.
+                // Never rotate that corrupt primary over the known-good persistent backup.
+                if ( !System::Unlink( path ) ) {
+                    ERROR_LOG( "Unable to remove invalid RPG profile." )
+                    return;
+                }
+            }
+            else {
+                System::Unlink( backupPath );
+                if ( std::rename( path.c_str(), backupPath.c_str() ) != 0 ) {
+                    ERROR_LOG( "Unable to rotate RPG profile backup." )
+                    return;
+                }
+                movedOriginalToBackup = true;
             }
         }
 
         if ( std::rename( tempPath.c_str(), path.c_str() ) != 0 ) {
-            if ( hadOriginal ) {
+            if ( movedOriginalToBackup ) {
                 std::rename( backupPath.c_str(), path.c_str() );
             }
-            System::Unlink( tempPath );
+            // tempPath is already a complete, validated write candidate. Keep it so the
+            // next launch can recover the newest profile instead of discarding good data.
+            ERROR_LOG( "Unable to promote temporary RPG profile." )
             return;
         }
         // Keep the previous valid profile at backupPath as a resilient fallback in case of corruption or crash.
@@ -1023,15 +1037,31 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
         }
         return firstTime > secondTime;
     } );
+    std::string loadedProfilePath;
     for ( const std::string & candidate : profileCandidates ) {
-        if ( readProfile( candidate, playerProfile ) ) {
+        Profile candidateProfile;
+        std::set<uint64_t> candidateVisited;
+        if ( readProfile( candidate, candidateProfile, candidateVisited ) ) {
+            playerProfile = std::move( candidateProfile );
+            visitedActionTiles = std::move( candidateVisited );
+            loadedProfilePath = candidate;
             break;
         }
     }
 
-    // Persist migrations immediately. In particular, this prevents a version-5 profile
-    // from being refunded repeatedly if the game exits before the first XP award.
-    saveProfile();
+    // If recovery had to fall back from a corrupt primary, do not let the recovery save
+    // rotate that corrupt file over a known-good backup. Validation uses temporary outputs
+    // so probing the primary cannot disturb the recovered profile or its visited-site set.
+    bool discardInvalidPrimary = false;
+    if ( !loadedProfilePath.empty() && loadedProfilePath != path && System::IsFile( path ) ) {
+        Profile primaryProfile;
+        std::set<uint64_t> primaryVisited;
+        discardInvalidPrimary = !readProfile( path, primaryProfile, primaryVisited );
+    }
+
+    // Persist migrations and recovered snapshots immediately. In particular, this prevents
+    // a version-5 profile from being refunded repeatedly if the game exits before the first XP award.
+    saveProfile( discardInvalidPrimary );
 
     // Temporary enemy RPG builds are deterministic for the same map/profile level and
     // scale only upgrades the player has actually purchased. This avoids fresh profiles
