@@ -68,6 +68,98 @@ namespace
 
     const int32_t defaultElementPopupButtons = Dialog::ZERO;
 
+    struct AutoPlayDialogDecision
+    {
+        int result{ Dialog::ZERO };
+        std::string text;
+    };
+
+    std::vector<AutoPlayDialogDecision> autoPlayDialogDecisionStack;
+
+    int getFallbackAutoPlayDialogDecision( const int buttons )
+    {
+        // Unknown Yes/No questions are declined by default. Explicit AI callers should
+        // always provide the real choice through AutoPlayDialogDecisionScope.
+        if ( ( buttons & Dialog::YES ) && ( buttons & Dialog::NO ) ) {
+            return Dialog::NO;
+        }
+        if ( buttons & Dialog::OK ) {
+            return Dialog::OK;
+        }
+        if ( buttons & Dialog::CANCEL ) {
+            return Dialog::CANCEL;
+        }
+        if ( buttons & Dialog::NO ) {
+            return Dialog::NO;
+        }
+        if ( buttons & Dialog::DISMISS ) {
+            return Dialog::DISMISS;
+        }
+        if ( buttons & Dialog::YES ) {
+            return Dialog::YES;
+        }
+        if ( buttons & Dialog::UPGRADE ) {
+            return Dialog::UPGRADE;
+        }
+        if ( buttons & Dialog::MAX ) {
+            return Dialog::MAX;
+        }
+        if ( buttons & Dialog::NEXT ) {
+            return Dialog::NEXT;
+        }
+        if ( buttons & Dialog::PREV ) {
+            return Dialog::PREV;
+        }
+        if ( buttons & Dialog::WORLD ) {
+            return Dialog::WORLD;
+        }
+        if ( buttons & Dialog::PUZZLE ) {
+            return Dialog::PUZZLE;
+        }
+        if ( buttons & Dialog::INFO ) {
+            return Dialog::INFO;
+        }
+        if ( buttons & Dialog::DIG ) {
+            return Dialog::DIG;
+        }
+
+        return Dialog::ZERO;
+    }
+
+    std::string getDialogDecisionName( const int result )
+    {
+        switch ( result ) {
+        case Dialog::YES:
+            return _( "Yes" );
+        case Dialog::OK:
+            return _( "Okay" );
+        case Dialog::NO:
+            return _( "No" );
+        case Dialog::CANCEL:
+            return _( "Cancel" );
+        case Dialog::DISMISS:
+            return _( "Dismiss" );
+        case Dialog::UPGRADE:
+            return _( "Upgrade" );
+        case Dialog::MAX:
+            return _( "Maximum" );
+        case Dialog::PREV:
+            return _( "Previous" );
+        case Dialog::NEXT:
+            return _( "Next" );
+        case Dialog::WORLD:
+            return _( "World" );
+        case Dialog::PUZZLE:
+            return _( "Puzzle" );
+        case Dialog::INFO:
+            return _( "Info" );
+        case Dialog::DIG:
+            return _( "Dig" );
+        default:
+            return _( "Continue" );
+        }
+    }
+
     void outputInTextSupportMode( const fheroes2::TextBase & header, const fheroes2::TextBase & body, const int buttonTypes )
     {
         START_TEXT_SUPPORT_MODE
@@ -93,6 +185,51 @@ namespace
 
 namespace fheroes2
 {
+    AutoPlayDialogDecisionScope::AutoPlayDialogDecisionScope( const int result, std::string decisionText )
+    {
+        if ( isAutoPlayPopupTimeoutEnabled() ) {
+            autoPlayDialogDecisionStack.push_back( { result, std::move( decisionText ) } );
+            _active = true;
+        }
+    }
+
+    AutoPlayDialogDecisionScope::~AutoPlayDialogDecisionScope()
+    {
+        if ( _active ) {
+            assert( !autoPlayDialogDecisionStack.empty() );
+            autoPlayDialogDecisionStack.pop_back();
+        }
+    }
+
+    int getAutoPlayDialogDecisionResult( const int buttons )
+    {
+        if ( !isAutoPlayPopupTimeoutEnabled() ) {
+            return Dialog::ZERO;
+        }
+
+        if ( !autoPlayDialogDecisionStack.empty() ) {
+            const int plannedResult = autoPlayDialogDecisionStack.back().result;
+            if ( plannedResult == Dialog::ZERO || ( buttons & plannedResult ) != 0 ) {
+                return plannedResult;
+            }
+        }
+
+        return getFallbackAutoPlayDialogDecision( buttons );
+    }
+
+    std::string getAutoPlayDialogDecisionText( const int buttons )
+    {
+        if ( !isAutoPlayPopupTimeoutEnabled() ) {
+            return {};
+        }
+
+        if ( !autoPlayDialogDecisionStack.empty() && !autoPlayDialogDecisionStack.back().text.empty() ) {
+            return autoPlayDialogDecisionStack.back().text;
+        }
+
+        return getDialogDecisionName( getAutoPlayDialogDecisionResult( buttons ) );
+    }
+
     bool isAutoPlayPopupTimeoutEnabled()
     {
         const Player * currentPlayer = Settings::Get().GetPlayers().GetCurrent();
@@ -102,6 +239,14 @@ namespace fheroes2
     int showMessage( const TextBase & header, const TextBase & body, const int buttons, const std::vector<const DialogElement *> & elements /* = {} */ )
     {
         outputInTextSupportMode( header, body, buttons );
+
+        const bool autoDismiss = isAutoPlayPopupTimeoutEnabled();
+        std::string autoDecisionMessage;
+        if ( autoDismiss ) {
+            autoDecisionMessage = _( "AI will choose in 5 seconds: %{decision}" );
+            StringReplace( autoDecisionMessage, "%{decision}", getAutoPlayDialogDecisionText( buttons ) );
+        }
+        const Text autoDecisionText( autoDecisionMessage, FontType::smallYellow() );
 
         const bool isProperDialog = ( buttons != 0 );
 
@@ -117,6 +262,11 @@ namespace fheroes2
         const int32_t bodyTextHeight = body.height( fheroes2::boxAreaWidthPx );
         if ( bodyTextHeight > 0 ) {
             overallTextHeight += bodyTextHeight + textOffsetY;
+        }
+
+        const int32_t autoDecisionTextHeight = autoDismiss ? autoDecisionText.height( fheroes2::boxAreaWidthPx ) : 0;
+        if ( autoDecisionTextHeight > 0 ) {
+            overallTextHeight += autoDecisionTextHeight + textOffsetY;
         }
 
         std::vector<int32_t> rowElementIndex;
@@ -181,6 +331,11 @@ namespace fheroes2
         header.draw( pos.x, pos.y + textOffsetY, fheroes2::boxAreaWidthPx, display );
         body.draw( pos.x, pos.y + textOffsetY + headerHeight, fheroes2::boxAreaWidthPx, display );
 
+        if ( autoDecisionTextHeight > 0 ) {
+            const int32_t decisionY = pos.y + textOffsetY + headerHeight + bodyTextHeight + ( bodyTextHeight > 0 ? textOffsetY : 0 );
+            autoDecisionText.draw( pos.x, decisionY, fheroes2::boxAreaWidthPx, display );
+        }
+
         elementHeight = overallTextHeight + textOffsetY;
         if ( bodyTextHeight > 0 ) {
             elementHeight += textOffsetY;
@@ -226,27 +381,8 @@ namespace fheroes2
         int result = Dialog::ZERO;
         LocalEvent & le = LocalEvent::Get();
 
-        const bool autoDismiss = isAutoPlayPopupTimeoutEnabled();
         TimeDelay autoDismissDelay( autoPlayPopupDisplayTimeMs );
-
-        const auto getAutoDismissResult = [buttons]() {
-            // Auto-play owns the decision while it is active. Prefer the affirmative/default
-            // action so automated turns keep progressing through normal gameplay prompts.
-            if ( buttons & Dialog::YES ) {
-                return Dialog::YES;
-            }
-            if ( buttons & Dialog::OK ) {
-                return Dialog::OK;
-            }
-            if ( buttons & Dialog::NO ) {
-                return Dialog::NO;
-            }
-            if ( buttons & Dialog::CANCEL ) {
-                return Dialog::CANCEL;
-            }
-
-            return Dialog::ZERO;
-        };
+        const int autoDismissResult = getAutoPlayDialogDecisionResult( buttons );
 
         bool delayInEventHandling = true;
 
@@ -278,7 +414,7 @@ namespace fheroes2
             }
 
             if ( autoDismiss && autoDismissDelay.isPassed() ) {
-                result = getAutoDismissResult();
+                result = autoDismissResult;
                 break;
             }
         }
