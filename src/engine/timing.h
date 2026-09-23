@@ -25,6 +25,10 @@
 
 namespace fheroes2
 {
+    // Returns a monotonic time point that does not advance while application timing is paused.
+    std::chrono::steady_clock::time_point getPausableTimePoint();
+    void setApplicationTimingPaused( bool paused );
+
     // IMPORTANT!!! According to https://en.cppreference.com/w/cpp/chrono/high_resolution_clock we should never use high_resolution_clock for time internal measurements
     // because for high_resolution_clock the time may go backwards.
 
@@ -38,20 +42,20 @@ namespace fheroes2
 
         void reset()
         {
-            _startTime = std::chrono::steady_clock::now();
+            _startTime = getPausableTimePoint();
         }
 
         // Returns time in seconds.
         double getS() const
         {
-            const std::chrono::duration<double> time = std::chrono::steady_clock::now() - _startTime;
+            const std::chrono::duration<double> time = getPausableTimePoint() - _startTime;
             return time.count();
         }
 
         // Returns rounded time in milliseconds.
         uint64_t getMs() const
         {
-            const auto time = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::steady_clock::now() - _startTime );
+            const auto time = std::chrono::duration_cast<std::chrono::milliseconds>( getPausableTimePoint() - _startTime );
             return time.count();
         }
 
@@ -87,7 +91,7 @@ namespace fheroes2
 
         bool isPassed( const uint64_t delayMs ) const
         {
-            const auto time = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::steady_clock::now() - _prevTime );
+            const auto time = std::chrono::duration_cast<std::chrono::milliseconds>( getPausableTimePoint() - _prevTime );
             const uint64_t passedMs = time.count();
             return passedMs >= delayMs;
         }
@@ -95,13 +99,13 @@ namespace fheroes2
         // Reset delay by starting the count from the current time.
         void reset()
         {
-            _prevTime = std::chrono::steady_clock::now();
+            _prevTime = getPausableTimePoint();
         }
 
         // Explicitly set delay to passed state. Can be used in cases when first call of isPassed() must return true.
         void pass()
         {
-            _prevTime = std::chrono::steady_clock::now() - std::chrono::milliseconds( 2 * _delayMs );
+            _prevTime = getPausableTimePoint() - std::chrono::milliseconds( 2 * _delayMs );
         }
 
     private:
