@@ -1581,6 +1581,7 @@ void fheroes2::RPG::showMenu()
     std::array<fheroes2::Rect, visibleRows> visibleUpgradeAreas{};
     std::array<fheroes2::Rect, visibleRows> buyAreas{};
     std::array<size_t, tabNames.size()> scrollOffsets{};
+    std::array<size_t, tabNames.size()> selectedOffsets{};
     const fheroes2::Rect statsArea( area.x + 12, area.y + 38, area.width - 24, 42 );
     const fheroes2::Rect listArea( area.x + 12, area.y + 151, area.width - 24, 181 );
     const int32_t scrollbarX = listArea.x + listArea.width - 19;
@@ -1592,6 +1593,21 @@ void fheroes2::RPG::showMenu()
     size_t tab = 0;
     bool redraw = true;
     LocalEvent & event = LocalEvent::Get();
+
+    const auto keepSelectedDoctrineVisible = [&scrollOffsets, &selectedOffsets]( const size_t tabIndex ) {
+        size_t & selectedOffset = selectedOffsets[tabIndex];
+        size_t & scrollOffset = scrollOffsets[tabIndex];
+
+        selectedOffset = std::min( selectedOffset, upgradesPerTab - 1 );
+        scrollOffset = std::min( scrollOffset, upgradesPerTab - visibleRows );
+
+        if ( selectedOffset < scrollOffset ) {
+            scrollOffset = selectedOffset;
+        }
+        else if ( selectedOffset >= scrollOffset + visibleRows ) {
+            scrollOffset = selectedOffset - visibleRows + 1;
+        }
+    };
 
     while ( event.HandleEvents() ) {
         if ( redraw ) {
@@ -1674,7 +1690,9 @@ void fheroes2::RPG::showMenu()
                 const int32_t buyWidth = 63;
                 buyAreas[row] = { rowArea.x + rowArea.width - buyWidth - 7, rowArea.y + 27, buyWidth, 20 };
                 drawBeveledPanel( buyAreas[row], !canBuy );
-                drawSingleLine( upgrades[i].name, textX, rowArea.y + 4, rowArea.width - 150, fheroes2::FontType::normalYellow() );
+                const bool isSelected = selectedOffsets[tab] == scrollOffsets[tab] + row;
+                drawSingleLine( ( isSelected ? "> " : "" ) + std::string( upgrades[i].name ), textX, rowArea.y + 4, rowArea.width - 150,
+                                fheroes2::FontType::normalYellow() );
                 drawSingleLine( "Rank " + formatNumber( playerProfile.ranks[i] ), rowArea.x + rowArea.width - 94, rowArea.y + 7, 84,
                                 fheroes2::FontType::smallWhite() );
                 drawSingleLine( upgrades[i].description, textX, rowArea.y + 21, rowArea.width - 126, fheroes2::FontType::smallWhite() );
@@ -1693,8 +1711,8 @@ void fheroes2::RPG::showMenu()
                           canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
 
-            drawText( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3   [1-8] Tabs  [S] Auto  [R] Respec  [B/Enter] Buy  [O] Info  [Esc] Close",
-                      area.x + 12, area.y + 337, area.width - 24, fheroes2::FontType::smallWhite() );
+            drawSingleLine( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3  [Up/Down] Select  [B/Enter] Buy  [S] Auto  [R] Respec  [Esc] Close",
+                            area.x + 12, area.y + 337, area.width - 24, fheroes2::FontType::smallWhite() );
             window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
             window.renderTextAdaptedButtonSprite( respecButton, "Respec", { 0, 6 }, fheroes2::StandardWindow::Padding::BOTTOM_CENTER );
@@ -1752,26 +1770,44 @@ void fheroes2::RPG::showMenu()
         }
 
         size_t & scrollOffset = scrollOffsets[tab];
-        if ( ( event.isKeyPressed( fheroes2::Key::KEY_PAGE_UP ) || event.isKeyPressed( fheroes2::Key::KEY_HOME ) ) && scrollOffset > 0 ) {
-            scrollOffset = 0;
+        if ( event.isKeyPressed( fheroes2::Key::KEY_PAGE_UP ) || event.isKeyPressed( fheroes2::Key::KEY_HOME ) ) {
+            selectedOffsets[tab] = 0;
+            keepSelectedDoctrineVisible( tab );
             redraw = true;
             continue;
         }
-        if ( ( event.isKeyPressed( fheroes2::Key::KEY_PAGE_DOWN ) || event.isKeyPressed( fheroes2::Key::KEY_END ) )
-             && scrollOffset + visibleRows < upgradesPerTab ) {
-            scrollOffset = upgradesPerTab - visibleRows;
+        if ( event.isKeyPressed( fheroes2::Key::KEY_PAGE_DOWN ) || event.isKeyPressed( fheroes2::Key::KEY_END ) ) {
+            selectedOffsets[tab] = upgradesPerTab - 1;
+            keepSelectedDoctrineVisible( tab );
             redraw = true;
             continue;
         }
-        if ( ( event.isKeyPressed( fheroes2::Key::KEY_UP ) || event.isMouseWheelUpInArea( listArea ) || event.MouseClickLeft( scrollUp.area() ) )
-             && scrollOffset > 0 ) {
+        if ( event.isKeyPressed( fheroes2::Key::KEY_UP ) ) {
+            if ( selectedOffsets[tab] > 0 ) {
+                --selectedOffsets[tab];
+                keepSelectedDoctrineVisible( tab );
+                redraw = true;
+            }
+            continue;
+        }
+        if ( event.isKeyPressed( fheroes2::Key::KEY_DOWN ) ) {
+            if ( selectedOffsets[tab] + 1 < upgradesPerTab ) {
+                ++selectedOffsets[tab];
+                keepSelectedDoctrineVisible( tab );
+                redraw = true;
+            }
+            continue;
+        }
+        if ( ( event.isMouseWheelUpInArea( listArea ) || event.MouseClickLeft( scrollUp.area() ) ) && scrollOffset > 0 ) {
             --scrollOffset;
+            selectedOffsets[tab] = std::clamp( selectedOffsets[tab], scrollOffset, scrollOffset + visibleRows - 1 );
             redraw = true;
             continue;
         }
-        if ( ( event.isKeyPressed( fheroes2::Key::KEY_DOWN ) || event.isMouseWheelDownInArea( listArea ) || event.MouseClickLeft( scrollDown.area() ) )
+        if ( ( event.isMouseWheelDownInArea( listArea ) || event.MouseClickLeft( scrollDown.area() ) )
              && scrollOffset + visibleRows < upgradesPerTab ) {
             ++scrollOffset;
+            selectedOffsets[tab] = std::clamp( selectedOffsets[tab], scrollOffset, scrollOffset + visibleRows - 1 );
             redraw = true;
             continue;
         }
@@ -1784,11 +1820,13 @@ void fheroes2::RPG::showMenu()
             const Point & cursor = event.getMouseCursorPos();
             if ( cursor.y < thumbY && scrollOffset > 0 ) {
                 --scrollOffset;
+                selectedOffsets[tab] = std::clamp( selectedOffsets[tab], scrollOffset, scrollOffset + visibleRows - 1 );
                 redraw = true;
                 continue;
             }
             if ( cursor.y > thumbY + scrollThumb.height() && scrollOffset + visibleRows < upgradesPerTab ) {
                 ++scrollOffset;
+                selectedOffsets[tab] = std::clamp( selectedOffsets[tab], scrollOffset, scrollOffset + visibleRows - 1 );
                 redraw = true;
                 continue;
             }
@@ -1804,11 +1842,13 @@ void fheroes2::RPG::showMenu()
         for ( size_t row = 0; row < visibleRows; ++row ) {
             const size_t i = tab * upgradesPerTab + scrollOffset + row;
             if ( event.isMouseRightButtonPressedInArea( visibleUpgradeAreas[row] ) || event.MouseLongPressLeft( visibleUpgradeAreas[row] ) ) {
+                selectedOffsets[tab] = scrollOffset + row;
                 showUpgradeDetails( i );
                 redraw = true;
                 break;
             }
             if ( event.MouseClickLeft( buyAreas[row] ) ) {
+                selectedOffsets[tab] = scrollOffset + row;
                 if ( buy( playerProfile, i ) ) {
                     saveProfile();
                 }
@@ -1819,6 +1859,7 @@ void fheroes2::RPG::showMenu()
                 break;
             }
             if ( event.MouseClickLeft( visibleUpgradeAreas[row] ) ) {
+                selectedOffsets[tab] = scrollOffset + row;
                 showUpgradeDetails( i );
                 redraw = true;
                 break;
@@ -1826,17 +1867,15 @@ void fheroes2::RPG::showMenu()
         }
 
         if ( event.isKeyPressed( fheroes2::Key::KEY_B ) || event.isKeyPressed( fheroes2::Key::KEY_ENTER ) || event.isKeyPressed( fheroes2::Key::KEY_SPACE ) ) {
-            for ( size_t row = 0; row < visibleRows; ++row ) {
-                const size_t i = tab * upgradesPerTab + scrollOffset + row;
-                if ( buy( playerProfile, i ) ) {
-                    saveProfile();
-                    redraw = true;
-                    break;
-                }
+            const size_t i = tab * upgradesPerTab + selectedOffsets[tab];
+            if ( buy( playerProfile, i ) ) {
+                saveProfile();
             }
-            if ( redraw ) {
-                continue;
+            else {
+                showUpgradeDetails( i );
             }
+            redraw = true;
+            continue;
         }
 
         if ( event.isMouseRightButtonPressedInArea( autoButton.area() ) || event.MouseLongPressLeft( autoButton.area() ) ) {
