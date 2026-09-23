@@ -458,6 +458,53 @@ namespace
         }
     }
 
+    long double autoBuyActivityFactor( const Profile & profile, const size_t id )
+    {
+        switch ( id ) {
+        case BLOOD_DRINKER:
+        case REAPER:
+        case MARKSMAN:
+        case BRAWLER:
+        case EXECUTIONER:
+        case OPENING_BLOW:
+        case GIANT_SLAYER:
+        case OVERWHELM:
+        case FRENZY:
+        case DISCIPLINE:
+        case ARMOR_PIERCING:
+        case ARROW_WARD:
+        case MELEE_GUARD:
+        case LAST_STAND:
+        case BULWARK:
+        case PYROMANCY:
+        case CRYOMANCY:
+        case STORMCRAFT:
+        case CATACLYSM:
+        case FIRE_WARD:
+        case COLD_WARD:
+        case STORM_WARD:
+        case CATACLYSM_WARD:
+        case LEADERSHIP:
+        case FORTUNE:
+        case REGENERATION:
+        case CRITICAL_TRAINING:
+        case BRUTAL_CRITICALS:
+        case EVASION:
+        case ARCANE_PIERCING:
+        case CLOSE_QUARTERS:
+        case UNYIELDING:
+        case RUTHLESS: {
+            // Battle-trigger history is intentionally only a modest tiebreaker. It helps the
+            // Steward deepen doctrines that are actually paying off for this profile without
+            // allowing a heavily used niche perk to overwhelm raw mechanical value per point.
+            const long double familiarity = std::log1p( static_cast<long double>( profile.useCounts[id] ) ) / 12.0L;
+            return 1.0L + std::min( 0.35L, familiarity );
+        }
+        default:
+            return 1.0L;
+        }
+    }
+
     void autoBuy( Profile & profile )
     {
         for ( size_t purchases = 0; purchases < 100000; ++purchases ) {
@@ -475,7 +522,8 @@ namespace
                     continue;
                 }
 
-                const long double marginalReturn = autoBuyUtility( profile, id ) / static_cast<long double>( cost( id, rank ) );
+                const long double marginalReturn
+                    = autoBuyUtility( profile, id ) * autoBuyActivityFactor( profile, id ) / static_cast<long double>( cost( id, rank ) );
                 if ( marginalReturn > bestReturn ) {
                     bestReturn = marginalReturn;
                     bestId = id;
@@ -1711,7 +1759,8 @@ void fheroes2::RPG::showMenu()
                           canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
 
-            drawSingleLine( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3  [Up/Down] Select  [B/Enter] Buy  [S] Auto  [R] Respec  [Esc] Close",
+            drawSingleLine( "Page " + std::to_string( scrollOffsets[tab] + 1 )
+                                + "/3  [Up/Down] Select  [B/Enter] Buy  [I] Details  [O] Overview  [S] Auto  [R] Respec  [Esc] Close",
                             area.x + 12, area.y + 337, area.width - 24, fheroes2::FontType::smallWhite() );
             window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
@@ -1832,7 +1881,13 @@ void fheroes2::RPG::showMenu()
             }
         }
 
-        if ( event.isKeyPressed( fheroes2::Key::KEY_O ) || event.isKeyPressed( fheroes2::Key::KEY_I ) || event.isMouseRightButtonPressedInArea( statsArea ) || event.MouseLongPressLeft( statsArea )
+        if ( event.isKeyPressed( fheroes2::Key::KEY_I ) ) {
+            showUpgradeDetails( tab * upgradesPerTab + selectedOffsets[tab] );
+            redraw = true;
+            continue;
+        }
+
+        if ( event.isKeyPressed( fheroes2::Key::KEY_O ) || event.isMouseRightButtonPressedInArea( statsArea ) || event.MouseLongPressLeft( statsArea )
              || event.MouseClickLeft( statsArea ) ) {
             showKingdomOverview();
             redraw = true;
@@ -1880,7 +1935,8 @@ void fheroes2::RPG::showMenu()
 
         if ( event.isMouseRightButtonPressedInArea( autoButton.area() ) || event.MouseLongPressLeft( autoButton.area() ) ) {
             fheroes2::showStandardTextMessage(
-                "Steward", "Automatically buys the available next rank with the largest immediate mechanical gain per point. Capped upgrades are skipped once another rank would add no effect.",
+                "Steward",
+                "Automatically buys the available next rank with the largest immediate mechanical gain per point. Battle-trigger history gives a modest preference to specialties your kingdom actually uses. Capped upgrades are skipped once another rank would add no effect.",
                 Dialog::ZERO );
             redraw = true;
             continue;
