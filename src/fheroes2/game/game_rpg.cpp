@@ -23,6 +23,8 @@
 #include "game_hotkeys.h"
 #include "icn.h"
 #include "image.h"
+#include "kingdom.h"
+#include "resource.h"
 #include "localevent.h"
 #include "logging.h"
 #include "mp2.h"
@@ -66,16 +68,16 @@ namespace
         { "Stormcraft", "Lightning damage" }, { "Cataclysm", "Wide-area spell damage" },
         { "Spell Ward", "All spell resistance" }, { "Fire Ward", "Fire resistance" }, { "Cold Ward", "Cold resistance" },
         { "Storm Ward", "Lightning resistance" }, { "Chaos Ward", "Wide-area resistance" },
-        { "Wisdom", "All RPG experience" }, { "Meditation", "Offline experience" }, { "Veteran", "Battle experience" },
-        { "Explorer", "Adventure experience" }, { "Mentor", "Hero-earned experience" },
-        { "Monster Hunter", "Neutral battle experience" }, { "Hero Slayer", "Enemy hero battle XP" },
-        { "Siege Master", "Castle battle experience" }, { "Defender", "Defensive battle XP" }, { "Survivor", "Lost battle experience" },
-        { "Scavenger", "Resource pickup XP" }, { "Treasure Hunter", "Chest experience" }, { "Relic Hunter", "Artifact experience" },
-        { "Prospector", "Mine capture experience" }, { "Castellan", "Castle visit experience" },
-        { "Pilgrim", "Shrine experience" }, { "Scholar", "Skill-site experience" }, { "Inspiration", "Morale and luck XP" },
-        { "Recruiter", "Dwelling experience" }, { "Storykeeper", "Map-event experience" },
-        { "Wayfarer", "Teleport experience" }, { "Mariner", "Sea travel experience" }, { "Cartographer", "Map discovery XP" },
-        { "Merchant", "Trading-post experience" }, { "Generalist", "Other adventure XP" }
+        { "War College", "Physical + spell damage" }, { "Mystic Discipline", "Spell resistance" }, { "Veteran Drills", "Physical resistance" },
+        { "Pathfinder", "Adventure cache value" }, { "Quartermaster", "Battle bounty value" },
+        { "Monster Hunter", "Gold bounty vs neutrals" }, { "Hero Slayer", "Gold bounty vs players" },
+        { "Siege Master", "Ore and gold from sieges" }, { "Defender", "Wood from defense wins" }, { "Survivor", "Gold after battle losses" },
+        { "Scavenger", "Gold from resource sites" }, { "Treasure Hunter", "Gold from treasure sites" }, { "Relic Hunter", "Gems from relic sites" },
+        { "Prospector", "Ore from production sites" }, { "Castellan", "Gold from castle visits" },
+        { "Pilgrim", "Mercury from shrines" }, { "Scholar", "Crystal from training sites" }, { "Inspiration", "Gems from morale/luck sites" },
+        { "Recruiter", "Gold from dwellings" }, { "Storykeeper", "Gold from events" },
+        { "Wayfarer", "Sulfur from portals" }, { "Mariner", "Gems from sea sites" }, { "Cartographer", "Gold from map sites" },
+        { "Merchant", "Gold from trade sites" }, { "Generalist", "Gold from other sites" }
     };
     constexpr std::array<const char *, upgradeCount> upgradeDetails{
         "Increases physical damage dealt by every troop in your kingdom's battles.",
@@ -93,33 +95,36 @@ namespace
         "Adds resistance against Cold Ray and Cold Ring damage.",
         "Adds resistance against Lightning Bolt and Chain Lightning damage.",
         "Adds resistance against Elemental Storm and Armageddon damage.",
-        "Adds a bonus to all RPG experience earned by this kingdom.",
-        "Adds a bonus to RPG experience earned from the full offline interval.",
-        "Adds a bonus to RPG experience earned from battles.",
-        "Adds a bonus to RPG experience earned from adventure-map actions.",
-        "Adds a bonus when a hero gains the game's normal hero experience.",
-        "Adds RPG experience for battles against neutral monsters.",
-        "Adds RPG experience for battles against another player's army.",
-        "Adds RPG experience when fighting at a castle, attacking or defending.",
-        "Adds RPG experience when your army defends in battle.",
-        "Adds RPG experience even when your army loses a battle.",
-        "Adds RPG experience from resource pickups and producing map objects.",
-        "Adds RPG experience from treasure and sea chests and wagons.",
-        "Adds RPG experience from artifacts, skeletons, and shipwreck survivors.",
-        "Adds RPG experience from mines, sawmills, labs, and lighthouses.",
-        "Adds RPG experience on your first action at a castle tile on a map.",
-        "Adds RPG experience from shrines and temples.",
-        "Adds RPG experience from skill-training sites, arenas, gazebos, and knowledge trees.",
-        "Adds RPG experience from morale and luck sites.",
-        "Adds RPG experience from creature dwellings and recruitment sites.",
-        "Adds RPG experience from map events, signs, sphinxes, and oracles.",
-        "Adds RPG experience from stone liths and whirlpools.",
-        "Adds RPG experience from shipwrecks, derelict ships, and sirens.",
-        "Adds RPG experience from observation towers, obelisks, maps, and Magi sites.",
-        "Adds RPG experience from trading posts and alchemist towers.",
-        "Adds RPG experience from other actionable adventure-map sites."
+        "Adds 35% of its listed effect to both physical troop damage and damaging spell power, making it a broad offensive doctrine.",
+        "Adds 50% of its listed effect to spell resistance. Combined spell resistance remains capped at 90%.",
+        "Adds 50% of its listed effect to physical resistance. Combined physical resistance remains capped at 90%.",
+        "Increases every direct resource cache generated by Spoils, Sites, and Travel upgrades by its listed effect.",
+        "Increases every conditional battle bounty and material reward generated by Battle upgrades by its listed effect.",
+        "After winning against neutral monsters, grants a gold bounty based on battle experience and this listed effect.",
+        "After winning against another player's army, grants a larger gold bounty based on battle experience and this listed effect.",
+        "After winning a castle battle, grants both gold and ore salvage. The reward scales with battle experience and this listed effect.",
+        "After winning while defending, grants wood for repairs and fortification. The reward scales with battle experience and this listed effect.",
+        "After losing a battle, grants a rebuilding gold payment based on battle experience and this listed effect.",
+        "On the first rewarded resource or producing-site action, grants bonus gold. Pathfinder increases the cache further.",
+        "On the first rewarded treasure chest, sea chest, or wagon action, grants bonus gold. Pathfinder increases the cache further.",
+        "On the first rewarded artifact, skeleton, or shipwreck-survivor action, grants bonus gems. Pathfinder increases the cache further.",
+        "On the first rewarded mine, sawmill, lab, lighthouse, or abandoned-mine action, grants bonus ore. Pathfinder increases the cache further.",
+        "On the first rewarded castle-tile action, grants a royal gold stipend. Pathfinder increases the cache further.",
+        "On the first rewarded shrine or temple action, grants bonus mercury. Pathfinder increases the cache further.",
+        "On the first rewarded skill-training, arena, gazebo, or knowledge-tree action, grants bonus crystal. Pathfinder increases the cache further.",
+        "On the first rewarded morale or luck site action, grants bonus gems. Pathfinder increases the cache further.",
+        "On the first rewarded dwelling or recruitment-site action, grants bonus gold for recruitment. Pathfinder increases the cache further.",
+        "On the first rewarded map event, sign, sphinx, or oracle action, grants bonus gold. Pathfinder increases the cache further.",
+        "On the first rewarded stone-lith or whirlpool action, grants bonus sulfur. Pathfinder increases the cache further.",
+        "On the first rewarded shipwreck, derelict-ship, or siren action, grants bonus gems. Pathfinder increases the cache further.",
+        "On the first rewarded observation tower, obelisk, map, or Magi-site action, grants bonus gold. Pathfinder increases the cache further.",
+        "On the first rewarded trading-post or alchemist-tower action, grants a large bonus gold cache. Pathfinder increases it further.",
+        "On the first rewarded adventure action not covered by another specialty, grants bonus gold. Pathfinder increases the cache further."
     };
     constexpr std::array<const char *, 8> tabNames{ "War", "Magic", "Wards", "Growth", "Battles", "Spoils", "Sites", "Travel" };
+    constexpr std::array<const char *, 8> tabPanelNames{
+        "WAR COUNCIL", "MAGE GUILD", "WARD HALL", "ROYAL ACADEMY", "BOUNTY BOARD", "TREASURY", "ADVENTURE GUILD", "WAYFARERS"
+    };
 
     struct Profile
     {
@@ -200,8 +205,29 @@ namespace
     long double effect( const size_t id, const uint64_t rank )
     {
         const long double value = static_cast<long double>( rank );
-        // Damage and XP ranks remain open-ended; only resistance approaches a safety limit.
+        // Upgrade ranks remain open-ended. Guard has its own asymptotic resistance curve;
+        // all other percentages are constrained where they are applied.
         return id == GUARD ? 75.0L * value / ( value + 50.0L ) : 5.0L * std::log1p( value );
+    }
+
+    uint32_t scaledReward( const size_t id, const uint64_t rank, const uint64_t base, const long double amplifier = 0.0L )
+    {
+        if ( rank == 0 || base == 0 ) {
+            return 0;
+        }
+
+        const long double raw = static_cast<long double>( base ) * effect( id, rank ) / 100.0L * ( 1.0L + amplifier / 100.0L );
+        const long double capped = std::min<long double>( std::numeric_limits<int32_t>::max(), std::max<long double>( 1.0L, raw ) );
+        return static_cast<uint32_t>( capped );
+    }
+
+    void grantResource( const PlayerColor color, const int resource, const uint32_t amount )
+    {
+        if ( color == PlayerColor::NONE || amount == 0 ) {
+            return;
+        }
+
+        world.GetKingdom( color ).AddFundsResource( Funds( resource, amount ) );
     }
 
     uint64_t cost( const uint64_t rank )
@@ -227,18 +253,15 @@ namespace
 
     void autoBuy( Profile & profile )
     {
-        // Marginal effect per point is the same quantity displayed in the upgrade tabs.
-        // XP upgrades receive a small weight because they compound into future level-ups.
-        // Offline-only XP is valued by the profile's observed offline share.
-        const long double totalExperience = static_cast<long double>( profile.fieldExperience ) + profile.offlineExperience;
-        const long double offlineShare = totalExperience > 0 ? static_cast<long double>( profile.offlineExperience ) / totalExperience : 0.5L;
-        const long double battleShare = totalExperience > 0 ? static_cast<long double>( profile.battleExperience ) / totalExperience : 0.3L;
-        const long double adventureShare = totalExperience > 0 ? static_cast<long double>( profile.adventureExperience ) / totalExperience : 0.3L;
-        const long double heroShare = totalExperience > 0 ? static_cast<long double>( profile.heroExperience ) / totalExperience : 0.2L;
         uint64_t battleUses = 0;
         uint64_t adventureUses = 0;
-        for ( size_t id = MONSTER_HUNTER; id <= SURVIVOR; ++id ) battleUses = saturatedAdd( battleUses, profile.useCounts[id] );
-        for ( size_t id = SCAVENGER; id < upgradeCount; ++id ) adventureUses = saturatedAdd( adventureUses, profile.useCounts[id] );
+        for ( size_t id = MONSTER_HUNTER; id <= SURVIVOR; ++id ) {
+            battleUses = saturatedAdd( battleUses, profile.useCounts[id] );
+        }
+        for ( size_t id = SCAVENGER; id < upgradeCount; ++id ) {
+            adventureUses = saturatedAdd( adventureUses, profile.useCounts[id] );
+        }
+
         for ( size_t purchases = 0; purchases < 100000; ++purchases ) {
             size_t bestId = upgradeCount;
             long double bestReturn = 0;
@@ -249,19 +272,26 @@ namespace
                     continue;
                 }
 
-                const long double weight = [id, offlineShare, battleShare, adventureShare, heroShare, battleUses, adventureUses, &profile]() -> long double {
-                    if ( id == WISDOM ) return 1.2L;
-                    if ( id == MEDITATION ) return 1.2L * offlineShare;
-                    if ( id == VETERAN ) return 1.2L * battleShare;
-                    if ( id == EXPLORER ) return 1.2L * adventureShare;
-                    if ( id == MENTOR ) return 1.2L * heroShare;
-                    if ( id >= MONSTER_HUNTER && id <= SURVIVOR )
-                        return battleShare * ( static_cast<long double>( profile.useCounts[id] ) + 1 ) / ( static_cast<long double>( battleUses ) + 5 ) * 2.5L;
-                    if ( id >= SCAVENGER )
-                        return adventureShare * ( static_cast<long double>( profile.useCounts[id] ) + 1 ) / ( static_cast<long double>( adventureUses ) + 15 ) * 5.25L;
+                const long double weight = [id, battleUses, adventureUses, &profile]() -> long double {
+                    if ( id == EXPLORER ) {
+                        return adventureUses == 0 ? 0.8L : 1.25L;
+                    }
+                    if ( id == MENTOR ) {
+                        return battleUses == 0 ? 0.8L : 1.25L;
+                    }
+                    if ( id >= MONSTER_HUNTER && id <= SURVIVOR ) {
+                        return ( static_cast<long double>( profile.useCounts[id] ) + 1.0L )
+                               / ( static_cast<long double>( battleUses ) + 5.0L ) * 5.0L;
+                    }
+                    if ( id >= SCAVENGER ) {
+                        return ( static_cast<long double>( profile.useCounts[id] ) + 1.0L )
+                               / ( static_cast<long double>( adventureUses ) + 15.0L ) * 15.0L;
+                    }
                     return 1.0L;
                 }();
-                const long double marginalReturn = weight * ( effect( id, rank + 1 ) - effect( id, rank ) ) / static_cast<long double>( cost( rank ) );
+
+                const long double marginalReturn
+                    = weight * ( effect( id, rank + 1 ) - effect( id, rank ) ) / static_cast<long double>( cost( rank ) );
                 if ( marginalReturn > bestReturn ) {
                     bestReturn = marginalReturn;
                     bestId = id;
@@ -472,8 +502,11 @@ namespace
             message += "\nNext rank costs: " + formatNumber( cost( rank ) ) + " points";
         }
         message += "\nAvailable points: " + formatNumber( playerProfile.points );
-        if ( id >= SCAVENGER ) {
-            message += "\nEach adventure tile can award RPG XP once per profile.";
+        if ( id >= MONSTER_HUNTER && id <= SURVIVOR ) {
+            message += "\nBattle rewards are paid after the matching battle condition is resolved.";
+        }
+        else if ( id >= SCAVENGER ) {
+            message += "\nAdventure resource rewards trigger at most once per map tile for this profile.";
         }
         fheroes2::showStandardTextMessage( upgrades[id].name, std::move( message ), Dialog::ZERO );
     }
@@ -574,17 +607,7 @@ uint64_t fheroes2::RPG::addExperience( const PlayerColor color, const uint64_t a
         return 0;
     }
 
-    long double bonus = effect( WISDOM, playerProfile.ranks[WISDOM] );
-    switch ( kind ) {
-    case ExperienceKind::OFFLINE: bonus += effect( MEDITATION, playerProfile.ranks[MEDITATION] ); break;
-    case ExperienceKind::BATTLE: bonus += effect( VETERAN, playerProfile.ranks[VETERAN] ); break;
-    case ExperienceKind::ADVENTURE: bonus += effect( EXPLORER, playerProfile.ranks[EXPLORER] ); break;
-    case ExperienceKind::HERO: bonus += effect( MENTOR, playerProfile.ranks[MENTOR] ); break;
-    }
-    const long double boosted = static_cast<long double>( amount ) * ( 1.0L + bonus / 100.0L );
-    const uint64_t gained = boosted >= static_cast<long double>( std::numeric_limits<uint64_t>::max() )
-                                ? std::numeric_limits<uint64_t>::max()
-                                : static_cast<uint64_t>( boosted );
+    const uint64_t gained = amount;
     const uint64_t credited = std::min( gained, std::numeric_limits<uint64_t>::max() - playerProfile.experience );
     playerProfile.experience += credited;
     playerProfile.progress = saturatedAdd( playerProfile.progress, credited );
@@ -630,25 +653,53 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
         return;
     }
 
-    long double bonus = 0;
     const bool neutral = opponent == PlayerColor::NONE;
-    bonus += effect( neutral ? MONSTER_HUNTER : HERO_SLAYER, playerProfile.ranks[neutral ? MONSTER_HUNTER : HERO_SLAYER] );
-    if ( siege ) bonus += effect( SIEGE_MASTER, playerProfile.ranks[SIEGE_MASTER] );
-    if ( defending ) bonus += effect( DEFENDER, playerProfile.ranks[DEFENDER] );
-    if ( !won ) bonus += effect( SURVIVOR, playerProfile.ranks[SURVIVOR] );
     const auto recordUse = []( const size_t id ) { playerProfile.useCounts[id] = saturatedAdd( playerProfile.useCounts[id], 1 ); };
     recordUse( neutral ? MONSTER_HUNTER : HERO_SLAYER );
-    if ( siege ) recordUse( SIEGE_MASTER );
-    if ( defending ) recordUse( DEFENDER );
-    if ( !won ) recordUse( SURVIVOR );
+    if ( siege ) {
+        recordUse( SIEGE_MASTER );
+    }
+    if ( defending ) {
+        recordUse( DEFENDER );
+    }
+    if ( !won ) {
+        recordUse( SURVIVOR );
+    }
 
     const Profile * opponentProfile = getProfile( opponent );
-    const long double challenge = opponentProfile == nullptr ? 1.0L : std::clamp( static_cast<long double>( opponentProfile->level )
-                                                                            / std::max<long double>( 1.0L, static_cast<long double>( playerProfile.level ) ), 0.5L, 2.0L );
+    const long double challenge = opponentProfile == nullptr
+                                      ? 1.0L
+                                      : std::clamp( static_cast<long double>( opponentProfile->level )
+                                                        / std::max<long double>( 1.0L, static_cast<long double>( playerProfile.level ) ),
+                                                    0.5L, 2.0L );
     const long double base = ( won ? 250.0L : 100.0L ) + static_cast<long double>( battleExperience ) * ( won ? 0.5L : 0.2L );
-    const long double earned = base * challenge * ( 1.0L + bonus / 100.0L );
+    const long double earned = base * challenge;
     addExperience( color, static_cast<uint64_t>( std::min( earned, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) ),
                    ExperienceKind::BATTLE );
+
+    const long double quartermasterBonus = effect( MENTOR, playerProfile.ranks[MENTOR] );
+    if ( won && neutral ) {
+        const uint64_t bountyBase = 1000ULL + battleExperience / 4ULL;
+        grantResource( color, Resource::GOLD, scaledReward( MONSTER_HUNTER, playerProfile.ranks[MONSTER_HUNTER], bountyBase, quartermasterBonus ) );
+    }
+    if ( won && !neutral ) {
+        const uint64_t bountyBase = 1500ULL + battleExperience / 3ULL;
+        grantResource( color, Resource::GOLD, scaledReward( HERO_SLAYER, playerProfile.ranks[HERO_SLAYER], bountyBase, quartermasterBonus ) );
+    }
+    if ( won && siege ) {
+        const uint64_t salvageGold = 1200ULL + battleExperience / 5ULL;
+        const uint64_t salvageOre = 18ULL + battleExperience / 1500ULL;
+        grantResource( color, Resource::GOLD, scaledReward( SIEGE_MASTER, playerProfile.ranks[SIEGE_MASTER], salvageGold, quartermasterBonus ) );
+        grantResource( color, Resource::ORE, scaledReward( SIEGE_MASTER, playerProfile.ranks[SIEGE_MASTER], salvageOre, quartermasterBonus ) );
+    }
+    if ( won && defending ) {
+        const uint64_t repairWood = 14ULL + battleExperience / 1800ULL;
+        grantResource( color, Resource::WOOD, scaledReward( DEFENDER, playerProfile.ranks[DEFENDER], repairWood, quartermasterBonus ) );
+    }
+    if ( !won ) {
+        const uint64_t rebuildingFund = 750ULL + battleExperience / 6ULL;
+        grantResource( color, Resource::GOLD, scaledReward( SURVIVOR, playerProfile.ranks[SURVIVOR], rebuildingFund, quartermasterBonus ) );
+    }
 }
 
 void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int objectType, const int32_t tileIndex )
@@ -700,7 +751,9 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
     case MP2::OBJ_TRADING_POST: case MP2::OBJ_ALCHEMIST_TOWER:
         upgrade = MERCHANT; base = 90; break;
     default:
-        if ( !MP2::isInGameActionObject( static_cast<MP2::MapObjectType>( objectType ), false ) ) return;
+        if ( !MP2::isInGameActionObject( static_cast<MP2::MapObjectType>( objectType ), false ) ) {
+            return;
+        }
         break;
     }
 
@@ -708,10 +761,63 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
     if ( !visitedActionTiles.insert( key ).second ) {
         return;
     }
+
     playerProfile.useCounts[upgrade] = saturatedAdd( playerProfile.useCounts[upgrade], 1 );
+
     const long double levelScale = 1.0L + std::log1p( static_cast<long double>( playerProfile.level ) ) / 5.0L;
-    const long double bonus = 1.0L + effect( upgrade, playerProfile.ranks[upgrade] ) / 100.0L;
-    addExperience( color, static_cast<uint64_t>( static_cast<long double>( base ) * levelScale * bonus ), ExperienceKind::ADVENTURE );
+    addExperience( color, static_cast<uint64_t>( static_cast<long double>( base ) * levelScale ), ExperienceKind::ADVENTURE );
+
+    const long double pathfinderBonus = effect( EXPLORER, playerProfile.ranks[EXPLORER] );
+    const uint64_t rank = playerProfile.ranks[upgrade];
+    switch ( upgrade ) {
+    case SCAVENGER:
+        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1200, pathfinderBonus ) );
+        break;
+    case TREASURE_HUNTER:
+        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 2500, pathfinderBonus ) );
+        break;
+    case RELIC_HUNTER:
+        grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 30, pathfinderBonus ) );
+        break;
+    case PROSPECTOR:
+        grantResource( color, Resource::ORE, scaledReward( upgrade, rank, 40, pathfinderBonus ) );
+        break;
+    case CASTELLAN:
+        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1800, pathfinderBonus ) );
+        break;
+    case PILGRIM:
+        grantResource( color, Resource::MERCURY, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
+        break;
+    case SCHOLAR:
+        grantResource( color, Resource::CRYSTAL, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
+        break;
+    case INSPIRATION:
+        grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
+        break;
+    case RECRUITER:
+        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1800, pathfinderBonus ) );
+        break;
+    case STORYKEEPER:
+        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1400, pathfinderBonus ) );
+        break;
+    case WAYFARER:
+        grantResource( color, Resource::SULFUR, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
+        break;
+    case MARINER:
+        grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 25, pathfinderBonus ) );
+        break;
+    case CARTOGRAPHER:
+        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1800, pathfinderBonus ) );
+        break;
+    case MERCHANT:
+        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 3000, pathfinderBonus ) );
+        break;
+    case GENERALIST:
+        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1000, pathfinderBonus ) );
+        break;
+    default:
+        break;
+    }
 }
 
 double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const PlayerColor defender, const bool ranged, const bool outnumbered )
@@ -721,13 +827,21 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
     long double attackBonus = 0;
     if ( attackProfile != nullptr ) {
         attackBonus += effect( MIGHT, attackProfile->ranks[MIGHT] );
+        attackBonus += effect( WISDOM, attackProfile->ranks[WISDOM] ) * 0.35L;
         const size_t style = ranged ? MARKSMAN : DUELIST;
         attackBonus += effect( style, attackProfile->ranks[style] );
         if ( outnumbered ) {
             attackBonus += effect( UNDERDOG, attackProfile->ranks[UNDERDOG] );
         }
     }
-    const long double defenseReduction = defenseProfile == nullptr ? 0 : effect( GUARD, defenseProfile->ranks[GUARD] );
+
+    long double defenseReduction = 0;
+    if ( defenseProfile != nullptr ) {
+        defenseReduction += effect( GUARD, defenseProfile->ranks[GUARD] );
+        defenseReduction += effect( VETERAN, defenseProfile->ranks[VETERAN] ) * 0.5L;
+    }
+    defenseReduction = std::min<long double>( defenseReduction, 90.0L );
+
     return static_cast<double>( ( 1.0L + attackBonus / 100.0L ) * ( 1.0L - defenseReduction / 100.0L ) );
 }
 
@@ -750,6 +864,12 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
     }();
     long double spellBonus = attackProfile == nullptr ? 0 : effect( SORCERY, attackProfile->ranks[SORCERY] );
     long double defenseReduction = defenseProfile == nullptr ? 0 : effect( SPELL_WARD, defenseProfile->ranks[SPELL_WARD] );
+    if ( attackProfile != nullptr ) {
+        spellBonus += effect( WISDOM, attackProfile->ranks[WISDOM] ) * 0.35L;
+    }
+    if ( defenseProfile != nullptr ) {
+        defenseReduction += effect( MEDITATION, defenseProfile->ranks[MEDITATION] ) * 0.5L;
+    }
     if ( specialization != upgradeCount ) {
         if ( attackProfile != nullptr ) {
             spellBonus += effect( specialization, attackProfile->ranks[specialization] );
@@ -776,7 +896,7 @@ void fheroes2::RPG::showMenu()
 
     const CursorRestorer cursorRestorer( true, ::Cursor::POINTER );
     fheroes2::Display & display = fheroes2::Display::instance();
-    fheroes2::StandardWindow window( 420, 378, true, display );
+    fheroes2::StandardWindow window( 432, 396, true, display );
     const fheroes2::Rect area = window.activeArea();
     const bool isEvilInterface = Settings::Get().isEvilInterfaceEnabled();
     const int scrollIcn = isEvilInterface ? ICN::SCROLLE : ICN::SCROLL;
@@ -785,8 +905,8 @@ void fheroes2::RPG::showMenu()
     std::array<fheroes2::Rect, tabNames.size()> tabAreas{};
     std::array<fheroes2::Rect, visibleRows> visibleUpgradeAreas{};
     std::array<size_t, tabNames.size()> scrollOffsets{};
-    const fheroes2::Rect statsArea( area.x + 12, area.y + 29, area.width - 24, 39 );
-    const fheroes2::Rect listArea( area.x + 12, area.y + 130, area.width - 24, 193 );
+    const fheroes2::Rect statsArea( area.x + 12, area.y + 38, area.width - 24, 42 );
+    const fheroes2::Rect listArea( area.x + 12, area.y + 151, area.width - 24, 181 );
     const int32_t scrollbarX = listArea.x + listArea.width - 19;
     fheroes2::Button scrollUp( scrollbarX + 1, listArea.y + 1, scrollIcn, 0, 1 );
     fheroes2::Button scrollDown( scrollbarX + 1, listArea.y + listArea.height - 15, scrollIcn, 2, 3 );
@@ -800,41 +920,50 @@ void fheroes2::RPG::showMenu()
         if ( redraw ) {
             window.render();
             window.applyGemDecoratedCorners();
-            drawText( "KINGDOM RPG", area.x + 12, area.y + 6, area.width - 24, fheroes2::FontType::normalYellow() );
+
+            drawText( "KINGDOM RPG", area.x + 12, area.y + 4, area.width - 24, fheroes2::FontType::normalYellow() );
+            drawText( "ROYAL GUILD LEDGER", area.x + 12, area.y + 22, area.width - 24, fheroes2::FontType::smallWhite() );
+            fheroes2::Fill( display, area.x + 22, area.y + 34, area.width - 44, 1, fheroes2::GetColorId( 219, 175, 66 ) );
 
             window.applyTextBackgroundShading( statsArea );
-            drawSingleLine( "LEVEL  " + formatNumber( playerProfile.level ), statsArea.x + 12, statsArea.y + 5, statsArea.width / 2 - 18,
+            fheroes2::Fill( display, statsArea.x + 3, statsArea.y + 3, statsArea.width - 6, 1, fheroes2::GetColorId( 219, 175, 66 ) );
+            drawSingleLine( "LEVEL  " + formatNumber( playerProfile.level ), statsArea.x + 12, statsArea.y + 6, statsArea.width / 2 - 18,
                             fheroes2::FontType::smallYellow() );
-            drawSingleLine( "POINTS  " + formatNumber( playerProfile.points ), statsArea.x + statsArea.width / 2 + 5, statsArea.y + 5,
+            drawSingleLine( "UPGRADE POINTS  " + formatNumber( playerProfile.points ), statsArea.x + statsArea.width / 2 + 5, statsArea.y + 6,
                             statsArea.width / 2 - 17, fheroes2::FontType::smallYellow() );
+
             const uint64_t remainingXP = xpToNextLevel( playerProfile.level ) > playerProfile.progress
                                              ? xpToNextLevel( playerProfile.level ) - playerProfile.progress
                                              : 0;
-            drawText( "XP " + formatExperience( playerProfile.experience ) + "    " + formatExperience( remainingXP ) + " to next", statsArea.x + 8,
-                      statsArea.y + 18, statsArea.width - 16,
-                      fheroes2::FontType::smallWhite() );
+            drawText( "Renown " + formatExperience( playerProfile.experience ) + "    " + formatExperience( remainingXP ) + " to next level",
+                      statsArea.x + 8, statsArea.y + 20, statsArea.width - 16, fheroes2::FontType::smallWhite() );
+
             const int32_t barWidth = statsArea.width - 24;
             const uint64_t nextLevelCost = xpToNextLevel( playerProfile.level );
-            const long double progressRatio = nextLevelCost == 0 ? 0.0L : std::min( 1.0L, static_cast<long double>( playerProfile.progress ) / nextLevelCost );
-            fheroes2::Fill( display, statsArea.x + 12, statsArea.y + 34, barWidth, 2, fheroes2::GetColorId( 53, 42, 32 ) );
-            fheroes2::Fill( display, statsArea.x + 12, statsArea.y + 34, static_cast<int32_t>( barWidth * progressRatio ), 2,
+            const long double progressRatio
+                = nextLevelCost == 0 ? 0.0L : std::min( 1.0L, static_cast<long double>( playerProfile.progress ) / nextLevelCost );
+            fheroes2::Fill( display, statsArea.x + 12, statsArea.y + 36, barWidth, 3, fheroes2::GetColorId( 53, 42, 32 ) );
+            fheroes2::Fill( display, statsArea.x + 12, statsArea.y + 36, static_cast<int32_t>( barWidth * progressRatio ), 3,
                             fheroes2::GetColorId( 219, 175, 66 ) );
 
             for ( size_t i = 0; i < tabNames.size(); ++i ) {
-                tabAreas[i] = { area.x + 12 + static_cast<int32_t>( i % 4 ) * 99, area.y + 74 + static_cast<int32_t>( i / 4 ) * 25, 96, 23 };
+                tabAreas[i] = { area.x + 12 + static_cast<int32_t>( i % 4 ) * 102, area.y + 87 + static_cast<int32_t>( i / 4 ) * 25, 99, 23 };
                 window.applyTextBackgroundShading( tabAreas[i] );
-                if ( i == tab ) {
-                    fheroes2::Fill( display, tabAreas[i].x + 5, tabAreas[i].y + 2, tabAreas[i].width - 10, 2,
-                                    fheroes2::GetColorId( 219, 175, 66 ) );
-                }
+                const uint8_t frameColor = i == tab ? fheroes2::GetColorId( 219, 175, 66 ) : fheroes2::GetColorId( 109, 84, 52 );
+                fheroes2::Fill( display, tabAreas[i].x + 3, tabAreas[i].y + 2, tabAreas[i].width - 6, 1, frameColor );
+                fheroes2::Fill( display, tabAreas[i].x + 3, tabAreas[i].y + tabAreas[i].height - 3, tabAreas[i].width - 6, 1, frameColor );
                 drawText( tabNames[i], tabAreas[i].x + 4, tabAreas[i].y + 5, tabAreas[i].width - 8,
                           i == tab ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
 
+            drawText( tabPanelNames[tab], area.x + 18, area.y + 137, area.width - 36, fheroes2::FontType::smallYellow() );
+
             window.applyTextBackgroundShading( listArea );
+            fheroes2::Fill( display, listArea.x + 3, listArea.y + 3, listArea.width - 6, 1, fheroes2::GetColorId( 219, 175, 66 ) );
             window.renderScrollbarBackground( { scrollbarX, listArea.y, 16, listArea.height }, isEvilInterface );
             scrollUp.draw();
             scrollDown.draw();
+
             const fheroes2::Sprite & scrollThumb = Assets::getImage( scrollIcn, 4 );
             const int32_t thumbTravel = std::max( 0, listArea.height - 38 - scrollThumb.height() );
             const int32_t thumbY = listArea.y + 19 + static_cast<int32_t>( scrollOffsets[tab] * thumbTravel / ( upgradesPerTab - visibleRows ) );
@@ -844,29 +973,30 @@ void fheroes2::RPG::showMenu()
             for ( size_t row = 0; row < visibleRows; ++row ) {
                 const size_t i = first + row;
                 fheroes2::Rect & rowArea = visibleUpgradeAreas[row];
-                rowArea = { listArea.x + 5, listArea.y + 5 + static_cast<int32_t>( row * 61 ), listArea.width - 31, 56 };
+                rowArea = { listArea.x + 5, listArea.y + 5 + static_cast<int32_t>( row * 57 ), listArea.width - 31, 52 };
                 window.applyTextBackgroundShading( rowArea );
+
                 const bool canBuy = playerProfile.ranks[i] < std::numeric_limits<uint64_t>::max()
                                     && playerProfile.points >= cost( playerProfile.ranks[i] );
                 if ( canBuy ) {
-                    fheroes2::Fill( display, rowArea.x + 3, rowArea.y + 7, 2, rowArea.height - 14, fheroes2::GetColorId( 219, 175, 66 ) );
+                    fheroes2::Fill( display, rowArea.x + 3, rowArea.y + 5, 2, rowArea.height - 10, fheroes2::GetColorId( 219, 175, 66 ) );
                 }
-                drawSingleLine( upgrades[i].name, rowArea.x + 10, rowArea.y + 5, rowArea.width - 110, fheroes2::FontType::normalYellow() );
-                drawSingleLine( "Rank " + formatNumber( playerProfile.ranks[i] ), rowArea.x + rowArea.width - 96, rowArea.y + 8, 86,
+
+                drawSingleLine( upgrades[i].name, rowArea.x + 10, rowArea.y + 4, rowArea.width - 108, fheroes2::FontType::normalYellow() );
+                drawSingleLine( "Rank " + formatNumber( playerProfile.ranks[i] ), rowArea.x + rowArea.width - 94, rowArea.y + 7, 84,
                                 fheroes2::FontType::smallWhite() );
-                drawSingleLine( upgrades[i].description, rowArea.x + 10, rowArea.y + 26, rowArea.width - 20, fheroes2::FontType::smallWhite() );
-                drawSingleLine( "+" + formatEffect( effect( i, playerProfile.ranks[i] ) ) + "   Cost "
+                drawSingleLine( upgrades[i].description, rowArea.x + 10, rowArea.y + 24, rowArea.width - 20, fheroes2::FontType::smallWhite() );
+                drawSingleLine( "Effect +" + formatEffect( effect( i, playerProfile.ranks[i] ) ) + "   Cost "
                                     + formatNumber( cost( playerProfile.ranks[i] ) ) + " pt",
-                                rowArea.x + 10, rowArea.y + 42, rowArea.width - 76,
+                                rowArea.x + 10, rowArea.y + 39, rowArea.width - 76,
                                 canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
-                drawText( "BUY", rowArea.x + rowArea.width - 60, rowArea.y + 41, 50,
+                drawText( "BUY", rowArea.x + rowArea.width - 60, rowArea.y + 38, 50,
                           canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
 
-            drawText( std::to_string( scrollOffsets[tab] + 1 ) + "-" + std::to_string( scrollOffsets[tab] + visibleRows )
-                          + " of 5   Wheel to scroll   Right-click for details",
-                      area.x + 12, area.y + 327, area.width - 24, fheroes2::FontType::smallWhite() );
-            window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Auto-buy ON" : "Auto-buy OFF", { 18, 6 },
+            drawText( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3   Wheel: scroll   Right-click: inspect",
+                      area.x + 12, area.y + 337, area.width - 24, fheroes2::FontType::smallWhite() );
+            window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
             window.renderTextAdaptedButtonSprite( closeButton, "Close", { 18, 6 }, fheroes2::StandardWindow::Padding::BOTTOM_RIGHT );
             display.render( window.totalArea() );
@@ -891,7 +1021,9 @@ void fheroes2::RPG::showMenu()
                 break;
             }
         }
-        if ( tabChanged ) continue;
+        if ( tabChanged ) {
+            continue;
+        }
 
         size_t & scrollOffset = scrollOffsets[tab];
         if ( ( event.isMouseWheelUpInArea( listArea ) || event.MouseClickLeft( scrollUp.area() ) ) && scrollOffset > 0 ) {
@@ -918,9 +1050,11 @@ void fheroes2::RPG::showMenu()
                 break;
             }
         }
+
         if ( event.isMouseRightButtonPressedInArea( autoButton.area() ) ) {
-            fheroes2::showStandardTextMessage( "Auto-buy ROI", "Automatically buys the upgrade with the best next effect per point. Battle and adventure choices also use your activity history.",
-                                               Dialog::ZERO );
+            fheroes2::showStandardTextMessage(
+                "Steward", "Automatically buys the next rank with the best marginal effect per point. Battle and adventure specialties are weighted by how often you actually trigger them.",
+                Dialog::ZERO );
             redraw = true;
             continue;
         }
@@ -934,3 +1068,4 @@ void fheroes2::RPG::showMenu()
         }
     }
 }
+
