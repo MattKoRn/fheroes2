@@ -44,6 +44,7 @@
 #include "castle.h"
 #include "color.h"
 #include "difficulty.h"
+#include "dialog.h"
 #include "direction.h"
 #include "game.h"
 #include "game_auto_playtest.h"
@@ -78,6 +79,8 @@
 #include "skill.h"
 #include "spell.h"
 #include "spell_info.h"
+#include "translations.h"
+#include "ui_dialog.h"
 #include "visit.h"
 #include "world.h"
 
@@ -2037,6 +2040,26 @@ void AI::HeroesAction( Heroes & hero, const int32_t dst_index )
 
     const bool isHeroDisembarking = hero.isShipMaster() && tile.isSuitableForDisembarkation();
     const bool isHeroActing = isHeroDisembarking || MP2::isInGameActionObject( objectType, hero.isShipMaster() );
+
+    Player * heroPlayer = Players::Get( hero.GetColor() );
+    const bool showAutoPlayAdventurePopup
+        = isHeroActing && heroPlayer != nullptr && heroPlayer->isAIAutoControlMode() && fheroes2::isAutoPlayPopupTimeoutEnabled();
+
+    if ( showAutoPlayAdventurePopup ) {
+        std::string message = _( "Auto-play has chosen this adventure action:" );
+        message += "\n\n";
+        message += isHeroDisembarking && !MP2::isInGameActionObject( objectType, hero.isShipMaster() ) ? _( "Disembark" ) : MP2::StringObject( objectType );
+        message += "\n\n";
+        message += _( "Continue?" );
+
+        if ( fheroes2::showStandardTextMessage( hero.GetName(), std::move( message ), Dialog::YES | Dialog::NO ) != Dialog::YES ) {
+            // A manual No is an explicit request to take control back before this action occurs.
+            heroPlayer->setAIAutoControlMode( false );
+            hero.GetPath().Reset();
+            hero.SetMove( false );
+            return;
+        }
+    }
 
     if ( isHeroActing ) {
         hero.SetModes( Heroes::ACTION );
