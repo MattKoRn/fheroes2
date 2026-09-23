@@ -444,7 +444,7 @@ namespace
             candidate.useCounts.fill( 0 );
         }
 
-        candidate.autoBuy = autoBuyValue != 0;
+        candidate.autoBuy = version < profileVersion ? false : autoBuyValue != 0;
         profile = candidate;
         visitedActionTiles = std::move( candidateVisited );
         return true;
@@ -694,6 +694,10 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     if ( !readProfile( path, playerProfile ) && !readProfile( path + ".tmp", playerProfile ) ) {
         readProfile( path + ".bak", playerProfile );
     }
+
+    // Persist migrations immediately. In particular, this prevents a version-5 profile
+    // from being refunded repeatedly if the game exits before the first XP award.
+    saveProfile();
 
     // Temporary enemy RPG builds are deterministic for the same map/profile level and
     // spend a point budget instead of receiving free ranks in every upgrade. This avoids
