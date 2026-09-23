@@ -655,9 +655,10 @@ namespace
             return;
         }
 
-        // Keep the previous valid primary as a recovery snapshot. The next save replaces this
-        // backup only after its new temporary file has been fully written, so a malformed or
-        // partially corrupted primary can still recover the last known-good offline state.
+        // The backup is only transactional. Once the new primary is installed successfully,
+        // remove the older snapshot so a future unrelated corruption cannot replay already-claimed
+        // offline time or restore stale resources.
+        System::Unlink( backupFilePath );
     }
 
     void setKingdomFundsExact( Kingdom & kingdom, const Funds & target )
