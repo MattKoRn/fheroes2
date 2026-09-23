@@ -104,6 +104,11 @@ namespace
     constexpr int64_t offlineSecondsPerDay{ 24 * 60 * 60 };
     constexpr char offlineProgressFileName[]{ "offline_progress.dat" };
 
+    PlayerColor offlineProgressActivePlayerColor{ PlayerColor::NONE };
+    int64_t offlineSuspendStartedUnix{ 0 };
+    int64_t offlineResumeElapsedSeconds{ 0 };
+    bool offlineResumePending{ false };
+
     using FundsMember = int32_t Funds::*;
 
     constexpr std::array<FundsMember, 7> offlineFundMembers{ &Funds::wood, &Funds::mercury, &Funds::ore, &Funds::sulfur,
@@ -1123,11 +1128,11 @@ namespace
         }
     }
 
-    void persistOfflineProgressSnapshot( Kingdom & kingdom )
+    void persistOfflineProgressSnapshot( Kingdom & kingdom, const int64_t snapshotUnix = 0 )
     {
         OfflineProgressData data;
         const bool hasSavedData = loadOfflineProgressData( data );
-        const int64_t now = getCurrentUnixTime();
+        const int64_t now = snapshotUnix > 0 ? snapshotUnix : getCurrentUnixTime();
 
         // Never move the offline clock backwards. A temporary system-clock rollback would
         // otherwise become a fake offline interval after the clock returns to normal.
@@ -1930,7 +1935,7 @@ namespace
         capturePersistentCreatureRoster( data, kingdom );
     }
 
-    OfflineProgressSummary applyOfflineProgress( Kingdom & kingdom )
+    OfflineProgressSummary applyOfflineProgress( Kingdom & kingdom, const int64_t elapsedOverrideSeconds = -1, const bool restorePersistentWallet = true )
     {
         OfflineProgressData data;
         const int64_t now = getCurrentUnixTime();
@@ -1944,12 +1949,19 @@ namespace
             return {};
         }
 
-        // The persistent wallet is authoritative across new maps and loaded games.
-        setKingdomFundsExact( kingdom, data.resources );
+        if ( restorePersistentWallet ) {
+            // The persistent wallet is authoritative when entering a map or loading a game.
+            setKingdomFundsExact( kingdom, data.resources );
+        }
+        else {
+            // Resume-time rewards are applied on top of the live game state so a battle, purchase
+            // or AI action completed after foregrounding can never be rolled back by offline progress.
+            data.resources = kingdom.GetFunds();
+        }
 
         OfflineProgressSummary summary;
         const int64_t previousLastSeenUnix = data.lastSeenUnix;
-        summary.elapsedSeconds = now > previousLastSeenUnix ? now - previousLastSeenUnix : 0;
+        summary.elapsedSeconds = elapsedOverrideSeconds >= 0 ? elapsedOverrideSeconds : ( now > previousLastSeenUnix ? now - previousLastSeenUnix : 0 );
         summary.stateCastles = data.stateCastles;
         summary.stateTowns = data.stateTowns;
         summary.stateHeroes = data.stateHeroes;
@@ -2116,6 +2128,19 @@ namespace
         LocalEvent::Get().reset();
 
         showOfflineRecruitmentPopup( summary );
+    }
+
+    OfflineProgressSummary consumePendingOfflineResumeProgress( Kingdom & kingdom )
+    {
+        if ( !offlineResumePending || kingdom.GetColor() != offlineProgressActivePlayerColor ) {
+            return {};
+        }
+
+        const int64_t elapsedSeconds = offlineResumeElapsedSeconds;
+        offlineResumePending = false;
+        offlineResumeElapsedSeconds = 0;
+
+        return applyOfflineProgress( kingdom, elapsedSeconds, false );
     }
 
     bool SortPlayers( const Player * player1, const Player * player2 )
