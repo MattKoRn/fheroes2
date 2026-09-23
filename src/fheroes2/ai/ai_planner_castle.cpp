@@ -448,29 +448,36 @@ void AI::Planner::reinforceCastle( Castle & castle )
         // Transfer the best troops from the garrison to the guest hero
         guestHeroArmy.JoinStrongestFromArmy( garrison );
 
-        // Check if we should leave some troops in the garrison
-        // TODO: amount of troops left could depend on region's safetyFactor
+        // Check if we should leave some troops in the garrison. The more dangerous the
+        // surrounding region is, the more field strength we are willing to reserve for defense.
         if ( const uint32_t regionID = world.getTile( castle.GetIndex() ).GetRegion();
              castle.isCastle() && _regions.at( regionID ).safetyFactor <= 100 && !garrison.isValid() ) {
+            const int safetyFactor = std::clamp( _regions.at( regionID ).safetyFactor, -100, 100 );
+
             auto [troopForTransferToGarrison, transferHalf]
-                = [guestHeroRole = guestHero->getAIRole(), &guestHeroArmy = std::as_const( guestHeroArmy )]() -> std::pair<Troop *, bool> {
+                = [guestHeroRole = guestHero->getAIRole(), safetyFactor, &guestHeroArmy = std::as_const( guestHeroArmy )]() -> std::pair<Troop *, bool> {
                 const bool isFighterRole = ( guestHeroRole == Heroes::Role::FIGHTER || guestHeroRole == Heroes::Role::CHAMPION );
+
+                // Convert safety 100..-100 into danger 0..1. Fighters/Champions keep the bulk of
+                // their power even in dangerous regions, while support heroes can leave a larger reserve.
+                const double dangerRatio = static_cast<double>( 100 - safetyFactor ) / 200.0;
+                const double reserveStrengthRatio = isFighterRole ? 0.025 + 0.075 * dangerRatio : 0.05 + 0.15 * dangerRatio;
 
                 // We need to compare a strength of troops themselves here (excluding commanding hero's stats)
                 const double troopsStrength = Troops( guestHeroArmy.getTroops() ).GetStrength();
-                const double significanceRatio = isFighterRole ? 20.0 : 10.0;
+                const double reserveStrengthLimit = troopsStrength * reserveStrengthRatio;
 
                 {
                     Troop * candidateTroop = guestHeroArmy.GetSlowestTroop();
                     assert( candidateTroop != nullptr );
 
-                    // We need to compare a strength of troops themselves here (excluding commanding hero's stats)
-                    if ( Troop( *candidateTroop ).GetStrength() <= troopsStrength / significanceRatio ) {
+                    // Prefer leaving a slow, low-value stack because this can also improve the hero's movement.
+                    if ( Troop( *candidateTroop ).GetStrength() <= reserveStrengthLimit ) {
                         return { candidateTroop, false };
                     }
                 }
 
-                // if this is an important hero, then all his troops are significant
+                // If this is an important hero, then all remaining troops are significant.
                 if ( isFighterRole ) {
                     return {};
                 }
@@ -479,9 +486,10 @@ void AI::Planner::reinforceCastle( Castle & castle )
                     Troop * candidateTroop = guestHeroArmy.GetWeakestTroop();
                     assert( candidateTroop != nullptr );
 
-                    // We need to compare a strength of troops themselves here (excluding commanding hero's stats)
-                    if ( Troop( *candidateTroop ).GetStrength() <= troopsStrength / significanceRatio ) {
-                        return { candidateTroop, true };
+                    if ( Troop( *candidateTroop ).GetStrength() <= reserveStrengthLimit ) {
+                        // In very dangerous regions leave the whole weak stack. Elsewhere half is
+                        // enough to avoid over-garrisoning at the expense of the field army.
+                        return { candidateTroop, safetyFactor > -50 };
                     }
                 }
 
