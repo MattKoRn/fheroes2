@@ -122,7 +122,8 @@ namespace Dialog
     bool inputString( const fheroes2::TextBase & title, const fheroes2::TextBase & body, std::string & result, const size_t charLimit, const bool isMultiLine,
                       const std::optional<fheroes2::SupportedLanguage> & textLanguage );
 
-    Troop RecruitMonster( const Monster & monster0, const uint32_t available, const bool allowDowngradedMonster, const int32_t windowOffsetY );
+    Troop RecruitMonster( const Monster & monster0, const uint32_t available, const bool allowDowngradedMonster, const int32_t windowOffsetY,
+                          const uint32_t selectedCount = 0 );
     void DwellingInfo( const Monster &, const uint32_t available );
     int ArmyInfo( const Troop & troop, int flags, bool isReflected = false, const int32_t windowOffsetY = 0 );
     int ArmyJoinFree( const Troop & troop );
