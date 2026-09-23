@@ -36,6 +36,7 @@
 #include "dir.h"
 #include "embedded_image.h"
 #include "exception.h"
+#include "game.h"
 #include "game_assets.h"
 #include "game_delays.h"
 #include "game_exit.h"
@@ -249,6 +250,7 @@ namespace Game
         LocalEvent & eventHandler = LocalEvent::Get();
         eventHandler.setGlobalMouseMotionEventHook( Cursor::updateCursorPosition );
         eventHandler.setGlobalKeyDownEventHook( globalKeyDownEvent );
+        eventHandler.setGlobalApplicationFocusEventHook( Game::onApplicationFocusChanged );
         eventHandler.setQuitEventProcessingHook( []() { return ( processExitEvent() == fheroes2::GameMode::QUIT_GAME ); } );
     }
 
