@@ -1476,6 +1476,18 @@ Battle::Actions AI::BattlePlanner::archerDecision( Battle::Arena & arena, const 
                 return static_cast<int32_t>( -1 );
             }
 
+            // Do not spend the turn retreating from a single threat that the shooter can remove
+            // immediately. The normal attack logic below will finish the stack and preserve both
+            // position and damage output.
+            if ( characteristics.threateningEnemiesIndexes.size() == 1 ) {
+                const Battle::Unit * threateningEnemy = arena.GetTroopBoard( *characteristics.threateningEnemiesIndexes.begin() );
+                assert( threateningEnemy != nullptr );
+
+                if ( currentUnit.getPotentialDamage( *threateningEnemy ) >= threateningEnemy->GetHitPoints() ) {
+                    return static_cast<int32_t>( -1 );
+                }
+            }
+
             const uint32_t currentUnitSpeed = currentUnit.GetSpeed();
             assert( currentUnitSpeed > Speed::STANDING );
 
