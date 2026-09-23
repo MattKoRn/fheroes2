@@ -46,6 +46,7 @@
 #include "resource.h"
 #include "screen.h"
 #include "settings.h"
+#include "timing.h"
 #include "tools.h"
 #include "translations.h"
 #include "ui_button.h"
@@ -443,6 +444,9 @@ Troop Dialog::RecruitMonster( const Monster & monster0, const uint32_t available
         }
     };
 
+    const bool autoDismiss = fheroes2::isAutoPlayPopupTimeoutEnabled();
+    fheroes2::TimeDelay autoDismissDelay( fheroes2::autoPlayPopupDisplayTimeMs );
+
     std::string typedValueBuf;
 
     // Sets the result to the specified value and resets the typed value buffer so that the result value is overwritten on subsequent keystrokes.
@@ -659,6 +663,10 @@ Troop Dialog::RecruitMonster( const Monster & monster0, const uint32_t available
             monsterSwitchRight.draw();
 
             display.render( windowActiveArea );
+        }
+
+        if ( autoDismiss && autoDismissDelay.isPassed() && buttonOk.isEnabled() ) {
+            break;
         }
     }
 
