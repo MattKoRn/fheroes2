@@ -883,6 +883,26 @@ namespace
                 rewardMessage = _( "The chest contains no usable reward." );
             }
 
+            std::string decisionText;
+            if ( goldReward ) {
+                decisionText = "Take ";
+                decisionText += std::to_string( *goldReward );
+                decisionText += " gold";
+            }
+            else if ( experienceReward ) {
+                decisionText = "Take ";
+                decisionText += std::to_string( *experienceReward );
+                decisionText += " experience";
+            }
+            else if ( artifactReward ) {
+                decisionText = "Take ";
+                decisionText += artifactReward->GetName();
+            }
+            else {
+                decisionText = "Continue";
+            }
+
+            const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::OK, std::move( decisionText ) );
             fheroes2::showStandardTextMessage( MP2::StringObject( objectType ), std::move( rewardMessage ), Dialog::OK );
         }
 
@@ -1383,6 +1403,7 @@ namespace
         }
 
         if ( fheroes2::isAutoPlayPopupTimeoutEnabled() && !mapEvent->message.empty() ) {
+            const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::OK, "Accept event outcome" );
             fheroes2::showStandardTextMessage( MP2::StringObject( MP2::OBJ_EVENT ), mapEvent->message, Dialog::OK );
         }
 
@@ -1692,6 +1713,12 @@ namespace
         }
 
         if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+            std::string decisionText = "Recruit ";
+            decisionText += std::to_string( recruitTroopCount );
+            decisionText += ' ';
+            decisionText += troop.GetPluralName( recruitTroopCount );
+            const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::OK, std::move( decisionText ) );
+
             troopToHire = Dialog::RecruitMonster( troop.GetMonster(), recruitTroopCount, false, 0 );
             if ( !troopToHire.isValid() ) {
                 return;
@@ -2089,6 +2116,10 @@ void AI::HeroesAction( Heroes & hero, const int32_t dst_index )
         message += isHeroDisembarking && !MP2::isInGameActionObject( objectType, hero.isShipMaster() ) ? _( "Disembark" ) : MP2::StringObject( objectType );
         message += "\n\n";
         message += _( "Continue?" );
+
+        std::string decisionText = "Interact with ";
+        decisionText += isHeroDisembarking && !MP2::isInGameActionObject( objectType, hero.isShipMaster() ) ? "coast" : MP2::StringObject( objectType );
+        const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::YES, std::move( decisionText ) );
 
         if ( fheroes2::showStandardTextMessage( hero.GetName(), std::move( message ), Dialog::YES | Dialog::NO ) != Dialog::YES ) {
             // A manual No is an explicit request to take control back before this action occurs.
