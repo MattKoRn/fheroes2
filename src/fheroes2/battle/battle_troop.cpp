@@ -287,7 +287,7 @@ int Battle::Unit::GetMorale() const
         --armyTroopMorale;
     }
 
-    if ( !Modes( CAP_TOWER ) ) {
+    if ( !Modes( CAP_TOWER ) && isAffectedByMorale() ) {
         armyTroopMorale += fheroes2::RPG::moraleBonus( GetColor() );
     }
 
@@ -595,9 +595,11 @@ uint32_t Battle::Unit::CalculateDamageUnit( const Unit & enemy, double dmg ) con
         dmg *= 2;
     }
 
-    int r = GetAttack() - enemy.GetDefense();
+    const int64_t attackDefenseDelta = static_cast<int64_t>( GetAttack() ) - static_cast<int64_t>( enemy.GetDefense() );
+    int r = static_cast<int>( std::clamp<int64_t>( attackDefenseDelta, std::numeric_limits<int>::min(), std::numeric_limits<int>::max() ) );
     if ( enemy.isDragons() && Modes( SP_DRAGONSLAYER ) ) {
-        r += Spell( Spell::DRAGONSLAYER ).ExtraValue();
+        const int64_t dragonSlayerDelta = static_cast<int64_t>( r ) + Spell( Spell::DRAGONSLAYER ).ExtraValue();
+        r = static_cast<int>( std::clamp<int64_t>( dragonSlayerDelta, std::numeric_limits<int>::min(), std::numeric_limits<int>::max() ) );
     }
 
     // Attack bonus is 20% to 300%
@@ -605,8 +607,8 @@ uint32_t Battle::Unit::CalculateDamageUnit( const Unit & enemy, double dmg ) con
 
     if ( !Modes( CAP_TOWER ) ) {
         const bool rangedAttack = isArchers() && !isHandFighting() && !isHandFighting( *this, enemy );
-        const uint64_t attackerStartingHitPoints = static_cast<uint64_t>( GetMaxCount() ) * Monster::GetHitPoints();
-        const uint64_t defenderStartingHitPoints = static_cast<uint64_t>( enemy.GetMaxCount() ) * enemy.Monster::GetHitPoints();
+        const uint64_t attackerStartingHitPoints = static_cast<uint64_t>( GetInitialCount() ) * Monster::GetHitPoints();
+        const uint64_t defenderStartingHitPoints = static_cast<uint64_t>( enemy.GetInitialCount() ) * enemy.Monster::GetHitPoints();
         const bool attackerFullHealth = static_cast<uint64_t>( GetHitPoints() ) == attackerStartingHitPoints;
         const bool defenderFullHealth = static_cast<uint64_t>( enemy.GetHitPoints() ) == defenderStartingHitPoints;
         const bool attackerBelowHalf = static_cast<uint64_t>( GetHitPoints() ) * 2 < attackerStartingHitPoints;
