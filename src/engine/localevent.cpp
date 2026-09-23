@@ -1691,6 +1691,7 @@ void LocalEvent::onApplicationFocusEvent( const bool isFocused )
     }
 
     _isApplicationFocused = isFocused;
+    fheroes2::setApplicationTimingPaused( !isFocused );
 
     if ( _globalApplicationFocusEventHook ) {
         _globalApplicationFocusEventHook( isFocused );
