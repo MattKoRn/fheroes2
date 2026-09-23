@@ -91,6 +91,7 @@
 #include "system.h"
 #include "tools.h"
 #include "translations.h"
+#include "ui_constants.h"
 #include "ui_dialog.h"
 #include "ui_language.h"
 #include "ui_text.h"
@@ -205,7 +206,120 @@ namespace
         uint32_t recruitedStacks{ 0 };
         uint32_t recruitmentSettlements{ 0 };
         Funds recruitmentSpent;
+        PersistentCreatureRoster recruitedCreatureRoster{};
         bool showPopup{ false };
+    };
+
+    class OfflineRecruitmentDialogElement final : public fheroes2::DialogElement
+    {
+    public:
+        explicit OfflineRecruitmentDialogElement( const PersistentCreatureRoster & roster )
+        {
+            _creatures.reserve( roster.size() );
+
+            for ( size_t monsterId = 0; monsterId < roster.size(); ++monsterId ) {
+                if ( roster[monsterId] == 0 ) {
+                    continue;
+                }
+
+                const Monster monster( static_cast<int>( monsterId ) );
+                if ( monster.isValid() ) {
+                    _creatures.emplace_back( monster, roster[monsterId] );
+                }
+            }
+
+            if ( _creatures.empty() ) {
+                _area = { fheroes2::boxAreaWidthPx, 0 };
+                return;
+            }
+
+            const int32_t columns = std::min<int32_t>( 8, static_cast<int32_t>( _creatures.size() ) );
+            const int32_t rows = ( static_cast<int32_t>( _creatures.size() ) + columns - 1 ) / columns;
+
+            // Reserve enough vertical room for the title, explanatory text, OK button and frame.
+            // The creature grid consumes only the remaining space and shrinks its icons if needed.
+            const int32_t maxGridHeight = std::max<int32_t>( 60, fheroes2::Display::instance().height() - 200 );
+            _area = { fheroes2::boxAreaWidthPx, std::min<int32_t>( rows * 34, maxGridHeight ) };
+        }
+
+        void draw( fheroes2::Image & output, const fheroes2::Point & offset ) const override
+        {
+            if ( _creatures.empty() || _area.height <= 0 ) {
+                return;
+            }
+
+            const int32_t columns = std::min<int32_t>( 8, static_cast<int32_t>( _creatures.size() ) );
+            const int32_t rows = ( static_cast<int32_t>( _creatures.size() ) + columns - 1 ) / columns;
+            const int32_t cellWidth = _area.width / columns;
+            const int32_t cellHeight = std::max<int32_t>( 1, _area.height / rows );
+
+            const fheroes2::Text sampleCountText( "x999", fheroes2::FontType::smallWhite() );
+            const int32_t countTextHeight = sampleCountText.height();
+            const int32_t maxIconWidth = std::max<int32_t>( 8, cellWidth - 4 );
+            const int32_t maxIconHeight = std::max<int32_t>( 8, cellHeight - countTextHeight - 2 );
+
+            for ( size_t i = 0; i < _creatures.size(); ++i ) {
+                const Monster & monster = _creatures[i].first;
+                const uint64_t count = _creatures[i].second;
+
+                const int32_t column = static_cast<int32_t>( i ) % columns;
+                const int32_t row = static_cast<int32_t>( i ) / columns;
+                const int32_t cellX = offset.x + column * cellWidth;
+                const int32_t cellY = offset.y + row * cellHeight;
+
+                const fheroes2::Sprite & original = Assets::getImage( ICN::MONS32, monster.GetSpriteIndex() );
+
+                int32_t iconWidth = original.width();
+                int32_t iconHeight = original.height();
+                if ( iconWidth > maxIconWidth || iconHeight > maxIconHeight ) {
+                    const double scale = std::min( static_cast<double>( maxIconWidth ) / iconWidth, static_cast<double>( maxIconHeight ) / iconHeight );
+                    iconWidth = std::max<int32_t>( 1, static_cast<int32_t>( std::floor( iconWidth * scale ) ) );
+                    iconHeight = std::max<int32_t>( 1, static_cast<int32_t>( std::floor( iconHeight * scale ) ) );
+
+                    fheroes2::Sprite resized( iconWidth, iconHeight );
+                    fheroes2::Resize( original, resized );
+                    fheroes2::Blit( resized, output, cellX + ( cellWidth - iconWidth ) / 2, cellY );
+                }
+                else {
+                    fheroes2::Blit( original, output, cellX + ( cellWidth - iconWidth ) / 2, cellY );
+                }
+
+                const fheroes2::Text countText( "x" + fheroes2::abbreviateNumber( count ), fheroes2::FontType::smallWhite() );
+                countText.draw( cellX + ( cellWidth - countText.width() ) / 2, cellY + cellHeight - countText.height(), output );
+            }
+        }
+
+        void processEvents( const fheroes2::Point & offset ) const override
+        {
+            if ( _creatures.empty() || _area.height <= 0 ) {
+                return;
+            }
+
+            const int32_t columns = std::min<int32_t>( 8, static_cast<int32_t>( _creatures.size() ) );
+            const int32_t rows = ( static_cast<int32_t>( _creatures.size() ) + columns - 1 ) / columns;
+            const int32_t cellWidth = _area.width / columns;
+            const int32_t cellHeight = std::max<int32_t>( 1, _area.height / rows );
+
+            LocalEvent & eventHandler = LocalEvent::Get();
+            for ( size_t i = 0; i < _creatures.size(); ++i ) {
+                const int32_t column = static_cast<int32_t>( i ) % columns;
+                const int32_t row = static_cast<int32_t>( i ) / columns;
+                const fheroes2::Rect cellRoi{ offset.x + column * cellWidth, offset.y + row * cellHeight, cellWidth, cellHeight };
+
+                if ( eventHandler.isMouseRightButtonPressedInArea( cellRoi ) ) {
+                    Dialog::ArmyInfo( Troop{ _creatures[i].first, 0 }, Dialog::ZERO );
+                    return;
+                }
+            }
+        }
+
+        void showPopup( const int /* buttons */ ) const override
+        {
+            // Individual creature details are available through right-click in processEvents().
+        }
+
+    private:
+        std::vector<std::pair<Monster, uint64_t>> _creatures;
     };
 
     int64_t getCurrentUnixTime()
@@ -1791,6 +1905,14 @@ namespace
             summary.recruitedCreatures += purchasedCount;
             ++summary.recruitedStacks;
 
+            const size_t monsterId = static_cast<size_t>( monster.GetID() );
+            if ( monsterId < summary.recruitedCreatureRoster.size() ) {
+                uint64_t & recruitedCount = summary.recruitedCreatureRoster[monsterId];
+                recruitedCount = std::numeric_limits<uint64_t>::max() - recruitedCount < purchasedCount
+                                     ? std::numeric_limits<uint64_t>::max()
+                                     : recruitedCount + purchasedCount;
+            }
+
             if ( !recruitedAtSettlement[option.settlementIndex] ) {
                 recruitedAtSettlement[option.settlementIndex] = true;
                 ++summary.recruitmentSettlements;
@@ -1932,6 +2054,26 @@ namespace
 
         fheroes2::showResourceMessage( fheroes2::Text( _( "Offline Progress" ), fheroes2::FontType::normalYellow() ),
                                        fheroes2::Text( std::move( message ), fheroes2::FontType::normalWhite() ), Dialog::OK, summary.rewards );
+    }
+
+    void showOfflineRecruitmentPopup( const OfflineProgressSummary & summary )
+    {
+        if ( !summary.showPopup ) {
+            return;
+        }
+
+        if ( summary.recruitedCreatures == 0 ) {
+            fheroes2::showStandardTextMessage( _( "Offline Recruitment" ), _( "No creatures were recruited while you were away." ), Dialog::OK );
+            return;
+        }
+
+        std::string message = _( "Recruited %{count} creatures while you were away." );
+        StringReplace( message, "%{count}", fheroes2::abbreviateNumber( summary.recruitedCreatures ) );
+        message += "\n";
+        message += _( "The number below each creature is the amount recruited. Right-click a creature for details." );
+
+        const OfflineRecruitmentDialogElement recruitedCreaturesUI( summary.recruitedCreatureRoster );
+        fheroes2::showStandardTextMessage( _( "Offline Recruitment" ), std::move( message ), Dialog::OK, { &recruitedCreaturesUI } );
     }
 
     bool SortPlayers( const Player * player1, const Player * player2 )
@@ -2607,6 +2749,7 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
     redraw( REDRAW_GAMEAREA | REDRAW_RADAR | REDRAW_ICONS | REDRAW_BUTTONS | REDRAW_STATUS | REDRAW_BORDER );
 
     showOfflineProgressPopup( offlineProgressSummary );
+    showOfflineRecruitmentPopup( offlineProgressSummary );
 
     bool isLoadedFromSave = conf.LoadedGameVersion();
     bool skipTurns = isLoadedFromSave;
