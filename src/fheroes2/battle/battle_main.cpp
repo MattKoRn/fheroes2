@@ -398,15 +398,17 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
 
     const Player * attackingPlayer = Players::Get( attackingArmy.GetColor() );
     const Player * defendingPlayer = Players::Get( defendingArmy.GetColor() );
-    const Player * currentPlayer = conf.GetPlayers().GetCurrent();
 
-    const bool attackerIsLocalAutoPlay
-        = attackingPlayer != nullptr && attackingPlayer == currentPlayer && attackingPlayer->isAIAutoControlMode();
-    const bool defenderIsLocalAutoPlay
-        = defendingPlayer != nullptr && defendingPlayer == currentPlayer && defendingPlayer->isAIAutoControlMode();
-    const bool isAutoPlayBattle = attackerIsLocalAutoPlay || defenderIsLocalAutoPlay;
+    const bool attackerIsAutoPlay = attackingPlayer != nullptr && attackingPlayer->isAIAutoControlMode();
+    const bool defenderIsAutoPlay = defendingPlayer != nullptr && defendingPlayer->isAIAutoControlMode();
+    const bool isAutoPlayBattle = attackerIsAutoPlay || defenderIsAutoPlay;
 
-    const auto shouldShowLocalBattlePopup = [&conf]( const HeroBase * hero ) {
+    // During an enemy AI turn, the F8-controlled human can be the defender while another player
+    // is the current player. Keep battle/post-battle popups timed in that case without affecting
+    // battles where a genuinely manual human side is participating.
+    const fheroes2::AutoPlayPopupTimeoutScope autoPlayPopupTimeoutScope( isAutoPlayBattle && !isHumanBattle );
+
+    const auto shouldShowLocalBattlePopup = []( const HeroBase * hero ) {
         if ( hero == nullptr ) {
             return false;
         }
@@ -414,9 +416,8 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
             return true;
         }
 
-        const Player * currentPlayer = conf.GetPlayers().GetCurrent();
         const Player * player = Players::Get( hero->GetColor() );
-        return player != nullptr && player == currentPlayer && player->isAIAutoControlMode();
+        return player != nullptr && player->isAIAutoControlMode();
     };
 
     // Auto-play battles are never auto-resolved. They are shown in full while the battle AI
