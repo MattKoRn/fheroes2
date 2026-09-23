@@ -44,6 +44,7 @@ namespace
 {
     constexpr size_t upgradeCount = 40;
     constexpr uint64_t pointsPerLevel = 5;
+    constexpr int profileVersion = 6;
     enum UpgradeId : size_t
     {
         ARMS_TRAINING, ARMOR_TRAINING, VETERAN_CORE, BLOOD_DRINKER, REAPER,
@@ -168,6 +169,24 @@ namespace
         return a > std::numeric_limits<uint64_t>::max() - b ? std::numeric_limits<uint64_t>::max() : a + b;
     }
 
+    uint64_t saturatedMultiply( const uint64_t a, const uint64_t b )
+    {
+        if ( a == 0 || b == 0 ) {
+            return 0;
+        }
+        return a > std::numeric_limits<uint64_t>::max() / b ? std::numeric_limits<uint64_t>::max() : a * b;
+    }
+
+    uint64_t legacyRankInvestment( const uint64_t rank )
+    {
+        // Profiles up to version 5 used cost(rank) = 1 + rank / 10.
+        const uint64_t completeGroups = rank / 10;
+        const uint64_t remainder = rank % 10;
+        const uint64_t groupSteps
+            = completeGroups == 0 ? 0 : saturatedMultiply( 5, saturatedMultiply( completeGroups, completeGroups - 1 ) );
+        return saturatedAdd( rank, saturatedAdd( groupSteps, saturatedMultiply( completeGroups, remainder ) ) );
+    }
+
     uint64_t scaledValue( const uint64_t value, const int percent )
     {
         const long double result = static_cast<long double>( value ) * percent / 100;
@@ -220,7 +239,7 @@ namespace
 
     long double percentEffect( const uint64_t rank )
     {
-        return 5.0L * std::log1p( static_cast<long double>( rank ) );
+        return 4.0L * std::log1p( static_cast<long double>( rank ) );
     }
 
     long double effect( const size_t id, const uint64_t rank )
@@ -232,28 +251,29 @@ namespace
         switch ( id ) {
         case ARMS_TRAINING:
         case ARMOR_TRAINING:
+            return static_cast<long double>( std::min<uint64_t>( rank, 8 ) );
         case VETERAN_CORE:
-            return static_cast<long double>( rank );
+            return static_cast<long double>( std::min<uint64_t>( rank, 4 ) );
         case LEADERSHIP:
         case FORTUNE:
             return static_cast<long double>( std::min<uint64_t>( rank, 3 ) );
         case BLOOD_DRINKER:
-            return std::min<long double>( 35.0L, 3.5L * std::log1p( static_cast<long double>( rank ) ) );
+            return std::min<long double>( 20.0L, 3.0L * std::log1p( static_cast<long double>( rank ) ) );
         case REAPER:
-            return std::min<long double>( 50.0L, 5.0L * std::log1p( static_cast<long double>( rank ) ) );
+            return std::min<long double>( 30.0L, 4.0L * std::log1p( static_cast<long double>( rank ) ) );
         case REGENERATION:
-            return std::min<long double>( 25.0L, 3.0L * std::log1p( static_cast<long double>( rank ) ) );
+            return std::min<long double>( 15.0L, 2.5L * std::log1p( static_cast<long double>( rank ) ) );
         case CRITICAL_TRAINING:
-            return std::min<long double>( 30.0L, 5.0L * std::log1p( static_cast<long double>( rank ) ) );
+            return std::min<long double>( 20.0L, 4.0L * std::log1p( static_cast<long double>( rank ) ) );
         case BRUTAL_CRITICALS:
-            return std::min<long double>( 150.0L, 10.0L * std::log1p( static_cast<long double>( rank ) ) );
+            return std::min<long double>( 100.0L, 8.0L * std::log1p( static_cast<long double>( rank ) ) );
         case EVASION:
-            return std::min<long double>( 25.0L, 3.0L * std::log1p( static_cast<long double>( rank ) ) );
+            return std::min<long double>( 15.0L, 2.5L * std::log1p( static_cast<long double>( rank ) ) );
         case ARMOR_PIERCING:
         case ARCANE_PIERCING:
-            return std::min<long double>( 75.0L, 8.0L * std::log1p( static_cast<long double>( rank ) ) );
+            return std::min<long double>( 60.0L, 6.0L * std::log1p( static_cast<long double>( rank ) ) );
         case CLOSE_QUARTERS:
-            return std::min<long double>( 100.0L, 12.0L * std::log1p( static_cast<long double>( rank ) ) );
+            return std::min<long double>( 100.0L, 10.0L * std::log1p( static_cast<long double>( rank ) ) );
         case IRON_SKIN:
         case ARROW_WARD:
         case MELEE_GUARD:
@@ -265,15 +285,34 @@ namespace
         case COLD_WARD:
         case STORM_WARD:
         case CATACLYSM_WARD:
-            return std::min<long double>( 60.0L, 4.0L * std::log1p( static_cast<long double>( rank ) ) );
+            return std::min<long double>( 50.0L, 3.5L * std::log1p( static_cast<long double>( rank ) ) );
         default:
             return percentEffect( rank );
         }
     }
 
-    uint64_t cost( const uint64_t rank )
+    uint64_t cost( const size_t id, const uint64_t rank )
     {
-        return 1 + rank / 10;
+        switch ( id ) {
+        case ARMS_TRAINING:
+        case ARMOR_TRAINING:
+            return saturatedAdd( 2, rank );
+        case VETERAN_CORE:
+            return saturatedAdd( 3, saturatedMultiply( 2, rank ) );
+        case LEADERSHIP:
+        case FORTUNE:
+            return saturatedAdd( 2, saturatedMultiply( 2, rank ) );
+        case BLOOD_DRINKER:
+        case REAPER:
+        case REGENERATION:
+            return saturatedAdd( 1, rank / 4 );
+        case CRITICAL_TRAINING:
+        case BRUTAL_CRITICALS:
+        case EVASION:
+            return saturatedAdd( 2, rank / 3 );
+        default:
+            return saturatedAdd( 1, rank / 5 );
+        }
     }
 
     bool buy( Profile & profile, const size_t id )
@@ -283,7 +322,7 @@ namespace
             return false;
         }
 
-        const uint64_t price = cost( profile.ranks[id] );
+        const uint64_t price = cost( id, profile.ranks[id] );
         if ( profile.points < price ) {
             return false;
         }
@@ -301,7 +340,8 @@ namespace
 
             for ( size_t id = 0; id < upgradeCount; ++id ) {
                 const uint64_t rank = profile.ranks[id];
-                if ( rank == std::numeric_limits<uint64_t>::max() || profile.points < cost( rank ) ) {
+                if ( rank == std::numeric_limits<uint64_t>::max() || profile.points < cost( id, rank )
+                     || effect( id, rank + 1 ) <= effect( id, rank ) ) {
                     continue;
                 }
 
@@ -310,7 +350,7 @@ namespace
                 }
 
                 const long double marginalReturn
-                    = ( effect( id, rank + 1 ) - effect( id, rank ) ) / static_cast<long double>( cost( rank ) );
+                    = ( effect( id, rank + 1 ) - effect( id, rank ) ) / static_cast<long double>( cost( id, rank ) );
                 if ( marginalReturn > bestReturn ) {
                     bestReturn = marginalReturn;
                     bestId = id;
@@ -335,7 +375,7 @@ namespace
         int autoBuyValue = 0;
         Profile candidate;
         if ( !( input >> version >> candidate.level >> candidate.experience >> candidate.progress >> candidate.points >> autoBuyValue )
-             || ( version < 1 || version > 5 )
+             || ( version < 1 || version > profileVersion )
              || candidate.level == 0 || ( autoBuyValue != 0 && autoBuyValue != 1 ) ) {
             return false;
         }
@@ -391,6 +431,19 @@ namespace
             candidate.heroExperience = candidate.fieldExperience;
         }
 
+        // Version 6 replaces the previous economy-oriented tree with combat affixes.
+        // Refund the old investment and reset the slots so legacy ranks cannot silently
+        // turn into oversized Attack, Defense, critical or sustain bonuses.
+        if ( version < profileVersion ) {
+            uint64_t refund = 0;
+            for ( const uint64_t rank : candidate.ranks ) {
+                refund = saturatedAdd( refund, legacyRankInvestment( rank ) );
+            }
+            candidate.points = saturatedAdd( candidate.points, refund );
+            candidate.ranks.fill( 0 );
+            candidate.useCounts.fill( 0 );
+        }
+
         candidate.autoBuy = autoBuyValue != 0;
         profile = candidate;
         visitedActionTiles = std::move( candidateVisited );
@@ -409,7 +462,7 @@ namespace
             return;
         }
 
-        output << "5 " << playerProfile.level << ' ' << playerProfile.experience << ' ' << playerProfile.progress << ' ' << playerProfile.points << ' '
+        output << profileVersion << ' ' << playerProfile.level << ' ' << playerProfile.experience << ' ' << playerProfile.progress << ' ' << playerProfile.points << ' '
                << static_cast<int>( playerProfile.autoBuy );
         for ( const uint64_t rank : playerProfile.ranks ) {
             output << ' ' << rank;
@@ -580,7 +633,7 @@ namespace
         message += "\nCurrent: " + shortEffectSummary( id, rank );
         if ( canAdvance ) {
             message += "\nNext rank: " + shortEffectSummary( id, rank + 1 );
-            message += "\nNext rank costs: " + formatNumber( cost( rank ) ) + " points";
+            message += "\nNext rank costs: " + formatNumber( cost( id, rank ) ) + " points";
         }
         message += "\nAvailable points: " + formatNumber( playerProfile.points );
         fheroes2::showStandardTextMessage( upgrades[id].name, std::move( message ), Dialog::ZERO );
@@ -973,7 +1026,8 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
         }
     }
 
-    defenseReduction = std::min<long double>( defenseReduction, 80.0L );
+    attackBonus = std::min<long double>( attackBonus, 100.0L );
+    defenseReduction = std::min<long double>( defenseReduction, 70.0L );
     if ( attackProfile != nullptr && defenseReduction > 0 ) {
         const long double piercing = effect( ARMOR_PIERCING, attackProfile->ranks[ARMOR_PIERCING] );
         defenseReduction *= 1.0L - piercing / 100.0L;
@@ -1018,7 +1072,8 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
         }
     }
 
-    defenseReduction = std::min<long double>( defenseReduction, 80.0L );
+    spellBonus = std::min<long double>( spellBonus, 100.0L );
+    defenseReduction = std::min<long double>( defenseReduction, 70.0L );
     if ( attackProfile != nullptr && defenseReduction > 0 ) {
         const long double piercing = effect( ARCANE_PIERCING, attackProfile->ranks[ARCANE_PIERCING] );
         defenseReduction *= 1.0L - piercing / 100.0L;
@@ -1127,7 +1182,7 @@ void fheroes2::RPG::showMenu()
 
                 const bool canBuy = playerProfile.ranks[i] < std::numeric_limits<uint64_t>::max()
                                     && effect( i, playerProfile.ranks[i] + 1 ) > effect( i, playerProfile.ranks[i] )
-                                    && playerProfile.points >= cost( playerProfile.ranks[i] );
+                                    && playerProfile.points >= cost( i, playerProfile.ranks[i] );
                 if ( canBuy ) {
                     fheroes2::Fill( display, rowArea.x + 3, rowArea.y + 5, 2, rowArea.height - 10, fheroes2::GetColorId( 219, 175, 66 ) );
                 }
@@ -1153,7 +1208,9 @@ void fheroes2::RPG::showMenu()
                 const std::string next = rankCanAdvance ? shortEffectSummary( i, rank + 1 ) : "MAX EFFECT";
                 drawSingleLine( current + " -> " + next, textX, rowArea.y + 36, rowArea.width - 130,
                                 canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
-                drawText( "BUY " + formatNumber( cost( playerProfile.ranks[i] ) ), buyAreas[row].x + 3, buyAreas[row].y + 5, buyAreas[row].width - 6,
+                const std::string buyLabel
+                    = rankCanAdvance ? "BUY " + formatNumber( cost( i, playerProfile.ranks[i] ) ) : "MAX";
+                drawText( buyLabel, buyAreas[row].x + 3, buyAreas[row].y + 5, buyAreas[row].width - 6,
                           canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
 
