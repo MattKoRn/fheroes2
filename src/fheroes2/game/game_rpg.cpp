@@ -1210,7 +1210,7 @@ void fheroes2::RPG::showMenu()
 
         if ( event.isMouseRightButtonPressedInArea( autoButton.area() ) ) {
             fheroes2::showStandardTextMessage(
-                "Steward", "Automatically buys the next rank with the best marginal effect per point. Battle and adventure specialties are weighted by how often you actually trigger them.",
+                "Steward", "Automatically buys the available next rank with the largest immediate mechanical gain per point. Capped upgrades are skipped once another rank would add no effect.",
                 Dialog::ZERO );
             redraw = true;
             continue;
