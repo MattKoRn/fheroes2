@@ -62,26 +62,26 @@ namespace
         const char * description;
     };
     constexpr std::array<UpgradeInfo, upgradeCount> upgrades{
-        UpgradeInfo{ "Might", "All army damage" }, { "Guard", "Physical resistance" }, { "Marksman", "Ranged damage" },
-        { "Duelist", "Melee damage" }, { "Underdog", "Outnumbered damage" },
-        { "Sorcery", "All spell damage" }, { "Pyromancy", "Fire spell damage" }, { "Cryomancy", "Cold spell damage" },
-        { "Stormcraft", "Lightning damage" }, { "Cataclysm", "Wide-area spell damage" },
-        { "Spell Ward", "All spell resistance" }, { "Fire Ward", "Fire resistance" }, { "Cold Ward", "Cold resistance" },
-        { "Storm Ward", "Lightning resistance" }, { "Chaos Ward", "Wide-area resistance" },
-        { "War College", "Physical + spell damage" }, { "Mystic Discipline", "Spell resistance" }, { "Veteran Drills", "Physical resistance" },
-        { "Pathfinder", "Adventure cache value" }, { "Quartermaster", "Battle bounty value" },
-        { "Monster Hunter", "Gold bounty vs neutrals" }, { "Hero Slayer", "Gold bounty vs players" },
-        { "Siege Master", "Ore and gold from sieges" }, { "Defender", "Wood from defense wins" }, { "Survivor", "Gold after battle losses" },
-        { "Scavenger", "Gold from resource sites" }, { "Treasure Hunter", "Gold from treasure sites" }, { "Relic Hunter", "Gems from relic sites" },
-        { "Prospector", "Ore from production sites" }, { "Castellan", "Gold from castle visits" },
-        { "Pilgrim", "Mercury from shrines" }, { "Scholar", "Crystal from training sites" }, { "Inspiration", "Gems from morale/luck sites" },
-        { "Recruiter", "Gold from dwellings" }, { "Storykeeper", "Gold from events" },
-        { "Wayfarer", "Sulfur from portals" }, { "Mariner", "Gems from sea sites" }, { "Cartographer", "Gold from map sites" },
-        { "Merchant", "Gold from trade sites" }, { "Generalist", "Gold from other sites" }
+        UpgradeInfo{ "Might", "All troop damage" }, { "Guard", "Physical damage resistance" }, { "Marksman", "Ranged troop damage" },
+        { "Duelist", "Melee troop damage" }, { "Underdog", "Damage while outnumbered" },
+        { "Sorcery", "All damaging spells" }, { "Pyromancy", "Fireball and Fireblast" }, { "Cryomancy", "Cold Ray and Cold Ring" },
+        { "Stormcraft", "Lightning and Chain Lightning" }, { "Cataclysm", "Storm and Armageddon" },
+        { "Spell Ward", "All spell damage resistance" }, { "Fire Ward", "Fire spell resistance" }, { "Cold Ward", "Cold spell resistance" },
+        { "Storm Ward", "Lightning resistance" }, { "Chaos Ward", "Storm and Armageddon resistance" },
+        { "War College", "Troop + spell offense" }, { "Mystic Discipline", "Spell defense doctrine" }, { "Veteran Drills", "Physical defense doctrine" },
+        { "Pathfinder", "All adventure reward bundles" }, { "Quartermaster", "All battle reward bundles" },
+        { "Monster Hunter", "Neutral bounty: gold + gems" }, { "Hero Slayer", "Player bounty: gold + crystal" },
+        { "Siege Master", "Siege salvage: gold + ore + wood" }, { "Defender", "Defense stores: wood + ore" }, { "Survivor", "Recovery: gold + wood" },
+        { "Scavenger", "Resource sites: gold + wood" }, { "Treasure Hunter", "Treasure: gold + gems" }, { "Relic Hunter", "Relics: gems + crystal" },
+        { "Prospector", "Production: ore + wood" }, { "Castellan", "Castle stipend: gold + wood" },
+        { "Pilgrim", "Shrines: mercury + gold" }, { "Scholar", "Training: crystal + mercury" }, { "Inspiration", "Morale sites: gems + gold" },
+        { "Recruiter", "Dwellings: gold + wood" }, { "Storykeeper", "Events: gold + gems" },
+        { "Wayfarer", "Portals: sulfur + mercury" }, { "Mariner", "Sea sites: gems + gold" }, { "Cartographer", "Map sites: gold + crystal" },
+        { "Merchant", "Trade stores: gold + ore + wood" }, { "Generalist", "Other sites: gold + wood" }
     };
     constexpr std::array<const char *, upgradeCount> upgradeDetails{
         "Increases physical damage dealt by every troop in your kingdom's battles.",
-        "Reduces physical damage received by your troops. Its effect approaches 75% resistance, so armies cannot become invulnerable.",
+        "Reduces physical damage received by your troops. Its curve approaches 75% before other defensive doctrine bonuses are applied.",
         "Adds physical damage when one of your troops makes a ranged attack.",
         "Adds physical damage when one of your troops attacks in melee.",
         "Adds physical damage when the attacking troop has fewer creatures than its target.",
@@ -90,38 +90,38 @@ namespace
         "Adds damage to Cold Ray and Cold Ring spells.",
         "Adds damage to Lightning Bolt and Chain Lightning spells.",
         "Adds damage to Elemental Storm and Armageddon spells.",
-        "Reduces damage received from every damaging spell. Total spell resistance cannot exceed 90%.",
+        "Reduces damage received from every damaging spell. Combined spell resistance is capped at 90%.",
         "Adds resistance against Fireball and Fireblast damage.",
         "Adds resistance against Cold Ray and Cold Ring damage.",
         "Adds resistance against Lightning Bolt and Chain Lightning damage.",
         "Adds resistance against Elemental Storm and Armageddon damage.",
-        "Adds 35% of its listed effect to both physical troop damage and damaging spell power, making it a broad offensive doctrine.",
+        "Adds 35% of its listed effect to both physical troop damage and damaging spell power, providing a broad offensive doctrine.",
         "Adds 50% of its listed effect to spell resistance. Combined spell resistance remains capped at 90%.",
         "Adds 50% of its listed effect to physical resistance. Combined physical resistance remains capped at 90%.",
-        "Increases every direct resource cache generated by Spoils, Sites, and Travel upgrades by its listed effect.",
-        "Increases every conditional battle bounty and material reward generated by Battle upgrades by its listed effect.",
-        "After winning against neutral monsters, grants a gold bounty based on battle experience and this listed effect.",
-        "After winning against another player's army, grants a larger gold bounty based on battle experience and this listed effect.",
-        "After winning a castle battle, grants both gold and ore salvage. The reward scales with battle experience and this listed effect.",
-        "After winning while defending, grants wood for repairs and fortification. The reward scales with battle experience and this listed effect.",
-        "After losing a battle, grants a rebuilding gold payment based on battle experience and this listed effect.",
-        "On the first rewarded resource or producing-site action, grants bonus gold. Pathfinder increases the cache further.",
-        "On the first rewarded treasure chest, sea chest, or wagon action, grants bonus gold. Pathfinder increases the cache further.",
-        "On the first rewarded artifact, skeleton, or shipwreck-survivor action, grants bonus gems. Pathfinder increases the cache further.",
-        "On the first rewarded mine, sawmill, lab, lighthouse, or abandoned-mine action, grants bonus ore. Pathfinder increases the cache further.",
-        "On the first rewarded castle-tile action, grants a royal gold stipend. Pathfinder increases the cache further.",
-        "On the first rewarded shrine or temple action, grants bonus mercury. Pathfinder increases the cache further.",
-        "On the first rewarded skill-training, arena, gazebo, or knowledge-tree action, grants bonus crystal. Pathfinder increases the cache further.",
-        "On the first rewarded morale or luck site action, grants bonus gems. Pathfinder increases the cache further.",
-        "On the first rewarded dwelling or recruitment-site action, grants bonus gold for recruitment. Pathfinder increases the cache further.",
-        "On the first rewarded map event, sign, sphinx, or oracle action, grants bonus gold. Pathfinder increases the cache further.",
-        "On the first rewarded stone-lith or whirlpool action, grants bonus sulfur. Pathfinder increases the cache further.",
-        "On the first rewarded shipwreck, derelict-ship, or siren action, grants bonus gems. Pathfinder increases the cache further.",
-        "On the first rewarded observation tower, obelisk, map, or Magi-site action, grants bonus gold. Pathfinder increases the cache further.",
-        "On the first rewarded trading-post or alchemist-tower action, grants a large bonus gold cache. Pathfinder increases it further.",
-        "On the first rewarded adventure action not covered by another specialty, grants bonus gold. Pathfinder increases the cache further."
+        "Amplifies every resource bundle generated by Spoils, Sites, and Travel upgrades. It improves all resources in the bundle, not RPG experience.",
+        "Amplifies every conditional battle bounty and salvage bundle generated by Battle upgrades. It improves all resources in the bundle.",
+        "After winning against neutral monsters, grants a gold bounty plus a gem trophy cache. Both scale with battle experience, rank, and Quartermaster.",
+        "After winning against another player's army, grants a larger gold bounty plus crystals recovered from the enemy force. Both scale with battle experience, rank, and Quartermaster.",
+        "After winning a castle battle, grants gold, ore, and wood salvage for captured stores and siege materials. All three rewards scale with battle experience, rank, and Quartermaster.",
+        "After winning while defending, grants wood and ore for repairs and fortification. Both rewards scale with battle experience, rank, and Quartermaster.",
+        "After a battle loss, grants a rebuilding fund in gold plus emergency wood supplies. Both rewards scale with battle experience, rank, and Quartermaster.",
+        "On the first rewarded resource or producing-site action on a tile, grants bonus gold and wood. Pathfinder increases both parts of the bundle.",
+        "On the first rewarded treasure chest, sea chest, or wagon action on a tile, grants bonus gold and gems. Pathfinder increases both rewards.",
+        "On the first rewarded artifact, skeleton, or shipwreck-survivor action on a tile, grants gems and crystals. Pathfinder increases both rewards.",
+        "On the first rewarded mine, sawmill, laboratory, lighthouse, or abandoned-mine action on a tile, grants ore and wood. Pathfinder increases both rewards.",
+        "On the first rewarded castle-tile action, grants a royal gold stipend and wood supplies. Pathfinder increases both rewards.",
+        "On the first rewarded shrine or temple action, grants mercury and a small gold tithe. Pathfinder increases both rewards.",
+        "On the first rewarded skill-training, arena, gazebo, or knowledge-tree action, grants crystals and mercury. Pathfinder increases both rewards.",
+        "On the first rewarded morale or luck site action, grants gems and a gold purse. Pathfinder increases both rewards.",
+        "On the first rewarded dwelling or recruitment-site action, grants recruitment gold and wood supplies. Pathfinder increases both rewards.",
+        "On the first rewarded map event, sign, sphinx, or oracle action, grants gold and gems. Pathfinder increases both rewards.",
+        "On the first rewarded stone-lith or whirlpool action, grants sulfur and mercury. Pathfinder increases both rewards.",
+        "On the first rewarded shipwreck, derelict-ship, or siren action, grants gems and recovered gold. Pathfinder increases both rewards.",
+        "On the first rewarded observation tower, obelisk, map, or Magi-site action, grants gold and crystals. Pathfinder increases both rewards.",
+        "On the first rewarded trading-post or alchemist-tower action, grants a large gold cache plus ore and wood stores. Pathfinder increases all three rewards.",
+        "On the first rewarded adventure action not covered by another specialty, grants gold and wood. Pathfinder increases both rewards."
     };
-    constexpr std::array<const char *, 8> tabNames{ "War", "Magic", "Wards", "Growth", "Battles", "Spoils", "Sites", "Travel" };
+    constexpr std::array<const char *, 8> tabNames{ "WAR", "MAGIC", "WARDS", "GROWTH", "BATTLES", "SPOILS", "SITES", "TRAVEL" };
     constexpr std::array<const char *, 8> tabPanelNames{
         "WAR COUNCIL", "MAGE GUILD", "WARD HALL", "ROYAL ACADEMY", "BOUNTY BOARD", "TREASURY", "ADVENTURE GUILD", "WAYFARERS"
     };
@@ -487,6 +487,85 @@ namespace
         return text.str();
     }
 
+    void drawBeveledPanel( const fheroes2::Rect & roi, const bool inset )
+    {
+        fheroes2::Display & display = fheroes2::Display::instance();
+        const uint8_t face = fheroes2::GetColorId( 93, 67, 42 );
+        const uint8_t highlight = fheroes2::GetColorId( 222, 184, 92 );
+        const uint8_t shadow = fheroes2::GetColorId( 49, 35, 24 );
+        const uint8_t topLeft = inset ? shadow : highlight;
+        const uint8_t bottomRight = inset ? highlight : shadow;
+
+        fheroes2::Fill( display, roi.x, roi.y, roi.width, roi.height, face );
+        fheroes2::Fill( display, roi.x, roi.y, roi.width, 2, topLeft );
+        fheroes2::Fill( display, roi.x, roi.y, 2, roi.height, topLeft );
+        fheroes2::Fill( display, roi.x, roi.y + roi.height - 2, roi.width, 2, bottomRight );
+        fheroes2::Fill( display, roi.x + roi.width - 2, roi.y, 2, roi.height, bottomRight );
+    }
+
+    std::string shortEffectSummary( const size_t id, const uint64_t rank )
+    {
+        const long double value = effect( id, rank );
+        switch ( id ) {
+        case MIGHT: return "+" + formatEffect( value ) + " troop damage";
+        case GUARD: return formatEffect( value ) + " physical resistance";
+        case MARKSMAN: return "+" + formatEffect( value ) + " ranged damage";
+        case DUELIST: return "+" + formatEffect( value ) + " melee damage";
+        case UNDERDOG: return "+" + formatEffect( value ) + " outnumbered damage";
+        case SORCERY: return "+" + formatEffect( value ) + " spell damage";
+        case PYROMANCY: return "+" + formatEffect( value ) + " fire spell damage";
+        case CRYOMANCY: return "+" + formatEffect( value ) + " cold spell damage";
+        case STORMCRAFT: return "+" + formatEffect( value ) + " lightning damage";
+        case CATACLYSM: return "+" + formatEffect( value ) + " area spell damage";
+        case SPELL_WARD: return formatEffect( value ) + " spell resistance";
+        case FIRE_WARD: return formatEffect( value ) + " fire resistance";
+        case COLD_WARD: return formatEffect( value ) + " cold resistance";
+        case STORM_WARD: return formatEffect( value ) + " lightning resistance";
+        case CATACLYSM_WARD: return formatEffect( value ) + " area spell resistance";
+        case WISDOM: return "+" + formatEffect( value * 0.35L ) + " troop + spell damage";
+        case MEDITATION: return formatEffect( value * 0.5L ) + " spell resistance";
+        case VETERAN: return formatEffect( value * 0.5L ) + " physical resistance";
+        case EXPLORER: return "+" + formatEffect( value ) + " adventure bundles";
+        case MENTOR: return "+" + formatEffect( value ) + " battle bundles";
+        case MONSTER_HUNTER: return "+" + formatEffect( value ) + " bounty: gold + gems";
+        case HERO_SLAYER: return "+" + formatEffect( value ) + " bounty: gold + crystal";
+        case SIEGE_MASTER: return "+" + formatEffect( value ) + " salvage: gold + ore + wood";
+        case DEFENDER: return "+" + formatEffect( value ) + " stores: wood + ore";
+        case SURVIVOR: return "+" + formatEffect( value ) + " recovery: gold + wood";
+        case SCAVENGER:
+            return formatNumber( scaledReward( id, rank, 1200 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 12 ) ) + " wood";
+        case TREASURE_HUNTER:
+            return formatNumber( scaledReward( id, rank, 2500 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 18 ) ) + " gems";
+        case RELIC_HUNTER:
+            return formatNumber( scaledReward( id, rank, 30 ) ) + " gems + " + formatNumber( scaledReward( id, rank, 12 ) ) + " crystal";
+        case PROSPECTOR:
+            return formatNumber( scaledReward( id, rank, 40 ) ) + " ore + " + formatNumber( scaledReward( id, rank, 20 ) ) + " wood";
+        case CASTELLAN:
+            return formatNumber( scaledReward( id, rank, 1800 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 15 ) ) + " wood";
+        case PILGRIM:
+            return formatNumber( scaledReward( id, rank, 20 ) ) + " mercury + " + formatNumber( scaledReward( id, rank, 700 ) ) + " gold";
+        case SCHOLAR:
+            return formatNumber( scaledReward( id, rank, 20 ) ) + " crystal + " + formatNumber( scaledReward( id, rank, 10 ) ) + " mercury";
+        case INSPIRATION:
+            return formatNumber( scaledReward( id, rank, 20 ) ) + " gems + " + formatNumber( scaledReward( id, rank, 900 ) ) + " gold";
+        case RECRUITER:
+            return formatNumber( scaledReward( id, rank, 1800 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 15 ) ) + " wood";
+        case STORYKEEPER:
+            return formatNumber( scaledReward( id, rank, 1400 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 12 ) ) + " gems";
+        case WAYFARER:
+            return formatNumber( scaledReward( id, rank, 20 ) ) + " sulfur + " + formatNumber( scaledReward( id, rank, 8 ) ) + " mercury";
+        case MARINER:
+            return formatNumber( scaledReward( id, rank, 25 ) ) + " gems + " + formatNumber( scaledReward( id, rank, 1200 ) ) + " gold";
+        case CARTOGRAPHER:
+            return formatNumber( scaledReward( id, rank, 1800 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 10 ) ) + " crystal";
+        case MERCHANT:
+            return formatNumber( scaledReward( id, rank, 3000 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 20 ) ) + " ore/wood";
+        case GENERALIST:
+            return formatNumber( scaledReward( id, rank, 1000 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 10 ) ) + " wood";
+        default: return formatEffect( value );
+        }
+    }
+
     void showUpgradeDetails( const size_t id )
     {
         const uint64_t rank = playerProfile.ranks[id];
@@ -494,14 +573,15 @@ namespace
         const bool canAdvance = rank < std::numeric_limits<uint64_t>::max();
         std::string message = upgradeDetails[id];
         message += "\n\nCurrent rank: " + formatNumber( rank );
-        message += "\nCurrent effect: +" + formatEffect( currentEffect );
+        message += "\nCurrent: " + shortEffectSummary( id, rank );
         if ( canAdvance ) {
             const long double nextEffect = effect( id, rank + 1 );
-            message += "\nNext effect: +" + formatEffect( nextEffect );
-            message += "\nNext rank adds: +" + formatEffect( nextEffect - currentEffect );
+            message += "\nNext rank: " + shortEffectSummary( id, rank + 1 );
+            message += "\nScaling gained: +" + formatEffect( nextEffect - currentEffect );
             message += "\nNext rank costs: " + formatNumber( cost( rank ) ) + " points";
         }
         message += "\nAvailable points: " + formatNumber( playerProfile.points );
+        message += "\nTimes triggered: " + formatNumber( playerProfile.useCounts[id] );
         if ( id >= MONSTER_HUNTER && id <= SURVIVOR ) {
             message += "\nBattle rewards are paid after the matching battle condition is resolved.";
         }
@@ -680,25 +760,35 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
     const long double quartermasterBonus = effect( MENTOR, playerProfile.ranks[MENTOR] );
     if ( won && neutral ) {
         const uint64_t bountyBase = 1000ULL + battleExperience / 4ULL;
+        const uint64_t trophyGems = 8ULL + battleExperience / 2200ULL;
         grantResource( color, Resource::GOLD, scaledReward( MONSTER_HUNTER, playerProfile.ranks[MONSTER_HUNTER], bountyBase, quartermasterBonus ) );
+        grantResource( color, Resource::GEMS, scaledReward( MONSTER_HUNTER, playerProfile.ranks[MONSTER_HUNTER], trophyGems, quartermasterBonus ) );
     }
     if ( won && !neutral ) {
         const uint64_t bountyBase = 1500ULL + battleExperience / 3ULL;
+        const uint64_t capturedCrystal = 8ULL + battleExperience / 2000ULL;
         grantResource( color, Resource::GOLD, scaledReward( HERO_SLAYER, playerProfile.ranks[HERO_SLAYER], bountyBase, quartermasterBonus ) );
+        grantResource( color, Resource::CRYSTAL, scaledReward( HERO_SLAYER, playerProfile.ranks[HERO_SLAYER], capturedCrystal, quartermasterBonus ) );
     }
     if ( won && siege ) {
         const uint64_t salvageGold = 1200ULL + battleExperience / 5ULL;
         const uint64_t salvageOre = 18ULL + battleExperience / 1500ULL;
+        const uint64_t salvageWood = 12ULL + battleExperience / 1800ULL;
         grantResource( color, Resource::GOLD, scaledReward( SIEGE_MASTER, playerProfile.ranks[SIEGE_MASTER], salvageGold, quartermasterBonus ) );
         grantResource( color, Resource::ORE, scaledReward( SIEGE_MASTER, playerProfile.ranks[SIEGE_MASTER], salvageOre, quartermasterBonus ) );
+        grantResource( color, Resource::WOOD, scaledReward( SIEGE_MASTER, playerProfile.ranks[SIEGE_MASTER], salvageWood, quartermasterBonus ) );
     }
     if ( won && defending ) {
         const uint64_t repairWood = 14ULL + battleExperience / 1800ULL;
+        const uint64_t repairOre = 8ULL + battleExperience / 2600ULL;
         grantResource( color, Resource::WOOD, scaledReward( DEFENDER, playerProfile.ranks[DEFENDER], repairWood, quartermasterBonus ) );
+        grantResource( color, Resource::ORE, scaledReward( DEFENDER, playerProfile.ranks[DEFENDER], repairOre, quartermasterBonus ) );
     }
     if ( !won ) {
         const uint64_t rebuildingFund = 750ULL + battleExperience / 6ULL;
+        const uint64_t emergencyWood = 8ULL + battleExperience / 2600ULL;
         grantResource( color, Resource::GOLD, scaledReward( SURVIVOR, playerProfile.ranks[SURVIVOR], rebuildingFund, quartermasterBonus ) );
+        grantResource( color, Resource::WOOD, scaledReward( SURVIVOR, playerProfile.ranks[SURVIVOR], emergencyWood, quartermasterBonus ) );
     }
 }
 
@@ -772,48 +862,64 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
     switch ( upgrade ) {
     case SCAVENGER:
         grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1200, pathfinderBonus ) );
+        grantResource( color, Resource::WOOD, scaledReward( upgrade, rank, 12, pathfinderBonus ) );
         break;
     case TREASURE_HUNTER:
         grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 2500, pathfinderBonus ) );
+        grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 18, pathfinderBonus ) );
         break;
     case RELIC_HUNTER:
         grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 30, pathfinderBonus ) );
+        grantResource( color, Resource::CRYSTAL, scaledReward( upgrade, rank, 12, pathfinderBonus ) );
         break;
     case PROSPECTOR:
         grantResource( color, Resource::ORE, scaledReward( upgrade, rank, 40, pathfinderBonus ) );
+        grantResource( color, Resource::WOOD, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
         break;
     case CASTELLAN:
         grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1800, pathfinderBonus ) );
+        grantResource( color, Resource::WOOD, scaledReward( upgrade, rank, 15, pathfinderBonus ) );
         break;
     case PILGRIM:
         grantResource( color, Resource::MERCURY, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
+        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 700, pathfinderBonus ) );
         break;
     case SCHOLAR:
         grantResource( color, Resource::CRYSTAL, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
+        grantResource( color, Resource::MERCURY, scaledReward( upgrade, rank, 10, pathfinderBonus ) );
         break;
     case INSPIRATION:
         grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
+        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 900, pathfinderBonus ) );
         break;
     case RECRUITER:
         grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1800, pathfinderBonus ) );
+        grantResource( color, Resource::WOOD, scaledReward( upgrade, rank, 15, pathfinderBonus ) );
         break;
     case STORYKEEPER:
         grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1400, pathfinderBonus ) );
+        grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 12, pathfinderBonus ) );
         break;
     case WAYFARER:
         grantResource( color, Resource::SULFUR, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
+        grantResource( color, Resource::MERCURY, scaledReward( upgrade, rank, 8, pathfinderBonus ) );
         break;
     case MARINER:
         grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 25, pathfinderBonus ) );
+        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1200, pathfinderBonus ) );
         break;
     case CARTOGRAPHER:
         grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1800, pathfinderBonus ) );
+        grantResource( color, Resource::CRYSTAL, scaledReward( upgrade, rank, 10, pathfinderBonus ) );
         break;
     case MERCHANT:
         grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 3000, pathfinderBonus ) );
+        grantResource( color, Resource::ORE, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
+        grantResource( color, Resource::WOOD, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
         break;
     case GENERALIST:
         grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1000, pathfinderBonus ) );
+        grantResource( color, Resource::WOOD, scaledReward( upgrade, rank, 10, pathfinderBonus ) );
         break;
     default:
         break;
@@ -904,6 +1010,7 @@ void fheroes2::RPG::showMenu()
     constexpr size_t visibleRows = 3;
     std::array<fheroes2::Rect, tabNames.size()> tabAreas{};
     std::array<fheroes2::Rect, visibleRows> visibleUpgradeAreas{};
+    std::array<fheroes2::Rect, visibleRows> buyAreas{};
     std::array<size_t, tabNames.size()> scrollOffsets{};
     const fheroes2::Rect statsArea( area.x + 12, area.y + 38, area.width - 24, 42 );
     const fheroes2::Rect listArea( area.x + 12, area.y + 151, area.width - 24, 181 );
@@ -922,14 +1029,15 @@ void fheroes2::RPG::showMenu()
             window.applyGemDecoratedCorners();
 
             drawText( "KINGDOM RPG", area.x + 12, area.y + 4, area.width - 24, fheroes2::FontType::normalYellow() );
-            drawText( "ROYAL GUILD LEDGER", area.x + 12, area.y + 22, area.width - 24, fheroes2::FontType::smallWhite() );
+            drawText( "ROYAL GUILD - RANKS & DOCTRINES", area.x + 12, area.y + 22, area.width - 24, fheroes2::FontType::smallWhite() );
             fheroes2::Fill( display, area.x + 22, area.y + 34, area.width - 44, 1, fheroes2::GetColorId( 219, 175, 66 ) );
 
             window.applyTextBackgroundShading( statsArea );
-            fheroes2::Fill( display, statsArea.x + 3, statsArea.y + 3, statsArea.width - 6, 1, fheroes2::GetColorId( 219, 175, 66 ) );
+            drawBeveledPanel( statsArea, true );
+            fheroes2::Fill( display, statsArea.x + 4, statsArea.y + 4, statsArea.width - 8, 1, fheroes2::GetColorId( 219, 175, 66 ) );
             drawSingleLine( "LEVEL  " + formatNumber( playerProfile.level ), statsArea.x + 12, statsArea.y + 6, statsArea.width / 2 - 18,
                             fheroes2::FontType::smallYellow() );
-            drawSingleLine( "UPGRADE POINTS  " + formatNumber( playerProfile.points ), statsArea.x + statsArea.width / 2 + 5, statsArea.y + 6,
+            drawSingleLine( "GUILD POINTS  " + formatNumber( playerProfile.points ), statsArea.x + statsArea.width / 2 + 5, statsArea.y + 6,
                             statsArea.width / 2 - 17, fheroes2::FontType::smallYellow() );
 
             const uint64_t remainingXP = xpToNextLevel( playerProfile.level ) > playerProfile.progress
@@ -949,9 +1057,10 @@ void fheroes2::RPG::showMenu()
             for ( size_t i = 0; i < tabNames.size(); ++i ) {
                 tabAreas[i] = { area.x + 12 + static_cast<int32_t>( i % 4 ) * 102, area.y + 87 + static_cast<int32_t>( i / 4 ) * 25, 99, 23 };
                 window.applyTextBackgroundShading( tabAreas[i] );
-                const uint8_t frameColor = i == tab ? fheroes2::GetColorId( 219, 175, 66 ) : fheroes2::GetColorId( 109, 84, 52 );
-                fheroes2::Fill( display, tabAreas[i].x + 3, tabAreas[i].y + 2, tabAreas[i].width - 6, 1, frameColor );
-                fheroes2::Fill( display, tabAreas[i].x + 3, tabAreas[i].y + tabAreas[i].height - 3, tabAreas[i].width - 6, 1, frameColor );
+                drawBeveledPanel( tabAreas[i], i == tab );
+                if ( i == tab ) {
+                    fheroes2::Fill( display, tabAreas[i].x + 5, tabAreas[i].y + 4, tabAreas[i].width - 10, 1, fheroes2::GetColorId( 219, 175, 66 ) );
+                }
                 drawText( tabNames[i], tabAreas[i].x + 4, tabAreas[i].y + 5, tabAreas[i].width - 8,
                           i == tab ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
@@ -959,7 +1068,8 @@ void fheroes2::RPG::showMenu()
             drawText( tabPanelNames[tab], area.x + 18, area.y + 137, area.width - 36, fheroes2::FontType::smallYellow() );
 
             window.applyTextBackgroundShading( listArea );
-            fheroes2::Fill( display, listArea.x + 3, listArea.y + 3, listArea.width - 6, 1, fheroes2::GetColorId( 219, 175, 66 ) );
+            drawBeveledPanel( listArea, true );
+            fheroes2::Fill( display, listArea.x + 4, listArea.y + 4, listArea.width - 8, 1, fheroes2::GetColorId( 219, 175, 66 ) );
             window.renderScrollbarBackground( { scrollbarX, listArea.y, 16, listArea.height }, isEvilInterface );
             scrollUp.draw();
             scrollDown.draw();
@@ -975,6 +1085,7 @@ void fheroes2::RPG::showMenu()
                 fheroes2::Rect & rowArea = visibleUpgradeAreas[row];
                 rowArea = { listArea.x + 5, listArea.y + 5 + static_cast<int32_t>( row * 57 ), listArea.width - 31, 52 };
                 window.applyTextBackgroundShading( rowArea );
+                drawBeveledPanel( rowArea, false );
 
                 const bool canBuy = playerProfile.ranks[i] < std::numeric_limits<uint64_t>::max()
                                     && playerProfile.points >= cost( playerProfile.ranks[i] );
@@ -982,19 +1093,30 @@ void fheroes2::RPG::showMenu()
                     fheroes2::Fill( display, rowArea.x + 3, rowArea.y + 5, 2, rowArea.height - 10, fheroes2::GetColorId( 219, 175, 66 ) );
                 }
 
-                drawSingleLine( upgrades[i].name, rowArea.x + 10, rowArea.y + 4, rowArea.width - 108, fheroes2::FontType::normalYellow() );
+                const fheroes2::Rect badgeArea{ rowArea.x + 7, rowArea.y + 8, 34, 34 };
+                drawBeveledPanel( badgeArea, true );
+                drawText( std::string( 1, upgrades[i].name[0] ), badgeArea.x + 2, badgeArea.y + 8, badgeArea.width - 4,
+                          fheroes2::FontType::normalYellow() );
+
+                const int32_t textX = rowArea.x + 48;
+                const int32_t buyWidth = 63;
+                buyAreas[row] = { rowArea.x + rowArea.width - buyWidth - 7, rowArea.y + 27, buyWidth, 20 };
+                drawBeveledPanel( buyAreas[row], canBuy );
+                drawSingleLine( upgrades[i].name, textX, rowArea.y + 4, rowArea.width - 150, fheroes2::FontType::normalYellow() );
                 drawSingleLine( "Rank " + formatNumber( playerProfile.ranks[i] ), rowArea.x + rowArea.width - 94, rowArea.y + 7, 84,
                                 fheroes2::FontType::smallWhite() );
-                drawSingleLine( upgrades[i].description, rowArea.x + 10, rowArea.y + 24, rowArea.width - 20, fheroes2::FontType::smallWhite() );
-                drawSingleLine( "Effect +" + formatEffect( effect( i, playerProfile.ranks[i] ) ) + "   Cost "
-                                    + formatNumber( cost( playerProfile.ranks[i] ) ) + " pt",
-                                rowArea.x + 10, rowArea.y + 39, rowArea.width - 76,
+                drawSingleLine( upgrades[i].description, textX, rowArea.y + 21, rowArea.width - 126, fheroes2::FontType::smallWhite() );
+
+                const uint64_t rank = playerProfile.ranks[i];
+                const std::string current = shortEffectSummary( i, rank );
+                const std::string next = rank == std::numeric_limits<uint64_t>::max() ? "MAX" : shortEffectSummary( i, rank + 1 );
+                drawSingleLine( current + " -> " + next, textX, rowArea.y + 36, rowArea.width - 130,
                                 canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
-                drawText( "BUY", rowArea.x + rowArea.width - 60, rowArea.y + 38, 50,
+                drawText( "BUY " + formatNumber( cost( playerProfile.ranks[i] ) ), buyAreas[row].x + 3, buyAreas[row].y + 5, buyAreas[row].width - 6,
                           canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
 
-            drawText( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3   Wheel: scroll   Right-click: inspect",
+            drawText( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3   Wheel: scroll   Right-click: inspect decree",
                       area.x + 12, area.y + 337, area.width - 24, fheroes2::FontType::smallWhite() );
             window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
@@ -1044,7 +1166,7 @@ void fheroes2::RPG::showMenu()
                 redraw = true;
                 break;
             }
-            if ( event.MouseClickLeft( visibleUpgradeAreas[row] ) && buy( playerProfile, i ) ) {
+            if ( event.MouseClickLeft( buyAreas[row] ) && buy( playerProfile, i ) ) {
                 saveProfile();
                 redraw = true;
                 break;
