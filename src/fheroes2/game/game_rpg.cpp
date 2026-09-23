@@ -1023,7 +1023,9 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     }
 
     const std::string path = profilePath();
-    std::array<std::string, 3> profileCandidates{ path, path + ".tmp", path + ".bak" };
+    // stable_sort preserves this priority when filesystem timestamps tie. A complete temporary
+    // snapshot is produced after the primary and therefore represents the newer save attempt.
+    std::array<std::string, 3> profileCandidates{ path + ".tmp", path, path + ".bak" };
     std::stable_sort( profileCandidates.begin(), profileCandidates.end(), []( const std::string & first, const std::string & second ) {
         std::error_code firstError;
         std::error_code secondError;

@@ -248,7 +248,7 @@ namespace
         return static_cast<int32_t>( std::clamp<int64_t>( value, 0, std::numeric_limits<int32_t>::max() ) );
     }
 
-    bool loadOfflineProgressData( OfflineProgressData & data )
+    bool loadOfflineProgressData( OfflineProgressData & data, bool * preserveRecoveryBackup = nullptr )
     {
         const auto loadFromPath = []( const std::string & candidatePath, OfflineProgressData & candidate ) {
             std::ifstream input( candidatePath );
@@ -514,20 +514,31 @@ namespace
         const std::array<std::string, 3> candidatePaths{ filePath + ".bak", filePath, filePath + ".tmp" };
 
         bool foundSnapshot = false;
+        bool primaryValid = false;
         int64_t newestTimestamp = 0;
+        std::string selectedPath;
         for ( const std::string & candidatePath : candidatePaths ) {
             OfflineProgressData candidate;
-            if ( loadFromPath( candidatePath, candidate ) && ( !foundSnapshot || candidate.lastSeenUnix >= newestTimestamp ) ) {
+            const bool isValid = loadFromPath( candidatePath, candidate );
+            if ( candidatePath == filePath ) {
+                primaryValid = isValid;
+            }
+            if ( isValid && ( !foundSnapshot || candidate.lastSeenUnix >= newestTimestamp ) ) {
                 data = std::move( candidate );
                 newestTimestamp = data.lastSeenUnix;
+                selectedPath = candidatePath;
                 foundSnapshot = true;
             }
         }
 
+        if ( preserveRecoveryBackup != nullptr ) {
+            *preserveRecoveryBackup
+                = foundSnapshot && ( selectedPath == filePath + ".bak" || ( System::IsFile( filePath ) && !primaryValid ) );
+        }
         return foundSnapshot;
     }
 
-    bool saveOfflineProgressData( const OfflineProgressData & data )
+    bool saveOfflineProgressData( const OfflineProgressData & data, const bool preserveRecoveryBackup = false )
     {
         const std::string filePath = getOfflineProgressFilePath();
         const std::string tempFilePath = filePath + ".tmp";
@@ -601,21 +612,33 @@ namespace
         // Replace the live file only after the temporary file is fully written. Keep one backup
         // during the swap so an interrupted rename cannot destroy the last valid snapshot.
         const bool hadOriginal = System::IsFile( filePath );
+        bool movedOriginalToBackup = false;
         if ( hadOriginal ) {
-            System::Unlink( backupFilePath );
-            if ( std::rename( filePath.c_str(), backupFilePath.c_str() ) != 0 ) {
-                ERROR_LOG( "Unable to back up offline progress data." )
-                System::Unlink( tempFilePath );
-                return false;
+            if ( preserveRecoveryBackup ) {
+                // Recovery trusted a fallback snapshot. Do not rotate the untrusted or older
+                // primary over the backup that may be the last known-good recovery point.
+                if ( !System::Unlink( filePath ) ) {
+                    ERROR_LOG( "Unable to remove superseded offline progress data." )
+                    return false;
+                }
+            }
+            else {
+                System::Unlink( backupFilePath );
+                if ( std::rename( filePath.c_str(), backupFilePath.c_str() ) != 0 ) {
+                    ERROR_LOG( "Unable to back up offline progress data." )
+                    return false;
+                }
+                movedOriginalToBackup = true;
             }
         }
 
         if ( std::rename( tempFilePath.c_str(), filePath.c_str() ) != 0 ) {
             ERROR_LOG( "Unable to replace offline progress data." )
-            if ( hadOriginal ) {
+            if ( movedOriginalToBackup ) {
                 std::rename( backupFilePath.c_str(), filePath.c_str() );
             }
-            System::Unlink( tempFilePath );
+            // tempFilePath is a complete write candidate. Keep it so the next load can
+            // recover this newest state instead of discarding it after a promotion failure.
             return false;
         }
 
@@ -676,7 +699,8 @@ namespace
     void persistOfflineProgressSnapshot( Kingdom & kingdom, const int64_t snapshotUnix = 0 )
     {
         OfflineProgressData data;
-        const bool hasSavedData = loadOfflineProgressData( data );
+        bool preserveRecoveryBackup = false;
+        const bool hasSavedData = loadOfflineProgressData( data, &preserveRecoveryBackup );
         const int64_t now = snapshotUnix > 0 ? snapshotUnix : getCurrentUnixTime();
 
         const bool hasPendingResume = offlineResumePending && offlineResumeElapsedSeconds > 0;
@@ -693,7 +717,7 @@ namespace
         data.resources = kingdom.GetFunds();
         captureOfflineKingdomState( data, kingdom );
 
-        if ( saveOfflineProgressData( data ) && hasPendingResume ) {
+        if ( saveOfflineProgressData( data, preserveRecoveryBackup ) && hasPendingResume ) {
             offlineResumeElapsedSeconds = 0;
             offlineResumePending = false;
         }
@@ -1347,8 +1371,9 @@ namespace
     {
         OfflineProgressData data;
         const int64_t now = getCurrentUnixTime();
+        bool preserveRecoveryBackup = false;
 
-        if ( !loadOfflineProgressData( data ) ) {
+        if ( !loadOfflineProgressData( data, &preserveRecoveryBackup ) ) {
             data.lastSeenUnix = now;
             data.resources = kingdom.GetFunds();
             captureOfflineKingdomState( data, kingdom );
@@ -1442,7 +1467,7 @@ namespace
         // Preserve a future saved timestamp if the local system clock temporarily moves backwards.
         data.lastSeenUnix = std::max( previousLastSeenUnix, now );
         captureOfflineKingdomState( data, kingdom );
-        saveOfflineProgressData( data );
+        saveOfflineProgressData( data, preserveRecoveryBackup );
 
         return summary;
     }
