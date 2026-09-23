@@ -780,44 +780,22 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     seed ^= static_cast<uint64_t>( playerColor ) * 0xC2B2AE3D27D4EB4FULL;
     std::mt19937_64 rng( seed );
 
-    const uint64_t earnedPointBudget
-        = playerProfile.level > 1 ? saturatedMultiply( playerProfile.level - 1, pointsPerLevel ) : 0;
-
-    const auto makeTemporaryProfile = [&rng, earnedPointBudget]( const int minimumPower, const int maximumPower ) {
+    const auto makeTemporaryProfile = [&rng]( const int minimumPower, const int maximumPower ) {
         std::uniform_int_distribution<int> variation( minimumPower, maximumPower );
         Profile temporary;
         temporary.level = std::max<uint64_t>( 1, scaledValue( playerProfile.level, variation( rng ) ) );
-        temporary.points = scaledValue( earnedPointBudget, variation( rng ) );
 
-        while ( temporary.points > 0 ) {
-            std::array<size_t, upgradeCount> candidates{};
-            size_t candidateCount = 0;
-
-            for ( size_t id = 0; id < upgradeCount; ++id ) {
-                const uint64_t rank = temporary.ranks[id];
-                if ( rank == std::numeric_limits<uint64_t>::max() || effect( id, rank + 1 ) <= effect( id, rank )
-                     || cost( id, rank ) > temporary.points ) {
-                    continue;
-                }
-                if ( id == BRUTAL_CRITICALS && temporary.ranks[CRITICAL_TRAINING] == 0 ) {
-                    continue;
-                }
-
-                candidates[candidateCount++] = id;
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            if ( playerProfile.ranks[id] == 0 ) {
+                continue;
             }
 
-            if ( candidateCount == 0 ) {
-                break;
-            }
-
-            std::uniform_int_distribution<size_t> pick( 0, candidateCount - 1 );
-            if ( !buy( temporary, candidates[pick( rng )] ) ) {
-                break;
-            }
+            const int percent = variation( rng );
+            const long double scaledRank = static_cast<long double>( playerProfile.ranks[id] ) * percent / 100.0L;
+            temporary.ranks[id] = static_cast<uint64_t>(
+                std::min<long double>( std::numeric_limits<uint64_t>::max(), std::max<long double>( 1.0L, std::floor( scaledRank + 0.5L ) ) ) );
         }
 
-        // Temporary profiles do not carry unspent currency or persistent counters.
-        temporary.points = 0;
         return temporary;
     };
 
