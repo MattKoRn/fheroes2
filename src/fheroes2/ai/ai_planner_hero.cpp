@@ -2086,9 +2086,33 @@ double AI::Planner::getFighterObjectValue( const Heroes & hero, const int32_t in
             return -dangerousTaskPenalty;
         }
 
-        // TODO: we should add logic to compare monsters and hero army strengths.
+        const double heroStrength = hero.GetArmy().GetStrength();
+        const double monsterStrength = monsters.GetStrength();
+        if ( heroStrength <= 0.0 || monsterStrength <= 0.0 ) {
+            return valueToIgnore;
+        }
+
         const bool anotherFriendlyHeroPresent = _regions[tile.GetRegion()].friendlyHeroes > 1;
-        return ( anotherFriendlyHeroPresent ? 4000.0 : 1000.0 ) + monsters.getTotalHP() / 100.0;
+        double value = ( anotherFriendlyHeroPresent ? 4000.0 : 1000.0 ) + monsters.getTotalHP() / 100.0;
+        const double strengthRatio = heroStrength / monsterStrength;
+
+        // Fighters should prefer battles that convert their army strength into progress efficiently.
+        // Overwhelming victories preserve the main army for enemy heroes and castles, while marginal
+        // neutral fights should lose priority unless there is little else to do in the region.
+        if ( strengthRatio >= 4.0 ) {
+            value *= 1.35;
+        }
+        else if ( strengthRatio >= 2.5 ) {
+            value *= 1.20;
+        }
+        else if ( strengthRatio >= 1.5 ) {
+            value *= 1.08;
+        }
+        else if ( strengthRatio < 1.15 ) {
+            value *= 0.50;
+        }
+
+        return value;
     }
     case MP2::OBJ_ABANDONED_MINE: {
         return 5000.0;
