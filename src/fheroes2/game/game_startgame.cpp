@@ -238,7 +238,7 @@ namespace
                 return;
             }
 
-            const int32_t columns = std::min<int32_t>( 8, static_cast<int32_t>( _creatures.size() ) );
+            const int32_t columns = std::min<int32_t>( 4, static_cast<int32_t>( _creatures.size() ) );
             const int32_t rows = ( static_cast<int32_t>( _creatures.size() ) + columns - 1 ) / columns;
 
             // The caller calculates the exact vertical space left by the dialog title, body,
@@ -252,7 +252,7 @@ namespace
                 return;
             }
 
-            const int32_t columns = std::min<int32_t>( 8, static_cast<int32_t>( _creatures.size() ) );
+            const int32_t columns = std::min<int32_t>( 4, static_cast<int32_t>( _creatures.size() ) );
             const int32_t rows = ( static_cast<int32_t>( _creatures.size() ) + columns - 1 ) / columns;
             const int32_t cellWidth = _area.width / columns;
             const int32_t cellHeight = std::max<int32_t>( 1, _area.height / rows );
@@ -290,7 +290,7 @@ namespace
                 }
 
                 if ( showCountText ) {
-                    const fheroes2::Text countText( "x" + fheroes2::abbreviateNumber( count ), fheroes2::FontType::smallWhite() );
+                    const fheroes2::Text countText( "x" + std::to_string( count ), fheroes2::FontType::smallWhite() );
                     countText.draw( cellX + ( cellWidth - countText.width() ) / 2, cellY + cellHeight - countText.height(), output );
                 }
             }
@@ -302,7 +302,7 @@ namespace
                 return;
             }
 
-            const int32_t columns = std::min<int32_t>( 8, static_cast<int32_t>( _creatures.size() ) );
+            const int32_t columns = std::min<int32_t>( 4, static_cast<int32_t>( _creatures.size() ) );
             const int32_t rows = ( static_cast<int32_t>( _creatures.size() ) + columns - 1 ) / columns;
             const int32_t cellWidth = _area.width / columns;
             const int32_t cellHeight = std::max<int32_t>( 1, _area.height / rows );
@@ -2088,7 +2088,7 @@ namespace
         }
 
         std::string message = _( "Recruited %{count} creatures while you were away." );
-        StringReplace( message, "%{count}", fheroes2::abbreviateNumber( summary.recruitedCreatures ) );
+        StringReplace( message, "%{count}", std::to_string( summary.recruitedCreatures ) );
         message += "\n";
         message += _( "Counts are shown below. Right-click a creature for details." );
 
