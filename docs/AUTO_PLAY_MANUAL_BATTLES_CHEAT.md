@@ -12,7 +12,7 @@ While an adventure map is active, press **F8**.
 - Auto-play battles are never skipped or instant-resolved, even if the normal instant-battle option is enabled.
 - Auto-play battles run at the engine's normal/default battle animation speed. Your configured battle-speed setting is restored when the battle ends.
 - Popups and reports that are shown during auto-play remain visible for **5 seconds**, then close automatically so automation continues. This includes battle results, captured-artifact pages, Eagle Eye, Necromancy, assembled-artifact notices, and standard informational dialogs.
-- Choice dialogs never auto-confirm an affirmative action: after 5 seconds they prefer **No** or **Cancel** where available.
+- Decision popups are resolved automatically after 5 seconds. Auto-play prefers **Yes**, then **OK**, then falls back to **No** or **Cancel** when no affirmative/default action is available.
 - Neutral and normal AI opponents remain AI-controlled. If Auto Play-Test puts both map players under auto-control, both sides are AI-controlled while the full battle remains visible.
 - **Left-click while your auto-controlled hero is moving to pause/stop auto-play.** The current hero stops immediately, no more AI hero or castle tasks are scheduled for your side that turn, and manual control is restored cleanly for your next turn.
 - Press **F8** again to queue the same return to normal adventure-map control without clicking.
