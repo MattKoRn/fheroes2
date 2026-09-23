@@ -391,18 +391,18 @@ namespace
                 input >> version;
             }
             else if ( key == "last_seen_unix" ) {
-                input >> data.lastSeenUnix;
+                input >> candidate.lastSeenUnix;
                 hasTimestamp = true;
             }
             else if ( key == "resources" ) {
-                hasResources = readFunds( data.resources );
+                hasResources = readFunds( candidate.resources );
             }
             else if ( key == "daily_income" ) {
-                hasIncome = readFunds( data.dailyIncome );
+                hasIncome = readFunds( candidate.dailyIncome );
             }
             else if ( key == "carry" ) {
                 hasCarry = true;
-                for ( int64_t & value : data.carry ) {
+                for ( int64_t & value : candidate.carry ) {
                     if ( !( input >> value ) ) {
                         return false;
                     }
@@ -411,74 +411,74 @@ namespace
                 }
             }
             else if ( key == "homecoming_streak" ) {
-                input >> data.homecomingStreak;
+                input >> candidate.homecomingStreak;
                 hasStreak = true;
             }
             else if ( key == "total_offline_seconds" ) {
-                input >> data.totalOfflineSeconds;
+                input >> candidate.totalOfflineSeconds;
                 hasTotalOfflineSeconds = true;
             }
             else if ( key == "offline_renown" ) {
-                input >> data.offlineRenown;
+                input >> candidate.offlineRenown;
                 hasOfflineRenown = true;
             }
             else if ( key == "contract_id" ) {
-                input >> data.contractId;
+                input >> candidate.contractId;
                 hasContractId = true;
             }
             else if ( key == "contract_progress" ) {
-                input >> data.contractProgress;
+                input >> candidate.contractProgress;
                 hasContractProgress = true;
             }
             else if ( key == "contract_target" ) {
-                input >> data.contractTarget;
+                input >> candidate.contractTarget;
                 hasContractTarget = true;
             }
             else if ( key == "contracts_completed" ) {
-                input >> data.contractsCompleted;
+                input >> candidate.contractsCompleted;
                 hasContractsCompleted = true;
             }
             else if ( key == "treasure_fragments" ) {
-                input >> data.treasureFragments;
+                input >> candidate.treasureFragments;
                 hasTreasureFragments = true;
             }
             else if ( key == "treasure_maps_completed" ) {
-                input >> data.treasureMapsCompleted;
+                input >> candidate.treasureMapsCompleted;
                 hasTreasureMapsCompleted = true;
             }
             else if ( key == "state_castles" ) {
-                input >> data.stateCastles;
+                input >> candidate.stateCastles;
                 hasStateCastles = true;
             }
             else if ( key == "state_towns" ) {
-                input >> data.stateTowns;
+                input >> candidate.stateTowns;
                 hasStateTowns = true;
             }
             else if ( key == "state_heroes" ) {
-                input >> data.stateHeroes;
+                input >> candidate.stateHeroes;
                 hasStateHeroes = true;
             }
             else if ( key == "state_mines" ) {
-                input >> data.stateMines;
+                input >> candidate.stateMines;
                 hasStateMines = true;
             }
             else if ( key == "state_artifacts" ) {
-                input >> data.stateArtifacts;
+                input >> candidate.stateArtifacts;
                 hasStateArtifacts = true;
             }
             else if ( key == "state_efficiency_percent" ) {
-                input >> data.stateEfficiencyPercent;
-                data.stateEfficiencyPercent = std::clamp<uint32_t>( data.stateEfficiencyPercent, 100, 150 );
+                input >> candidate.stateEfficiencyPercent;
+                candidate.stateEfficiencyPercent = std::clamp<uint32_t>( candidate.stateEfficiencyPercent, 100, 150 );
                 hasStateEfficiency = true;
             }
             else if ( key == "supply_rush_meter" ) {
-                input >> data.supplyRushMeter;
-                data.supplyRushMeter = std::min<uint32_t>( data.supplyRushMeter, 99 );
+                input >> candidate.supplyRushMeter;
+                candidate.supplyRushMeter = std::min<uint32_t>( candidate.supplyRushMeter, 99 );
                 hasSupplyRushMeter = true;
             }
             else if ( key == "creature_roster" ) {
                 hasCreatureRoster = true;
-                for ( uint64_t & count : data.creatureRoster ) {
+                for ( uint64_t & count : candidate.creatureRoster ) {
                     if ( !( input >> count ) ) {
                         return false;
                     }
@@ -486,7 +486,7 @@ namespace
             }
             else if ( key == "creature_reserve" ) {
                 hasCreatureReserve = true;
-                for ( uint64_t & count : data.creatureReserve ) {
+                for ( uint64_t & count : candidate.creatureReserve ) {
                     if ( !( input >> count ) ) {
                         return false;
                     }
@@ -494,7 +494,7 @@ namespace
             }
             else if ( key == "creature_recruit_carry" ) {
                 hasCreatureRecruitCarry = true;
-                for ( uint64_t & value : data.creatureRecruitCarry ) {
+                for ( uint64_t & value : candidate.creatureRecruitCarry ) {
                     if ( !( input >> value ) ) {
                         return false;
                     }
@@ -530,7 +530,7 @@ namespace
                    && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
                    && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter && hasCreatureRoster && hasCreatureReserve
                    && hasCreatureRecruitCarry );
-        return ( version >= 1 && version <= 9 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
+        return ( version >= 1 && version <= 9 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && candidate.lastSeenUnix > 0;
 
         };
 
