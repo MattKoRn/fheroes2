@@ -405,6 +405,13 @@ Troop Dialog::RecruitMonster( const Monster & monster0, const uint32_t available
         buttonMin.draw();
     }
 
+    if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+        std::string decisionMessage = _( "AI will choose in 5 seconds: %{decision}" );
+        StringReplace( decisionMessage, "%{decision}", fheroes2::getAutoPlayDialogDecisionText( Dialog::OK | Dialog::CANCEL ) );
+        const fheroes2::Text decisionText( std::move( decisionMessage ), fheroes2::FontType::smallYellow() );
+        decisionText.draw( dialogOffset.x + 8, dialogOffset.y + 213, windowSize.width - 16, display );
+    }
+
     display.render( roi );
 
     const fheroes2::Rect monsterArea( dialogOffset.x + 24, dialogOffset.y + 19, 75, 95 );
@@ -665,7 +672,11 @@ Troop Dialog::RecruitMonster( const Monster & monster0, const uint32_t available
             display.render( windowActiveArea );
         }
 
-        if ( autoDismiss && autoDismissDelay.isPassed() && buttonOk.isEnabled() ) {
+        if ( autoDismiss && autoDismissDelay.isPassed() ) {
+            const int autoDecision = fheroes2::getAutoPlayDialogDecisionResult( Dialog::OK | Dialog::CANCEL );
+            if ( autoDecision == Dialog::CANCEL || !buttonOk.isEnabled() ) {
+                result = 0;
+            }
             break;
         }
     }
