@@ -2736,8 +2736,14 @@ int AI::Planner::getPriorityTarget( Heroes & hero, double & maxPriority )
 
                 double extraValue = 0;
 
+                // Objects encountered along a route are not free: distance-sensitive object
+                // evaluations (for example movement bonuses and courier detours) must use the
+                // distance from the hero to that object, not pretend that the hero is already there.
+                const uint32_t objectDistance = _pathfinder.getDistance( pair.first );
+                assert( objectDistance > 0 );
+
                 if ( isValidObject ) {
-                    extraValue = valueStorage.value( pair, 0 );
+                    extraValue = valueStorage.value( pair, objectDistance );
                 }
                 else {
                     assert( isFutureObjectPredictionAllowed );
@@ -2751,7 +2757,7 @@ int AI::Planner::getPriorityTarget( Heroes & hero, double & maxPriority )
                         // Count the refreshed object's value only when the hero reaches it on or
                         // after the day it becomes valid. Arriving earlier would still find the
                         // object exhausted, so rewarding that route would be misleading.
-                        extraValue = valueStorage.futureValue( pair, 0 );
+                        extraValue = valueStorage.futureValue( pair, objectDistance );
                     }
                 }
 
