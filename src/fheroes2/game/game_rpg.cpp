@@ -19,7 +19,9 @@
 #include "color.h"
 #include "cursor.h"
 #include "dialog.h"
+#include "game_assets.h"
 #include "game_hotkeys.h"
+#include "icn.h"
 #include "image.h"
 #include "localevent.h"
 #include "logging.h"
@@ -31,7 +33,9 @@
 #include "spell.h"
 #include "translations.h"
 #include "ui_dialog.h"
+#include "ui_button.h"
 #include "ui_text.h"
+#include "ui_window.h"
 #include "world.h"
 
 namespace
@@ -439,6 +443,13 @@ namespace
         fheroes2::Text( value, font ).draw( x, y, width, fheroes2::Display::instance() );
     }
 
+    void drawSingleLine( const std::string & value, const int32_t x, const int32_t y, const int32_t width, const fheroes2::FontType & font )
+    {
+        fheroes2::Text line( value, font );
+        line.fitToOneRow( width );
+        line.draw( x, y, fheroes2::Display::instance() );
+    }
+
     std::string formatEffect( const long double value )
     {
         std::ostringstream text;
@@ -764,88 +775,131 @@ void fheroes2::RPG::showMenu()
     }
 
     const CursorRestorer cursorRestorer( true, ::Cursor::POINTER );
-    Dialog::FrameBox frame( 360, true );
-    const fheroes2::Rect area = frame.GetArea();
-    const int32_t x = area.x + 8;
-    const int32_t width = area.width - 16;
-    const int32_t rowWidth = width - 24;
+    fheroes2::Display & display = fheroes2::Display::instance();
+    fheroes2::StandardWindow window( 420, 378, true, display );
+    const fheroes2::Rect area = window.activeArea();
+    const bool isEvilInterface = Settings::Get().isEvilInterfaceEnabled();
+    const int scrollIcn = isEvilInterface ? ICN::SCROLLE : ICN::SCROLL;
     constexpr size_t upgradesPerTab = 5;
     constexpr size_t visibleRows = 3;
     std::array<fheroes2::Rect, tabNames.size()> tabAreas{};
-    std::array<fheroes2::Rect, upgradeCount> upgradeAreas{};
+    std::array<fheroes2::Rect, visibleRows> visibleUpgradeAreas{};
     std::array<size_t, tabNames.size()> scrollOffsets{};
-    const fheroes2::Rect listArea( x, area.y + 88, width, 216 );
-    const fheroes2::Rect scrollUp( x + rowWidth, listArea.y, 24, 22 );
-    const fheroes2::Rect scrollDown( x + rowWidth, listArea.y + listArea.height - 24, 24, 22 );
-    const fheroes2::Rect autoButton( x, area.y + area.height - 70, width, 22 );
-    const fheroes2::Rect closeButton( x, area.y + area.height - 44, width, 25 );
+    const fheroes2::Rect statsArea( area.x + 12, area.y + 29, area.width - 24, 39 );
+    const fheroes2::Rect listArea( area.x + 12, area.y + 130, area.width - 24, 193 );
+    const int32_t scrollbarX = listArea.x + listArea.width - 19;
+    fheroes2::Button scrollUp( scrollbarX + 1, listArea.y + 1, scrollIcn, 0, 1 );
+    fheroes2::Button scrollDown( scrollbarX + 1, listArea.y + listArea.height - 15, scrollIcn, 2, 3 );
+    fheroes2::ButtonSprite autoButton;
+    fheroes2::ButtonSprite closeButton;
     size_t tab = 0;
     bool redraw = true;
     LocalEvent & event = LocalEvent::Get();
 
     while ( event.HandleEvents() ) {
         if ( redraw ) {
-            // The frame is drawn once by its constructor. Clear only its content when tabs change.
-            fheroes2::Fill( fheroes2::Display::instance(), area.x, area.y, area.width, area.height, fheroes2::GetColorId( 37, 31, 23 ) );
-            drawText( "KINGDOM RPG", x, area.y + 4, width, fheroes2::FontType::normalYellow() );
-            drawText( "Lv " + formatNumber( playerProfile.level ) + "  Pts " + formatNumber( playerProfile.points ), x, area.y + 23, width,
-                      fheroes2::FontType::smallWhite() );
+            window.render();
+            window.applyGemDecoratedCorners();
+            drawText( "KINGDOM RPG", area.x + 12, area.y + 6, area.width - 24, fheroes2::FontType::normalYellow() );
+
+            window.applyTextBackgroundShading( statsArea );
+            drawSingleLine( "LEVEL  " + formatNumber( playerProfile.level ), statsArea.x + 12, statsArea.y + 5, statsArea.width / 2 - 18,
+                            fheroes2::FontType::smallYellow() );
+            drawSingleLine( "POINTS  " + formatNumber( playerProfile.points ), statsArea.x + statsArea.width / 2 + 5, statsArea.y + 5,
+                            statsArea.width / 2 - 17, fheroes2::FontType::smallYellow() );
             const uint64_t remainingXP = xpToNextLevel( playerProfile.level ) > playerProfile.progress
                                              ? xpToNextLevel( playerProfile.level ) - playerProfile.progress
                                              : 0;
-            drawText( "XP " + formatExperience( playerProfile.experience ) + "  Next " + formatExperience( remainingXP ), x, area.y + 34, width,
+            drawText( "XP " + formatExperience( playerProfile.experience ) + "    " + formatExperience( remainingXP ) + " to next", statsArea.x + 8,
+                      statsArea.y + 18, statsArea.width - 16,
                       fheroes2::FontType::smallWhite() );
+            const int32_t barWidth = statsArea.width - 24;
+            const uint64_t nextLevelCost = xpToNextLevel( playerProfile.level );
+            const long double progressRatio = nextLevelCost == 0 ? 0.0L : std::min( 1.0L, static_cast<long double>( playerProfile.progress ) / nextLevelCost );
+            fheroes2::Fill( display, statsArea.x + 12, statsArea.y + 34, barWidth, 2, fheroes2::GetColorId( 53, 42, 32 ) );
+            fheroes2::Fill( display, statsArea.x + 12, statsArea.y + 34, static_cast<int32_t>( barWidth * progressRatio ), 2,
+                            fheroes2::GetColorId( 219, 175, 66 ) );
+
             for ( size_t i = 0; i < tabNames.size(); ++i ) {
-                tabAreas[i] = { x + static_cast<int32_t>( ( i % 4 ) * width / 4 ), area.y + 45 + static_cast<int32_t>( i / 4 ) * 22,
-                                static_cast<int32_t>( width / 4 ), 21 };
-                drawText( tabNames[i], tabAreas[i].x, tabAreas[i].y, tabAreas[i].width,
+                tabAreas[i] = { area.x + 12 + static_cast<int32_t>( i % 4 ) * 99, area.y + 74 + static_cast<int32_t>( i / 4 ) * 25, 96, 23 };
+                window.applyTextBackgroundShading( tabAreas[i] );
+                if ( i == tab ) {
+                    fheroes2::Fill( display, tabAreas[i].x + 5, tabAreas[i].y + 2, tabAreas[i].width - 10, 2,
+                                    fheroes2::GetColorId( 219, 175, 66 ) );
+                }
+                drawText( tabNames[i], tabAreas[i].x + 4, tabAreas[i].y + 5, tabAreas[i].width - 8,
                           i == tab ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
+
+            window.applyTextBackgroundShading( listArea );
+            window.renderScrollbarBackground( { scrollbarX, listArea.y, 16, listArea.height }, isEvilInterface );
+            scrollUp.draw();
+            scrollDown.draw();
+            const fheroes2::Sprite & scrollThumb = Assets::getImage( scrollIcn, 4 );
+            const int32_t thumbTravel = std::max( 0, listArea.height - 38 - scrollThumb.height() );
+            const int32_t thumbY = listArea.y + 19 + static_cast<int32_t>( scrollOffsets[tab] * thumbTravel / ( upgradesPerTab - visibleRows ) );
+            fheroes2::Blit( scrollThumb, display, scrollbarX + 2, thumbY );
 
             const size_t first = tab * upgradesPerTab + scrollOffsets[tab];
             for ( size_t row = 0; row < visibleRows; ++row ) {
                 const size_t i = first + row;
-                const int32_t y = listArea.y + static_cast<int32_t>( row * 72 );
-                upgradeAreas[i] = { x, y, rowWidth, 69 };
-                drawText( std::string( upgrades[i].name ) + "  " + formatNumber( playerProfile.ranks[i] ) + "  [Buy]", x, y, rowWidth,
-                          fheroes2::FontType::normalYellow() );
-                drawText( upgrades[i].description, x, y + 20, rowWidth, fheroes2::FontType::smallWhite() );
-                drawText( "Effect +" + formatEffect( effect( i, playerProfile.ranks[i] ) ) + "  Cost " + formatNumber( cost( playerProfile.ranks[i] ) ),
-                          x, y + 39, rowWidth, fheroes2::FontType::smallWhite() );
+                fheroes2::Rect & rowArea = visibleUpgradeAreas[row];
+                rowArea = { listArea.x + 5, listArea.y + 5 + static_cast<int32_t>( row * 61 ), listArea.width - 31, 56 };
+                window.applyTextBackgroundShading( rowArea );
+                const bool canBuy = playerProfile.ranks[i] < std::numeric_limits<uint64_t>::max()
+                                    && playerProfile.points >= cost( playerProfile.ranks[i] );
+                if ( canBuy ) {
+                    fheroes2::Fill( display, rowArea.x + 3, rowArea.y + 7, 2, rowArea.height - 14, fheroes2::GetColorId( 219, 175, 66 ) );
+                }
+                drawSingleLine( upgrades[i].name, rowArea.x + 10, rowArea.y + 5, rowArea.width - 110, fheroes2::FontType::normalYellow() );
+                drawSingleLine( "Rank " + formatNumber( playerProfile.ranks[i] ), rowArea.x + rowArea.width - 96, rowArea.y + 8, 86,
+                                fheroes2::FontType::smallWhite() );
+                drawSingleLine( upgrades[i].description, rowArea.x + 10, rowArea.y + 26, rowArea.width - 20, fheroes2::FontType::smallWhite() );
+                drawSingleLine( "+" + formatEffect( effect( i, playerProfile.ranks[i] ) ) + "   Cost "
+                                    + formatNumber( cost( playerProfile.ranks[i] ) ) + " pt",
+                                rowArea.x + 10, rowArea.y + 42, rowArea.width - 76,
+                                canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
+                drawText( "BUY", rowArea.x + rowArea.width - 60, rowArea.y + 41, 50,
+                          canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
 
-            drawText( "^", scrollUp.x, scrollUp.y, scrollUp.width, fheroes2::FontType::normalYellow() );
-            drawText( "v", scrollDown.x, scrollDown.y, scrollDown.width, fheroes2::FontType::normalYellow() );
-            drawText( std::to_string( scrollOffsets[tab] + 1 ) + "-" + std::to_string( scrollOffsets[tab] + visibleRows ) + "/5  Wheel or arrows to scroll",
-                      x, listArea.y + listArea.height + 1, width, fheroes2::FontType::smallWhite() );
-            drawText( "Right-click an upgrade for details", x, listArea.y + listArea.height + 13, width, fheroes2::FontType::smallWhite() );
-
-            drawText( playerProfile.autoBuy ? "Auto-buy ROI: ON [toggle]" : "Auto-buy ROI: OFF [toggle]", x, autoButton.y, width,
-                      fheroes2::FontType::normalYellow() );
-            drawText( "[ Close ]", x, closeButton.y, width, fheroes2::FontType::normalYellow() );
-            fheroes2::Display::instance().render();
+            drawText( std::to_string( scrollOffsets[tab] + 1 ) + "-" + std::to_string( scrollOffsets[tab] + visibleRows )
+                          + " of 5   Wheel to scroll   Right-click for details",
+                      area.x + 12, area.y + 327, area.width - 24, fheroes2::FontType::smallWhite() );
+            window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Auto-buy ON" : "Auto-buy OFF", { 18, 6 },
+                                                  fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
+            window.renderTextAdaptedButtonSprite( closeButton, "Close", { 18, 6 }, fheroes2::StandardWindow::Padding::BOTTOM_RIGHT );
+            display.render( window.totalArea() );
             redraw = false;
         }
 
-        if ( Game::HotKeyPressEvent( Game::HotKeyEvent::DEFAULT_CANCEL ) || event.MouseClickLeft( closeButton ) ) {
+        autoButton.drawOnState( event.isMouseLeftButtonPressedAndHeldInArea( autoButton.area() ) );
+        closeButton.drawOnState( event.isMouseLeftButtonPressedAndHeldInArea( closeButton.area() ) );
+        scrollUp.drawOnState( event.isMouseLeftButtonPressedAndHeldInArea( scrollUp.area() ) );
+        scrollDown.drawOnState( event.isMouseLeftButtonPressedAndHeldInArea( scrollDown.area() ) );
+
+        if ( Game::HotKeyCloseWindow() || event.MouseClickLeft( closeButton.area() ) ) {
             break;
         }
 
+        bool tabChanged = false;
         for ( size_t i = 0; i < tabNames.size(); ++i ) {
             if ( event.MouseClickLeft( tabAreas[i] ) ) {
                 tab = i;
                 redraw = true;
+                tabChanged = true;
                 break;
             }
         }
+        if ( tabChanged ) continue;
 
         size_t & scrollOffset = scrollOffsets[tab];
-        if ( ( event.isMouseWheelUpInArea( listArea ) || event.MouseClickLeft( scrollUp ) ) && scrollOffset > 0 ) {
+        if ( ( event.isMouseWheelUpInArea( listArea ) || event.MouseClickLeft( scrollUp.area() ) ) && scrollOffset > 0 ) {
             --scrollOffset;
             redraw = true;
             continue;
         }
-        if ( ( event.isMouseWheelDownInArea( listArea ) || event.MouseClickLeft( scrollDown ) ) && scrollOffset + visibleRows < upgradesPerTab ) {
+        if ( ( event.isMouseWheelDownInArea( listArea ) || event.MouseClickLeft( scrollDown.area() ) ) && scrollOffset + visibleRows < upgradesPerTab ) {
             ++scrollOffset;
             redraw = true;
             continue;
@@ -853,18 +907,24 @@ void fheroes2::RPG::showMenu()
 
         for ( size_t row = 0; row < visibleRows; ++row ) {
             const size_t i = tab * upgradesPerTab + scrollOffset + row;
-            if ( event.isMouseRightButtonPressedInArea( upgradeAreas[i] ) ) {
+            if ( event.isMouseRightButtonPressedInArea( visibleUpgradeAreas[row] ) ) {
                 showUpgradeDetails( i );
                 redraw = true;
                 break;
             }
-            if ( event.MouseClickLeft( upgradeAreas[i] ) && buy( playerProfile, i ) ) {
+            if ( event.MouseClickLeft( visibleUpgradeAreas[row] ) && buy( playerProfile, i ) ) {
                 saveProfile();
                 redraw = true;
                 break;
             }
         }
-        if ( event.MouseClickLeft( autoButton ) ) {
+        if ( event.isMouseRightButtonPressedInArea( autoButton.area() ) ) {
+            fheroes2::showStandardTextMessage( "Auto-buy ROI", "Automatically buys the upgrade with the best next effect per point. Battle and adventure choices also use your activity history.",
+                                               Dialog::ZERO );
+            redraw = true;
+            continue;
+        }
+        if ( event.MouseClickLeft( autoButton.area() ) ) {
             playerProfile.autoBuy = !playerProfile.autoBuy;
             if ( playerProfile.autoBuy ) {
                 autoBuy( playerProfile );

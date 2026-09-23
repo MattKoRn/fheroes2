@@ -1,6 +1,6 @@
 # Homm2RPG
 
-Homm2RPG adds a persistent, kingdom-wide RPG profile to fheroes2. Press **F9** on the adventure map to open the menu. The eight tabs contain five upgrades each. Each tab shows three upgrades at a time; use the mouse wheel over the list or its up and down arrows to reach the others. Every level awards five upgrade points. Level 2 requires 250,000 RPG XP, and each later level requires another 100,000 XP. RPG levels and upgrade ranks have no fixed cap; saved numbers use 64-bit storage. Resistance is limited so armies cannot become invulnerable. No upgrade changes movement or game speed.
+Homm2RPG adds a persistent, kingdom-wide RPG profile to fheroes2. Press **F9** on the adventure map to open the menu. The menu follows the game's good or evil window theme, with eight tabs of five upgrades each. Each tab shows three upgrades at a time; use the mouse wheel or its scrollbar to reach the others. Every level awards five upgrade points. Level 2 requires 250,000 RPG XP, and each later level requires another 100,000 XP. RPG levels and upgrade ranks have no fixed cap; saved numbers use 64-bit storage. Resistance is limited so armies cannot become invulnerable. No upgrade changes movement or game speed.
 
 ## Tabs and upgrades
 
