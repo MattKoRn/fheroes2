@@ -46,14 +46,14 @@ namespace
     constexpr uint64_t pointsPerLevel = 5;
     enum UpgradeId : size_t
     {
-        MIGHT, GUARD, MARKSMAN, DUELIST, UNDERDOG,
+        ARMS_TRAINING, ARMOR_TRAINING, VETERAN_CORE, BLOOD_DRINKER, REAPER,
+        FEROCITY, MARKSMAN, BRAWLER, EXECUTIONER, OPENING_BLOW,
+        GIANT_SLAYER, OVERWHELM, FRENZY, DISCIPLINE, ARMOR_PIERCING,
+        IRON_SKIN, ARROW_WARD, MELEE_GUARD, LAST_STAND, BULWARK,
         SORCERY, PYROMANCY, CRYOMANCY, STORMCRAFT, CATACLYSM,
         SPELL_WARD, FIRE_WARD, COLD_WARD, STORM_WARD, CATACLYSM_WARD,
-        WISDOM, MEDITATION, VETERAN, EXPLORER, MENTOR,
-        MONSTER_HUNTER, HERO_SLAYER, SIEGE_MASTER, DEFENDER, SURVIVOR,
-        SCAVENGER, TREASURE_HUNTER, RELIC_HUNTER, PROSPECTOR, CASTELLAN,
-        PILGRIM, SCHOLAR, INSPIRATION, RECRUITER, STORYKEEPER,
-        WAYFARER, MARINER, CARTOGRAPHER, MERCHANT, GENERALIST
+        LEADERSHIP, FORTUNE, REGENERATION, CRITICAL_TRAINING, BRUTAL_CRITICALS,
+        EVASION, ARCANE_PIERCING, CLOSE_QUARTERS, UNYIELDING, RUTHLESS
     };
 
     struct UpgradeInfo
@@ -62,70 +62,87 @@ namespace
         const char * description;
     };
     constexpr std::array<UpgradeInfo, upgradeCount> upgrades{
-        UpgradeInfo{ "Might", "All troop damage" }, { "Guard", "Physical damage resistance" }, { "Marksman", "Ranged troop damage" },
-        { "Duelist", "Melee troop damage" }, { "Underdog", "Damage while outnumbered" },
-        { "Sorcery", "All damaging spells" }, { "Pyromancy", "Fireball and Fireblast" }, { "Cryomancy", "Cold Ray and Cold Ring" },
-        { "Stormcraft", "Lightning and Chain Lightning" }, { "Cataclysm", "Storm and Armageddon" },
-        { "Spell Ward", "All spell damage resistance" }, { "Fire Ward", "Fire spell resistance" }, { "Cold Ward", "Cold spell resistance" },
-        { "Storm Ward", "Lightning resistance" }, { "Chaos Ward", "Storm and Armageddon resistance" },
-        { "War College", "Troop + spell offense" }, { "Mystic Discipline", "Spell defense doctrine" }, { "Veteran Drills", "Physical defense doctrine" },
-        { "Pathfinder", "All adventure reward bundles" }, { "Quartermaster", "All battle reward bundles" },
-        { "Monster Hunter", "Neutral bounty: gold + gems" }, { "Hero Slayer", "Player bounty: gold + crystal" },
-        { "Siege Master", "Siege salvage: gold + ore + wood" }, { "Defender", "Defense stores: wood + ore" }, { "Survivor", "Recovery: gold + wood" },
-        { "Scavenger", "Resource sites: gold + wood" }, { "Treasure Hunter", "Treasure: gold + gems" }, { "Relic Hunter", "Relics: gems + crystal" },
-        { "Prospector", "Production: ore + wood" }, { "Castellan", "Castle stipend: gold + wood" },
-        { "Pilgrim", "Shrines: mercury + gold" }, { "Scholar", "Training: crystal + mercury" }, { "Inspiration", "Morale sites: gems + gold" },
-        { "Recruiter", "Dwellings: gold + wood" }, { "Storykeeper", "Events: gold + gems" },
-        { "Wayfarer", "Portals: sulfur + mercury" }, { "Mariner", "Sea sites: gems + gold" }, { "Cartographer", "Map sites: gold + crystal" },
-        { "Merchant", "Trade stores: gold + ore + wood" }, { "Generalist", "Other sites: gold + wood" }
+        UpgradeInfo{ "Arms Training", "Increase creature Attack" }, { "Armor Training", "Increase creature Defense" },
+        { "Veteran Core", "Increase Attack and Defense" }, { "Blood Drinker", "Attacks steal life" }, { "Reaper", "Kills restore life" },
+
+        { "Ferocity", "Increase all creature damage" }, { "Marksman", "Increase ranged damage" }, { "Brawler", "Increase melee damage" },
+        { "Executioner", "More damage to wounded stacks" }, { "Opening Blow", "More damage to untouched stacks" },
+
+        { "Giant Slayer", "More damage while outnumbered" }, { "Overwhelm", "More damage while outnumbering" },
+        { "Frenzy", "More damage below half health" }, { "Discipline", "More damage at full health" },
+        { "Armor Piercing", "Ignore RPG physical resistance" },
+
+        { "Iron Skin", "Reduce all creature damage" }, { "Arrow Ward", "Reduce ranged damage" }, { "Melee Guard", "Reduce melee damage" },
+        { "Last Stand", "Reduce damage below half health" }, { "Bulwark", "Reduce damage while outnumbered" },
+
+        { "Sorcery", "Increase all damaging spells" }, { "Pyromancy", "Increase fire spell damage" }, { "Cryomancy", "Increase cold spell damage" },
+        { "Stormcraft", "Increase lightning damage" }, { "Cataclysm", "Increase wide-area spell damage" },
+
+        { "Spell Ward", "Reduce all spell damage" }, { "Fire Ward", "Reduce fire spell damage" }, { "Cold Ward", "Reduce cold spell damage" },
+        { "Storm Ward", "Reduce lightning spell damage" }, { "Chaos Ward", "Reduce wide-area spell damage" },
+
+        { "Leadership", "Increase creature Morale" }, { "Fortune", "Increase creature Luck" }, { "Regeneration", "Heal wounded creatures each turn" },
+        { "Critical Training", "Chance for a critical attack" }, { "Brutal Criticals", "Critical attacks deal more damage" },
+
+        { "Evasion", "Chance to halve creature damage" }, { "Arcane Piercing", "Ignore RPG spell resistance" },
+        { "Close Quarters", "Reduce ranged melee penalty" }, { "Unyielding", "Reduce damage while untouched" },
+        { "Ruthless", "More damage to stacks below half health" }
     };
     constexpr std::array<const char *, upgradeCount> upgradeDetails{
-        "Increases physical damage dealt by every troop in your kingdom's battles.",
-        "Reduces physical damage received by your troops. Its curve approaches 75% before other defensive doctrine bonuses are applied.",
-        "Adds physical damage when one of your troops makes a ranged attack.",
-        "Adds physical damage when one of your troops attacks in melee.",
-        "Adds physical damage when the attacking troop has fewer creatures than its target.",
-        "Increases damage from every damaging spell cast for your kingdom.",
-        "Adds damage to Fireball and Fireblast spells.",
-        "Adds damage to Cold Ray and Cold Ring spells.",
-        "Adds damage to Lightning Bolt and Chain Lightning spells.",
-        "Adds damage to Elemental Storm and Armageddon spells.",
-        "Reduces damage received from every damaging spell. Combined spell resistance is capped at 90%.",
-        "Adds resistance against Fireball and Fireblast damage.",
-        "Adds resistance against Cold Ray and Cold Ring damage.",
-        "Adds resistance against Lightning Bolt and Chain Lightning damage.",
-        "Adds resistance against Elemental Storm and Armageddon damage.",
-        "Adds 35% of its listed effect to both physical troop damage and damaging spell power, providing a broad offensive doctrine.",
-        "Adds 50% of its listed effect to spell resistance. Combined spell resistance remains capped at 90%.",
-        "Adds 50% of its listed effect to physical resistance. Combined physical resistance remains capped at 90%.",
-        "Amplifies every resource bundle generated by Spoils, Sites, and Travel upgrades. It improves all resources in the bundle, not RPG experience.",
-        "Amplifies every conditional battle bounty and salvage bundle generated by Battle upgrades. It improves all resources in the bundle.",
-        "After winning against neutral monsters, grants a gold bounty plus a gem trophy cache. Both scale with battle experience, rank, and Quartermaster.",
-        "After winning against another player's army, grants a larger gold bounty plus crystals recovered from the enemy force. Both scale with battle experience, rank, and Quartermaster.",
-        "After winning a castle battle, grants gold, ore, and wood salvage for captured stores and siege materials. All three rewards scale with battle experience, rank, and Quartermaster.",
-        "After winning while defending, grants wood and ore for repairs and fortification. Both rewards scale with battle experience, rank, and Quartermaster.",
-        "After a battle loss, grants a rebuilding fund in gold plus emergency wood supplies. Both rewards scale with battle experience, rank, and Quartermaster.",
-        "On the first rewarded resource or producing-site action on a tile, grants bonus gold and wood. Pathfinder increases both parts of the bundle.",
-        "On the first rewarded treasure chest, sea chest, or wagon action on a tile, grants bonus gold and gems. Pathfinder increases both rewards.",
-        "On the first rewarded artifact, skeleton, or shipwreck-survivor action on a tile, grants gems and crystals. Pathfinder increases both rewards.",
-        "On the first rewarded mine, sawmill, laboratory, lighthouse, or abandoned-mine action on a tile, grants ore and wood. Pathfinder increases both rewards.",
-        "On the first rewarded castle-tile action, grants a royal gold stipend and wood supplies. Pathfinder increases both rewards.",
-        "On the first rewarded shrine or temple action, grants mercury and a small gold tithe. Pathfinder increases both rewards.",
-        "On the first rewarded skill-training, arena, gazebo, or knowledge-tree action, grants crystals and mercury. Pathfinder increases both rewards.",
-        "On the first rewarded morale or luck site action, grants gems and a gold purse. Pathfinder increases both rewards.",
-        "On the first rewarded dwelling or recruitment-site action, grants recruitment gold and wood supplies. Pathfinder increases both rewards.",
-        "On the first rewarded map event, sign, sphinx, or oracle action, grants gold and gems. Pathfinder increases both rewards.",
-        "On the first rewarded stone-lith or whirlpool action, grants sulfur and mercury. Pathfinder increases both rewards.",
-        "On the first rewarded shipwreck, derelict-ship, or siren action, grants gems and recovered gold. Pathfinder increases both rewards.",
-        "On the first rewarded observation tower, obelisk, map, or Magi-site action, grants gold and crystals. Pathfinder increases both rewards.",
-        "On the first rewarded trading-post or alchemist-tower action, grants a large gold cache plus ore and wood stores. Pathfinder increases all three rewards.",
-        "On the first rewarded adventure action not covered by another specialty, grants gold and wood. Pathfinder increases both rewards."
+        "Adds a flat Attack bonus to every creature stack controlled by this RPG profile. Each rank adds +1 Attack.",
+        "Adds a flat Defense bonus to every creature stack controlled by this RPG profile. Each rank adds +1 Defense.",
+        "Adds both Attack and Defense to every creature stack. Each rank adds +1 to both stats.",
+        "Whenever one of your creature stacks deals attack damage, it heals for a percentage of the actual damage dealt. Healing repairs the surviving stack but does not resurrect killed creatures.",
+        "Whenever one of your attacks kills creatures, the attacking stack heals for a percentage of the slain creatures' hit points. It cannot resurrect creatures already lost from that stack.",
+
+        "Increases all physical damage dealt by your creature stacks.",
+        "Increases physical damage dealt by ranged attacks.",
+        "Increases physical damage dealt by melee attacks.",
+        "Increases physical damage against any stack that has already lost hit points or creatures.",
+        "Increases physical damage against a stack that has taken no damage and lost no creatures yet.",
+
+        "Increases physical damage when the attacking stack has fewer creatures than its target.",
+        "Increases physical damage when the attacking stack has more creatures than its target.",
+        "Increases physical damage while the attacking stack is below half of its starting battle hit points.",
+        "Increases physical damage while the attacking stack is still at its full starting battle hit points.",
+        "Ignores a percentage of the defender's RPG physical damage reduction after all applicable defensive upgrades are combined.",
+
+        "Reduces all physical damage received by your creature stacks.",
+        "Adds extra damage reduction against ranged creature attacks.",
+        "Adds extra damage reduction against melee creature attacks.",
+        "Adds extra physical damage reduction while the defending stack is below half of its starting battle hit points.",
+        "Adds extra physical damage reduction while the defending stack has fewer creatures than its attacker.",
+
+        "Increases damage from every damaging spell cast by a hero using this RPG profile.",
+        "Adds damage to Fireball and Fireblast.",
+        "Adds damage to Cold Ray and Cold Ring.",
+        "Adds damage to Lightning Bolt and Chain Lightning.",
+        "Adds damage to Elemental Storm and Armageddon.",
+
+        "Reduces damage received from every damaging spell. Combined RPG spell resistance is capped so it cannot make a stack immune.",
+        "Adds RPG resistance against Fireball and Fireblast.",
+        "Adds RPG resistance against Cold Ray and Cold Ring.",
+        "Adds RPG resistance against Lightning Bolt and Chain Lightning.",
+        "Adds RPG resistance against Elemental Storm and Armageddon.",
+
+        "Adds Morale to your creature stacks during combat, up to +3 from this upgrade.",
+        "Adds Luck to your creature stacks during combat, up to +3 from this upgrade.",
+        "At the beginning of a stack's turn, restores a percentage of the surviving creatures' missing hit points. This heals wounds but never resurrects dead creatures.",
+        "Gives each creature attack a chance to become a critical hit. A critical hit deals 50% extra damage before Brutal Criticals is added.",
+        "Increases the bonus damage of critical hits beyond their normal +50% damage.",
+
+        "Gives your creature stacks a chance to evade part of an incoming creature attack, reducing that attack's final damage by 50%.",
+        "Ignores a percentage of the target's combined RPG spell resistance when your hero casts a damaging spell.",
+        "Recovers part of the normal 50% melee penalty suffered by ranged creatures forced into hand-to-hand combat. At 100% recovery, the RPG penalty modifier removes that penalty.",
+        "Reduces physical damage while the defending stack is still at its full starting battle hit points.",
+        "Adds another damage bonus against enemy stacks below half of their starting battle hit points, rewarding aggressive finishing attacks."
     };
-    constexpr std::array<const char *, 8> tabNames{ "WAR", "MAGIC", "WARDS", "GROWTH", "BATTLES", "SPOILS", "SITES", "TRAVEL" };
+    constexpr std::array<const char *, 8> tabNames{ "ARMY", "OFFENSE", "TACTICS", "DEFENSE", "MAGIC", "WARDS", "COMMAND", "MASTERY" };
     constexpr std::array<const char *, 8> tabPanelNames{
-        "WAR COUNCIL", "MAGE GUILD", "WARD HALL", "ROYAL ACADEMY", "BOUNTY BOARD", "TREASURY", "ADVENTURE GUILD", "WAYFARERS"
+        "TRAINING YARD", "WAR COUNCIL", "TACTICS HALL", "GUARD HOUSE", "MAGE GUILD", "WARD HALL", "THRONE ROOM", "MASTER'S HALL"
     };
 
+    struct Profile
     struct Profile
     {
         uint64_t level{ 1 };
@@ -202,32 +219,57 @@ namespace
         return formatDecimalNumber( std::to_string( value ) );
     }
 
-    long double effect( const size_t id, const uint64_t rank )
+    long double percentEffect( const uint64_t rank )
     {
-        const long double value = static_cast<long double>( rank );
-        // Upgrade ranks remain open-ended. Guard has its own asymptotic resistance curve;
-        // all other percentages are constrained where they are applied.
-        return id == GUARD ? 75.0L * value / ( value + 50.0L ) : 5.0L * std::log1p( value );
+        return 5.0L * std::log1p( static_cast<long double>( rank ) );
     }
 
-    uint32_t scaledReward( const size_t id, const uint64_t rank, const uint64_t base, const long double amplifier = 0.0L )
+    long double effect( const size_t id, const uint64_t rank )
     {
-        if ( rank == 0 || base == 0 ) {
+        if ( rank == 0 ) {
             return 0;
         }
 
-        const long double raw = static_cast<long double>( base ) * effect( id, rank ) / 100.0L * ( 1.0L + amplifier / 100.0L );
-        const long double capped = std::min<long double>( std::numeric_limits<int32_t>::max(), std::max<long double>( 1.0L, raw ) );
-        return static_cast<uint32_t>( capped );
-    }
-
-    void grantResource( const PlayerColor color, const int resource, const uint32_t amount )
-    {
-        if ( color == PlayerColor::NONE || amount == 0 ) {
-            return;
+        switch ( id ) {
+        case ARMS_TRAINING:
+        case ARMOR_TRAINING:
+        case VETERAN_CORE:
+            return static_cast<long double>( rank );
+        case LEADERSHIP:
+        case FORTUNE:
+            return static_cast<long double>( std::min<uint64_t>( rank, 3 ) );
+        case BLOOD_DRINKER:
+            return std::min<long double>( 35.0L, 3.5L * std::log1p( static_cast<long double>( rank ) ) );
+        case REAPER:
+            return std::min<long double>( 50.0L, 5.0L * std::log1p( static_cast<long double>( rank ) ) );
+        case REGENERATION:
+            return std::min<long double>( 25.0L, 3.0L * std::log1p( static_cast<long double>( rank ) ) );
+        case CRITICAL_TRAINING:
+            return std::min<long double>( 30.0L, 5.0L * std::log1p( static_cast<long double>( rank ) ) );
+        case BRUTAL_CRITICALS:
+            return std::min<long double>( 150.0L, 10.0L * std::log1p( static_cast<long double>( rank ) ) );
+        case EVASION:
+            return std::min<long double>( 25.0L, 3.0L * std::log1p( static_cast<long double>( rank ) ) );
+        case ARMOR_PIERCING:
+        case ARCANE_PIERCING:
+            return std::min<long double>( 75.0L, 8.0L * std::log1p( static_cast<long double>( rank ) ) );
+        case CLOSE_QUARTERS:
+            return std::min<long double>( 100.0L, 12.0L * std::log1p( static_cast<long double>( rank ) ) );
+        case IRON_SKIN:
+        case ARROW_WARD:
+        case MELEE_GUARD:
+        case LAST_STAND:
+        case BULWARK:
+        case UNYIELDING:
+        case SPELL_WARD:
+        case FIRE_WARD:
+        case COLD_WARD:
+        case STORM_WARD:
+        case CATACLYSM_WARD:
+            return std::min<long double>( 60.0L, 4.0L * std::log1p( static_cast<long double>( rank ) ) );
+        default:
+            return percentEffect( rank );
         }
-
-        world.GetKingdom( color ).AddFundsResource( Funds( resource, amount ) );
     }
 
     uint64_t cost( const uint64_t rank )
@@ -253,15 +295,6 @@ namespace
 
     void autoBuy( Profile & profile )
     {
-        uint64_t battleUses = 0;
-        uint64_t adventureUses = 0;
-        for ( size_t id = MONSTER_HUNTER; id <= SURVIVOR; ++id ) {
-            battleUses = saturatedAdd( battleUses, profile.useCounts[id] );
-        }
-        for ( size_t id = SCAVENGER; id < upgradeCount; ++id ) {
-            adventureUses = saturatedAdd( adventureUses, profile.useCounts[id] );
-        }
-
         for ( size_t purchases = 0; purchases < 100000; ++purchases ) {
             size_t bestId = upgradeCount;
             long double bestReturn = 0;
@@ -272,26 +305,8 @@ namespace
                     continue;
                 }
 
-                const long double weight = [id, battleUses, adventureUses, &profile]() -> long double {
-                    if ( id == EXPLORER ) {
-                        return adventureUses == 0 ? 0.8L : 1.25L;
-                    }
-                    if ( id == MENTOR ) {
-                        return battleUses == 0 ? 0.8L : 1.25L;
-                    }
-                    if ( id >= MONSTER_HUNTER && id <= SURVIVOR ) {
-                        return ( static_cast<long double>( profile.useCounts[id] ) + 1.0L )
-                               / ( static_cast<long double>( battleUses ) + 5.0L ) * 5.0L;
-                    }
-                    if ( id >= SCAVENGER ) {
-                        return ( static_cast<long double>( profile.useCounts[id] ) + 1.0L )
-                               / ( static_cast<long double>( adventureUses ) + 15.0L ) * 15.0L;
-                    }
-                    return 1.0L;
-                }();
-
                 const long double marginalReturn
-                    = weight * ( effect( id, rank + 1 ) - effect( id, rank ) ) / static_cast<long double>( cost( rank ) );
+                    = ( effect( id, rank + 1 ) - effect( id, rank ) ) / static_cast<long double>( cost( rank ) );
                 if ( marginalReturn > bestReturn ) {
                     bestReturn = marginalReturn;
                     bestId = id;
@@ -328,11 +343,11 @@ namespace
                     return false;
                 }
             }
-            candidate.ranks[MIGHT] = oldRanks[0];
-            candidate.ranks[GUARD] = oldRanks[1];
+            candidate.ranks[ARMS_TRAINING] = oldRanks[0];
+            candidate.ranks[ARMOR_TRAINING] = oldRanks[1];
             candidate.ranks[SORCERY] = oldRanks[2];
-            candidate.ranks[WISDOM] = oldRanks[3];
-            candidate.ranks[MEDITATION] = oldRanks[4];
+            candidate.ranks[VETERAN_CORE] = oldRanks[3];
+            candidate.ranks[SPELL_WARD] = oldRanks[4];
         }
         else {
             for ( uint64_t & rank : candidate.ranks ) {
@@ -507,61 +522,46 @@ namespace
     {
         const long double value = effect( id, rank );
         switch ( id ) {
-        case MIGHT: return "+" + formatEffect( value ) + " troop damage";
-        case GUARD: return formatEffect( value ) + " physical resistance";
+        case ARMS_TRAINING: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Attack";
+        case ARMOR_TRAINING: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Defense";
+        case VETERAN_CORE: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Attack & Defense";
+        case BLOOD_DRINKER: return formatEffect( value ) + " life steal";
+        case REAPER: return formatEffect( value ) + " slain-HP healing";
+        case FEROCITY: return "+" + formatEffect( value ) + " creature damage";
         case MARKSMAN: return "+" + formatEffect( value ) + " ranged damage";
-        case DUELIST: return "+" + formatEffect( value ) + " melee damage";
-        case UNDERDOG: return "+" + formatEffect( value ) + " outnumbered damage";
+        case BRAWLER: return "+" + formatEffect( value ) + " melee damage";
+        case EXECUTIONER: return "+" + formatEffect( value ) + " vs wounded";
+        case OPENING_BLOW: return "+" + formatEffect( value ) + " vs untouched";
+        case GIANT_SLAYER: return "+" + formatEffect( value ) + " while outnumbered";
+        case OVERWHELM: return "+" + formatEffect( value ) + " while outnumbering";
+        case FRENZY: return "+" + formatEffect( value ) + " below half HP";
+        case DISCIPLINE: return "+" + formatEffect( value ) + " at full HP";
+        case ARMOR_PIERCING: return formatEffect( value ) + " physical resistance ignored";
+        case IRON_SKIN: return formatEffect( value ) + " physical reduction";
+        case ARROW_WARD: return formatEffect( value ) + " ranged reduction";
+        case MELEE_GUARD: return formatEffect( value ) + " melee reduction";
+        case LAST_STAND: return formatEffect( value ) + " reduction below half HP";
+        case BULWARK: return formatEffect( value ) + " reduction while outnumbered";
         case SORCERY: return "+" + formatEffect( value ) + " spell damage";
-        case PYROMANCY: return "+" + formatEffect( value ) + " fire spell damage";
-        case CRYOMANCY: return "+" + formatEffect( value ) + " cold spell damage";
+        case PYROMANCY: return "+" + formatEffect( value ) + " fire damage";
+        case CRYOMANCY: return "+" + formatEffect( value ) + " cold damage";
         case STORMCRAFT: return "+" + formatEffect( value ) + " lightning damage";
         case CATACLYSM: return "+" + formatEffect( value ) + " area spell damage";
-        case SPELL_WARD: return formatEffect( value ) + " spell resistance";
-        case FIRE_WARD: return formatEffect( value ) + " fire resistance";
-        case COLD_WARD: return formatEffect( value ) + " cold resistance";
-        case STORM_WARD: return formatEffect( value ) + " lightning resistance";
-        case CATACLYSM_WARD: return formatEffect( value ) + " area spell resistance";
-        case WISDOM: return "+" + formatEffect( value * 0.35L ) + " troop + spell damage";
-        case MEDITATION: return formatEffect( value * 0.5L ) + " spell resistance";
-        case VETERAN: return formatEffect( value * 0.5L ) + " physical resistance";
-        case EXPLORER: return "+" + formatEffect( value ) + " adventure bundles";
-        case MENTOR: return "+" + formatEffect( value ) + " battle bundles";
-        case MONSTER_HUNTER: return "+" + formatEffect( value ) + " bounty: gold + gems";
-        case HERO_SLAYER: return "+" + formatEffect( value ) + " bounty: gold + crystal";
-        case SIEGE_MASTER: return "+" + formatEffect( value ) + " salvage: gold + ore + wood";
-        case DEFENDER: return "+" + formatEffect( value ) + " stores: wood + ore";
-        case SURVIVOR: return "+" + formatEffect( value ) + " recovery: gold + wood";
-        case SCAVENGER:
-            return formatNumber( scaledReward( id, rank, 1200 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 12 ) ) + " wood";
-        case TREASURE_HUNTER:
-            return formatNumber( scaledReward( id, rank, 2500 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 18 ) ) + " gems";
-        case RELIC_HUNTER:
-            return formatNumber( scaledReward( id, rank, 30 ) ) + " gems + " + formatNumber( scaledReward( id, rank, 12 ) ) + " crystal";
-        case PROSPECTOR:
-            return formatNumber( scaledReward( id, rank, 40 ) ) + " ore + " + formatNumber( scaledReward( id, rank, 20 ) ) + " wood";
-        case CASTELLAN:
-            return formatNumber( scaledReward( id, rank, 1800 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 15 ) ) + " wood";
-        case PILGRIM:
-            return formatNumber( scaledReward( id, rank, 20 ) ) + " mercury + " + formatNumber( scaledReward( id, rank, 700 ) ) + " gold";
-        case SCHOLAR:
-            return formatNumber( scaledReward( id, rank, 20 ) ) + " crystal + " + formatNumber( scaledReward( id, rank, 10 ) ) + " mercury";
-        case INSPIRATION:
-            return formatNumber( scaledReward( id, rank, 20 ) ) + " gems + " + formatNumber( scaledReward( id, rank, 900 ) ) + " gold";
-        case RECRUITER:
-            return formatNumber( scaledReward( id, rank, 1800 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 15 ) ) + " wood";
-        case STORYKEEPER:
-            return formatNumber( scaledReward( id, rank, 1400 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 12 ) ) + " gems";
-        case WAYFARER:
-            return formatNumber( scaledReward( id, rank, 20 ) ) + " sulfur + " + formatNumber( scaledReward( id, rank, 8 ) ) + " mercury";
-        case MARINER:
-            return formatNumber( scaledReward( id, rank, 25 ) ) + " gems + " + formatNumber( scaledReward( id, rank, 1200 ) ) + " gold";
-        case CARTOGRAPHER:
-            return formatNumber( scaledReward( id, rank, 1800 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 10 ) ) + " crystal";
-        case MERCHANT:
-            return formatNumber( scaledReward( id, rank, 3000 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 20 ) ) + " ore/wood";
-        case GENERALIST:
-            return formatNumber( scaledReward( id, rank, 1000 ) ) + " gold + " + formatNumber( scaledReward( id, rank, 10 ) ) + " wood";
+        case SPELL_WARD: return formatEffect( value ) + " spell reduction";
+        case FIRE_WARD: return formatEffect( value ) + " fire reduction";
+        case COLD_WARD: return formatEffect( value ) + " cold reduction";
+        case STORM_WARD: return formatEffect( value ) + " lightning reduction";
+        case CATACLYSM_WARD: return formatEffect( value ) + " area spell reduction";
+        case LEADERSHIP: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Morale";
+        case FORTUNE: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Luck";
+        case REGENERATION: return formatEffect( value ) + " turn regeneration";
+        case CRITICAL_TRAINING: return formatEffect( value ) + " crit chance";
+        case BRUTAL_CRITICALS: return "+50% + " + formatEffect( value ) + " crit damage";
+        case EVASION: return formatEffect( value ) + " evade chance";
+        case ARCANE_PIERCING: return formatEffect( value ) + " spell resistance ignored";
+        case CLOSE_QUARTERS: return formatEffect( value ) + " melee penalty recovered";
+        case UNYIELDING: return formatEffect( value ) + " reduction while untouched";
+        case RUTHLESS: return "+" + formatEffect( value ) + " vs targets below half HP";
         default: return formatEffect( value );
         }
     }
@@ -581,15 +581,6 @@ namespace
             message += "\nNext rank costs: " + formatNumber( cost( rank ) ) + " points";
         }
         message += "\nAvailable points: " + formatNumber( playerProfile.points );
-        if ( id >= MONSTER_HUNTER ) {
-            message += "\nTimes triggered: " + formatNumber( playerProfile.useCounts[id] );
-        }
-        if ( id >= MONSTER_HUNTER && id <= SURVIVOR ) {
-            message += "\nBattle rewards are paid after the matching battle condition is resolved.";
-        }
-        else if ( id >= SCAVENGER ) {
-            message += "\nAdventure resource rewards trigger at most once per map tile for this profile.";
-        }
         fheroes2::showStandardTextMessage( upgrades[id].name, std::move( message ), Dialog::ZERO );
     }
 }
@@ -729,23 +720,10 @@ uint64_t fheroes2::RPG::addExperience( const PlayerColor color, const uint64_t a
 }
 
 void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor opponent, const uint32_t battleExperience, const bool won,
-                                  const bool defending, const bool siege )
+                                  const bool /* defending */, const bool /* siege */ )
 {
     if ( color != activePlayerColor ) {
         return;
-    }
-
-    const bool neutral = opponent == PlayerColor::NONE;
-    const auto recordUse = []( const size_t id ) { playerProfile.useCounts[id] = saturatedAdd( playerProfile.useCounts[id], 1 ); };
-    recordUse( neutral ? MONSTER_HUNTER : HERO_SLAYER );
-    if ( siege ) {
-        recordUse( SIEGE_MASTER );
-    }
-    if ( defending ) {
-        recordUse( DEFENDER );
-    }
-    if ( !won ) {
-        recordUse( SURVIVOR );
     }
 
     const Profile * opponentProfile = getProfile( opponent );
@@ -758,40 +736,6 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
     const long double earned = base * challenge;
     addExperience( color, static_cast<uint64_t>( std::min( earned, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) ),
                    ExperienceKind::BATTLE );
-
-    const long double quartermasterBonus = effect( MENTOR, playerProfile.ranks[MENTOR] );
-    if ( won && neutral ) {
-        const uint64_t bountyBase = 1000ULL + battleExperience / 4ULL;
-        const uint64_t trophyGems = 8ULL + battleExperience / 2200ULL;
-        grantResource( color, Resource::GOLD, scaledReward( MONSTER_HUNTER, playerProfile.ranks[MONSTER_HUNTER], bountyBase, quartermasterBonus ) );
-        grantResource( color, Resource::GEMS, scaledReward( MONSTER_HUNTER, playerProfile.ranks[MONSTER_HUNTER], trophyGems, quartermasterBonus ) );
-    }
-    if ( won && !neutral ) {
-        const uint64_t bountyBase = 1500ULL + battleExperience / 3ULL;
-        const uint64_t capturedCrystal = 8ULL + battleExperience / 2000ULL;
-        grantResource( color, Resource::GOLD, scaledReward( HERO_SLAYER, playerProfile.ranks[HERO_SLAYER], bountyBase, quartermasterBonus ) );
-        grantResource( color, Resource::CRYSTAL, scaledReward( HERO_SLAYER, playerProfile.ranks[HERO_SLAYER], capturedCrystal, quartermasterBonus ) );
-    }
-    if ( won && siege ) {
-        const uint64_t salvageGold = 1200ULL + battleExperience / 5ULL;
-        const uint64_t salvageOre = 18ULL + battleExperience / 1500ULL;
-        const uint64_t salvageWood = 12ULL + battleExperience / 1800ULL;
-        grantResource( color, Resource::GOLD, scaledReward( SIEGE_MASTER, playerProfile.ranks[SIEGE_MASTER], salvageGold, quartermasterBonus ) );
-        grantResource( color, Resource::ORE, scaledReward( SIEGE_MASTER, playerProfile.ranks[SIEGE_MASTER], salvageOre, quartermasterBonus ) );
-        grantResource( color, Resource::WOOD, scaledReward( SIEGE_MASTER, playerProfile.ranks[SIEGE_MASTER], salvageWood, quartermasterBonus ) );
-    }
-    if ( won && defending ) {
-        const uint64_t repairWood = 14ULL + battleExperience / 1800ULL;
-        const uint64_t repairOre = 8ULL + battleExperience / 2600ULL;
-        grantResource( color, Resource::WOOD, scaledReward( DEFENDER, playerProfile.ranks[DEFENDER], repairWood, quartermasterBonus ) );
-        grantResource( color, Resource::ORE, scaledReward( DEFENDER, playerProfile.ranks[DEFENDER], repairOre, quartermasterBonus ) );
-    }
-    if ( !won ) {
-        const uint64_t rebuildingFund = 750ULL + battleExperience / 6ULL;
-        const uint64_t emergencyWood = 8ULL + battleExperience / 2600ULL;
-        grantResource( color, Resource::GOLD, scaledReward( SURVIVOR, playerProfile.ranks[SURVIVOR], rebuildingFund, quartermasterBonus ) );
-        grantResource( color, Resource::WOOD, scaledReward( SURVIVOR, playerProfile.ranks[SURVIVOR], emergencyWood, quartermasterBonus ) );
-    }
 }
 
 void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int objectType, const int32_t tileIndex )
@@ -800,48 +744,90 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
         return;
     }
 
-    size_t upgrade = GENERALIST;
     uint64_t base = 70;
     switch ( objectType ) {
     case MP2::OBJ_MONSTER:
     case MP2::OBJ_HERO:
-    case MP2::OBJ_BOAT: return;
-    case MP2::OBJ_RESOURCE: case MP2::OBJ_BARREL: case MP2::OBJ_BOTTLE: case MP2::OBJ_CAMPFIRE: case MP2::OBJ_FLOTSAM:
-    case MP2::OBJ_WINDMILL: case MP2::OBJ_WATER_WHEEL: case MP2::OBJ_MAGIC_GARDEN: case MP2::OBJ_LEAN_TO:
-        upgrade = SCAVENGER; base = 80; break;
-    case MP2::OBJ_TREASURE_CHEST: case MP2::OBJ_SEA_CHEST: case MP2::OBJ_WAGON:
-        upgrade = TREASURE_HUNTER; base = 180; break;
-    case MP2::OBJ_ARTIFACT: case MP2::OBJ_SHIPWRECK_SURVIVOR: case MP2::OBJ_SKELETON:
-        upgrade = RELIC_HUNTER; base = 200; break;
-    case MP2::OBJ_MINE: case MP2::OBJ_ALCHEMIST_LAB: case MP2::OBJ_SAWMILL: case MP2::OBJ_LIGHTHOUSE: case MP2::OBJ_ABANDONED_MINE:
-        upgrade = PROSPECTOR; base = 180; break;
-    case MP2::OBJ_CASTLE: upgrade = CASTELLAN; base = 140; break;
-    case MP2::OBJ_SHRINE_FIRST_CIRCLE: case MP2::OBJ_SHRINE_SECOND_CIRCLE: case MP2::OBJ_SHRINE_THIRD_CIRCLE: case MP2::OBJ_TEMPLE:
-        upgrade = PILGRIM; base = 120; break;
-    case MP2::OBJ_FORT: case MP2::OBJ_MERCENARY_CAMP: case MP2::OBJ_WITCH_DOCTORS_HUT: case MP2::OBJ_STANDING_STONES:
-    case MP2::OBJ_ARENA: case MP2::OBJ_GAZEBO: case MP2::OBJ_WITCHS_HUT: case MP2::OBJ_TREE_OF_KNOWLEDGE:
-        upgrade = SCHOLAR; base = 150; break;
-    case MP2::OBJ_FOUNTAIN: case MP2::OBJ_FAERIE_RING: case MP2::OBJ_IDOL: case MP2::OBJ_MERMAID:
-    case MP2::OBJ_OASIS: case MP2::OBJ_WATERING_HOLE: case MP2::OBJ_BUOY:
-        upgrade = INSPIRATION; base = 90; break;
-    case MP2::OBJ_WATCH_TOWER: case MP2::OBJ_EXCAVATION: case MP2::OBJ_CAVE: case MP2::OBJ_TREE_HOUSE:
-    case MP2::OBJ_ARCHER_HOUSE: case MP2::OBJ_GOBLIN_HUT: case MP2::OBJ_DWARF_COTTAGE: case MP2::OBJ_HALFLING_HOLE:
-    case MP2::OBJ_PEASANT_HUT: case MP2::OBJ_RUINS: case MP2::OBJ_TREE_CITY: case MP2::OBJ_WAGON_CAMP:
-    case MP2::OBJ_DESERT_TENT: case MP2::OBJ_GENIE_LAMP: case MP2::OBJ_DRAGON_CITY: case MP2::OBJ_CITY_OF_DEAD:
-    case MP2::OBJ_TROLL_BRIDGE: case MP2::OBJ_WATER_ALTAR: case MP2::OBJ_AIR_ALTAR: case MP2::OBJ_FIRE_ALTAR:
-    case MP2::OBJ_EARTH_ALTAR: case MP2::OBJ_BARROW_MOUNDS:
-        upgrade = RECRUITER; base = 140; break;
-    case MP2::OBJ_EVENT: case MP2::OBJ_SIGN: case MP2::OBJ_SPHINX: case MP2::OBJ_ORACLE:
-        upgrade = STORYKEEPER; base = 100; break;
-    case MP2::OBJ_STONE_LITHS: case MP2::OBJ_WHIRLPOOL:
-        upgrade = WAYFARER; base = 90; break;
-    case MP2::OBJ_SHIPWRECK: case MP2::OBJ_DERELICT_SHIP: case MP2::OBJ_SIRENS:
-        upgrade = MARINER; base = 130; break;
-    case MP2::OBJ_OBSERVATION_TOWER: case MP2::OBJ_MAGELLANS_MAPS: case MP2::OBJ_OBELISK:
-    case MP2::OBJ_HUT_OF_MAGI: case MP2::OBJ_EYE_OF_MAGI:
-        upgrade = CARTOGRAPHER; base = 150; break;
-    case MP2::OBJ_TRADING_POST: case MP2::OBJ_ALCHEMIST_TOWER:
-        upgrade = MERCHANT; base = 90; break;
+    case MP2::OBJ_BOAT:
+        return;
+    case MP2::OBJ_RESOURCE:
+    case MP2::OBJ_BARREL:
+    case MP2::OBJ_BOTTLE:
+    case MP2::OBJ_CAMPFIRE:
+    case MP2::OBJ_FLOTSAM:
+    case MP2::OBJ_WINDMILL:
+    case MP2::OBJ_WATER_WHEEL:
+    case MP2::OBJ_MAGIC_GARDEN:
+    case MP2::OBJ_LEAN_TO:
+        base = 80;
+        break;
+    case MP2::OBJ_TREASURE_CHEST:
+    case MP2::OBJ_SEA_CHEST:
+    case MP2::OBJ_WAGON:
+        base = 180;
+        break;
+    case MP2::OBJ_ARTIFACT:
+    case MP2::OBJ_SHIPWRECK_SURVIVOR:
+    case MP2::OBJ_SKELETON:
+        base = 200;
+        break;
+    case MP2::OBJ_MINE:
+    case MP2::OBJ_ALCHEMIST_LAB:
+    case MP2::OBJ_SAWMILL:
+    case MP2::OBJ_LIGHTHOUSE:
+    case MP2::OBJ_ABANDONED_MINE:
+        base = 180;
+        break;
+    case MP2::OBJ_CASTLE:
+        base = 140;
+        break;
+    case MP2::OBJ_SHRINE_FIRST_CIRCLE:
+    case MP2::OBJ_SHRINE_SECOND_CIRCLE:
+    case MP2::OBJ_SHRINE_THIRD_CIRCLE:
+    case MP2::OBJ_TEMPLE:
+        base = 120;
+        break;
+    case MP2::OBJ_FORT:
+    case MP2::OBJ_MERCENARY_CAMP:
+    case MP2::OBJ_WITCH_DOCTORS_HUT:
+    case MP2::OBJ_STANDING_STONES:
+    case MP2::OBJ_ARENA:
+    case MP2::OBJ_GAZEBO:
+    case MP2::OBJ_WITCHS_HUT:
+    case MP2::OBJ_TREE_OF_KNOWLEDGE:
+        base = 150;
+        break;
+    case MP2::OBJ_FOUNTAIN:
+    case MP2::OBJ_FAERIE_RING:
+    case MP2::OBJ_IDOL:
+    case MP2::OBJ_MERMAID:
+    case MP2::OBJ_OASIS:
+    case MP2::OBJ_WATERING_HOLE:
+    case MP2::OBJ_BUOY:
+        base = 90;
+        break;
+    case MP2::OBJ_EVENT:
+    case MP2::OBJ_SIGN:
+    case MP2::OBJ_SPHINX:
+    case MP2::OBJ_ORACLE:
+        base = 100;
+        break;
+    case MP2::OBJ_STONE_LITHS:
+    case MP2::OBJ_WHIRLPOOL:
+        base = 90;
+        break;
+    case MP2::OBJ_SHIPWRECK:
+    case MP2::OBJ_DERELICT_SHIP:
+    case MP2::OBJ_SIRENS:
+        base = 130;
+        break;
+    case MP2::OBJ_OBSERVATION_TOWER:
+    case MP2::OBJ_MAGELLANS_MAPS:
+    case MP2::OBJ_OBELISK:
+    case MP2::OBJ_HUT_OF_MAGI:
+    case MP2::OBJ_EYE_OF_MAGI:
+        base = 150;
+        break;
     default:
         if ( !MP2::isInGameActionObject( static_cast<MP2::MapObjectType>( objectType ), false ) ) {
             return;
@@ -854,101 +840,142 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
         return;
     }
 
-    playerProfile.useCounts[upgrade] = saturatedAdd( playerProfile.useCounts[upgrade], 1 );
-
     const long double levelScale = 1.0L + std::log1p( static_cast<long double>( playerProfile.level ) ) / 5.0L;
     addExperience( color, static_cast<uint64_t>( static_cast<long double>( base ) * levelScale ), ExperienceKind::ADVENTURE );
-
-    const long double pathfinderBonus = effect( EXPLORER, playerProfile.ranks[EXPLORER] );
-    const uint64_t rank = playerProfile.ranks[upgrade];
-    switch ( upgrade ) {
-    case SCAVENGER:
-        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1200, pathfinderBonus ) );
-        grantResource( color, Resource::WOOD, scaledReward( upgrade, rank, 12, pathfinderBonus ) );
-        break;
-    case TREASURE_HUNTER:
-        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 2500, pathfinderBonus ) );
-        grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 18, pathfinderBonus ) );
-        break;
-    case RELIC_HUNTER:
-        grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 30, pathfinderBonus ) );
-        grantResource( color, Resource::CRYSTAL, scaledReward( upgrade, rank, 12, pathfinderBonus ) );
-        break;
-    case PROSPECTOR:
-        grantResource( color, Resource::ORE, scaledReward( upgrade, rank, 40, pathfinderBonus ) );
-        grantResource( color, Resource::WOOD, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
-        break;
-    case CASTELLAN:
-        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1800, pathfinderBonus ) );
-        grantResource( color, Resource::WOOD, scaledReward( upgrade, rank, 15, pathfinderBonus ) );
-        break;
-    case PILGRIM:
-        grantResource( color, Resource::MERCURY, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
-        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 700, pathfinderBonus ) );
-        break;
-    case SCHOLAR:
-        grantResource( color, Resource::CRYSTAL, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
-        grantResource( color, Resource::MERCURY, scaledReward( upgrade, rank, 10, pathfinderBonus ) );
-        break;
-    case INSPIRATION:
-        grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
-        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 900, pathfinderBonus ) );
-        break;
-    case RECRUITER:
-        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1800, pathfinderBonus ) );
-        grantResource( color, Resource::WOOD, scaledReward( upgrade, rank, 15, pathfinderBonus ) );
-        break;
-    case STORYKEEPER:
-        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1400, pathfinderBonus ) );
-        grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 12, pathfinderBonus ) );
-        break;
-    case WAYFARER:
-        grantResource( color, Resource::SULFUR, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
-        grantResource( color, Resource::MERCURY, scaledReward( upgrade, rank, 8, pathfinderBonus ) );
-        break;
-    case MARINER:
-        grantResource( color, Resource::GEMS, scaledReward( upgrade, rank, 25, pathfinderBonus ) );
-        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1200, pathfinderBonus ) );
-        break;
-    case CARTOGRAPHER:
-        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1800, pathfinderBonus ) );
-        grantResource( color, Resource::CRYSTAL, scaledReward( upgrade, rank, 10, pathfinderBonus ) );
-        break;
-    case MERCHANT:
-        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 3000, pathfinderBonus ) );
-        grantResource( color, Resource::ORE, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
-        grantResource( color, Resource::WOOD, scaledReward( upgrade, rank, 20, pathfinderBonus ) );
-        break;
-    case GENERALIST:
-        grantResource( color, Resource::GOLD, scaledReward( upgrade, rank, 1000, pathfinderBonus ) );
-        grantResource( color, Resource::WOOD, scaledReward( upgrade, rank, 10, pathfinderBonus ) );
-        break;
-    default:
-        break;
-    }
 }
 
-double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const PlayerColor defender, const bool ranged, const bool outnumbered )
+uint32_t fheroes2::RPG::creatureAttackBonus( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    if ( profile == nullptr ) {
+        return 0;
+    }
+
+    const long double total = effect( ARMS_TRAINING, profile->ranks[ARMS_TRAINING] ) + effect( VETERAN_CORE, profile->ranks[VETERAN_CORE] );
+    return static_cast<uint32_t>( std::min<long double>( total, std::numeric_limits<uint32_t>::max() ) );
+}
+
+uint32_t fheroes2::RPG::creatureDefenseBonus( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    if ( profile == nullptr ) {
+        return 0;
+    }
+
+    const long double total = effect( ARMOR_TRAINING, profile->ranks[ARMOR_TRAINING] ) + effect( VETERAN_CORE, profile->ranks[VETERAN_CORE] );
+    return static_cast<uint32_t>( std::min<long double>( total, std::numeric_limits<uint32_t>::max() ) );
+}
+
+int fheroes2::RPG::moraleBonus( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    return profile == nullptr ? 0 : static_cast<int>( effect( LEADERSHIP, profile->ranks[LEADERSHIP] ) );
+}
+
+int fheroes2::RPG::luckBonus( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    return profile == nullptr ? 0 : static_cast<int>( effect( FORTUNE, profile->ranks[FORTUNE] ) );
+}
+
+double fheroes2::RPG::lifeStealPercent( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    return profile == nullptr ? 0.0 : static_cast<double>( effect( BLOOD_DRINKER, profile->ranks[BLOOD_DRINKER] ) );
+}
+
+double fheroes2::RPG::killHealPercent( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    return profile == nullptr ? 0.0 : static_cast<double>( effect( REAPER, profile->ranks[REAPER] ) );
+}
+
+double fheroes2::RPG::regenerationPercent( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    return profile == nullptr ? 0.0 : static_cast<double>( effect( REGENERATION, profile->ranks[REGENERATION] ) );
+}
+
+uint32_t fheroes2::RPG::criticalChance( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    return profile == nullptr ? 0 : static_cast<uint32_t>( effect( CRITICAL_TRAINING, profile->ranks[CRITICAL_TRAINING] ) );
+}
+
+double fheroes2::RPG::criticalDamageBonusPercent( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    return profile == nullptr ? 50.0 : 50.0 + static_cast<double>( effect( BRUTAL_CRITICALS, profile->ranks[BRUTAL_CRITICALS] ) );
+}
+
+uint32_t fheroes2::RPG::evasionChance( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    return profile == nullptr ? 0 : static_cast<uint32_t>( effect( EVASION, profile->ranks[EVASION] ) );
+}
+
+double fheroes2::RPG::rangedMeleePenaltyRecoveryPercent( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    return profile == nullptr ? 0.0 : static_cast<double>( effect( CLOSE_QUARTERS, profile->ranks[CLOSE_QUARTERS] ) );
+}
+
+double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const PlayerColor defender, const bool ranged, const bool attackerOutnumbered,
+                                        const bool defenderOutnumbered, const bool attackerFullHealth, const bool defenderFullHealth,
+                                        const bool attackerBelowHalf, const bool defenderBelowHalf )
 {
     const Profile * attackProfile = getProfile( attacker );
     const Profile * defenseProfile = getProfile( defender );
+
     long double attackBonus = 0;
     if ( attackProfile != nullptr ) {
-        attackBonus += effect( MIGHT, attackProfile->ranks[MIGHT] );
-        attackBonus += effect( WISDOM, attackProfile->ranks[WISDOM] ) * 0.35L;
-        const size_t style = ranged ? MARKSMAN : DUELIST;
-        attackBonus += effect( style, attackProfile->ranks[style] );
-        if ( outnumbered ) {
-            attackBonus += effect( UNDERDOG, attackProfile->ranks[UNDERDOG] );
+        attackBonus += effect( FEROCITY, attackProfile->ranks[FEROCITY] );
+        attackBonus += effect( ranged ? MARKSMAN : BRAWLER, attackProfile->ranks[ranged ? MARKSMAN : BRAWLER] );
+
+        if ( !defenderFullHealth ) {
+            attackBonus += effect( EXECUTIONER, attackProfile->ranks[EXECUTIONER] );
+        }
+        if ( defenderFullHealth ) {
+            attackBonus += effect( OPENING_BLOW, attackProfile->ranks[OPENING_BLOW] );
+        }
+        if ( attackerOutnumbered ) {
+            attackBonus += effect( GIANT_SLAYER, attackProfile->ranks[GIANT_SLAYER] );
+        }
+        if ( defenderOutnumbered ) {
+            attackBonus += effect( OVERWHELM, attackProfile->ranks[OVERWHELM] );
+        }
+        if ( attackerBelowHalf ) {
+            attackBonus += effect( FRENZY, attackProfile->ranks[FRENZY] );
+        }
+        if ( attackerFullHealth ) {
+            attackBonus += effect( DISCIPLINE, attackProfile->ranks[DISCIPLINE] );
+        }
+        if ( defenderBelowHalf ) {
+            attackBonus += effect( RUTHLESS, attackProfile->ranks[RUTHLESS] );
         }
     }
 
     long double defenseReduction = 0;
     if ( defenseProfile != nullptr ) {
-        defenseReduction += effect( GUARD, defenseProfile->ranks[GUARD] );
-        defenseReduction += effect( VETERAN, defenseProfile->ranks[VETERAN] ) * 0.5L;
+        defenseReduction += effect( IRON_SKIN, defenseProfile->ranks[IRON_SKIN] );
+        defenseReduction += effect( ranged ? ARROW_WARD : MELEE_GUARD, defenseProfile->ranks[ranged ? ARROW_WARD : MELEE_GUARD] );
+
+        if ( defenderBelowHalf ) {
+            defenseReduction += effect( LAST_STAND, defenseProfile->ranks[LAST_STAND] );
+        }
+        if ( defenderOutnumbered ) {
+            defenseReduction += effect( BULWARK, defenseProfile->ranks[BULWARK] );
+        }
+        if ( defenderFullHealth ) {
+            defenseReduction += effect( UNYIELDING, defenseProfile->ranks[UNYIELDING] );
+        }
     }
-    defenseReduction = std::min<long double>( defenseReduction, 90.0L );
+
+    defenseReduction = std::min<long double>( defenseReduction, 80.0L );
+    if ( attackProfile != nullptr && defenseReduction > 0 ) {
+        const long double piercing = effect( ARMOR_PIERCING, attackProfile->ranks[ARMOR_PIERCING] );
+        defenseReduction *= 1.0L - piercing / 100.0L;
+    }
 
     return static_cast<double>( ( 1.0L + attackBonus / 100.0L ) * ( 1.0L - defenseReduction / 100.0L ) );
 }
@@ -960,24 +987,25 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
     const size_t specialization = [spellId]() -> size_t {
         switch ( spellId ) {
         case Spell::FIREBALL:
-        case Spell::FIREBLAST: return PYROMANCY;
+        case Spell::FIREBLAST:
+            return PYROMANCY;
         case Spell::COLDRAY:
-        case Spell::COLDRING: return CRYOMANCY;
+        case Spell::COLDRING:
+            return CRYOMANCY;
         case Spell::LIGHTNINGBOLT:
-        case Spell::CHAINLIGHTNING: return STORMCRAFT;
+        case Spell::CHAINLIGHTNING:
+            return STORMCRAFT;
         case Spell::ELEMENTALSTORM:
-        case Spell::ARMAGEDDON: return CATACLYSM;
-        default: return upgradeCount;
+        case Spell::ARMAGEDDON:
+            return CATACLYSM;
+        default:
+            return upgradeCount;
         }
     }();
+
     long double spellBonus = attackProfile == nullptr ? 0 : effect( SORCERY, attackProfile->ranks[SORCERY] );
     long double defenseReduction = defenseProfile == nullptr ? 0 : effect( SPELL_WARD, defenseProfile->ranks[SPELL_WARD] );
-    if ( attackProfile != nullptr ) {
-        spellBonus += effect( WISDOM, attackProfile->ranks[WISDOM] ) * 0.35L;
-    }
-    if ( defenseProfile != nullptr ) {
-        defenseReduction += effect( MEDITATION, defenseProfile->ranks[MEDITATION] ) * 0.5L;
-    }
+
     if ( specialization != upgradeCount ) {
         if ( attackProfile != nullptr ) {
             spellBonus += effect( specialization, attackProfile->ranks[specialization] );
@@ -987,7 +1015,13 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
             defenseReduction += effect( ward, defenseProfile->ranks[ward] );
         }
     }
-    defenseReduction = std::min<long double>( defenseReduction, 90.0L );
+
+    defenseReduction = std::min<long double>( defenseReduction, 80.0L );
+    if ( attackProfile != nullptr && defenseReduction > 0 ) {
+        const long double piercing = effect( ARCANE_PIERCING, attackProfile->ranks[ARCANE_PIERCING] );
+        defenseReduction *= 1.0L - piercing / 100.0L;
+    }
+
     return static_cast<double>( ( 1.0L + spellBonus / 100.0L ) * ( 1.0L - defenseReduction / 100.0L ) );
 }
 
