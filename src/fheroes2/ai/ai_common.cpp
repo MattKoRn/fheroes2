@@ -37,6 +37,7 @@
 #include "artifact_ultimate.h"
 #include "buildinginfo.h"
 #include "castle.h"
+#include "dialog.h"
 #include "color.h"
 #include "difficulty.h"
 #include "game.h"
@@ -76,6 +77,8 @@ bool AI::BuildIfPossible( Castle & castle, const BuildingType building )
 
     if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
         const BuildingInfo buildingInfo( castle, building );
+        const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::OK, std::string( "Build " ) + buildingInfo.GetName() );
+
         if ( !buildingInfo.DialogBuyBuilding( true ) ) {
             return false;
         }
