@@ -50,6 +50,7 @@
 #include "game_auto_playtest.h"
 #include "game_delays.h"
 #include "game_interface.h"
+#include "game_rpg.h"
 #include "game_static.h"
 #include "game_string.h"
 #include "heroes.h" // IWYU pragma: associated
@@ -3784,7 +3785,10 @@ void Heroes::Action( const int tileIndex )
         // Restore the original music after the action is completed.
         const AudioManager::MusicRestorer musicRestorer;
 
+        const PlayerColor actionColor = GetColor();
+        const MP2::MapObjectType actionType = world.getTile( tileIndex ).getMainObjectType();
         AI::HeroesAction( *this, tileIndex );
+        fheroes2::RPG::awardAdventureAction( actionColor, actionType, tileIndex );
 
         return;
     }
@@ -3800,6 +3804,7 @@ void Heroes::Action( const int tileIndex )
 
     const Maps::Tile & tile = world.getTile( tileIndex );
     const MP2::MapObjectType objectType = tile.getMainObjectType( tileIndex != heroPosIndex );
+    const PlayerColor actionColor = GetColor();
 
     const bool isHeroDisembarking = isShipMaster() && tile.isSuitableForDisembarkation();
     const bool isHeroActing = isHeroDisembarking || MP2::isInGameActionObject( objectType, isShipMaster() );
@@ -4085,4 +4090,5 @@ void Heroes::Action( const int tileIndex )
         assert( !isHeroActing );
         break;
     }
+    fheroes2::RPG::awardAdventureAction( actionColor, objectType, tileIndex );
 }

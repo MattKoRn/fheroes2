@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <limits>
 #include <optional>
 #include <sstream>
 
@@ -42,6 +43,7 @@
 #include "castle.h"
 #include "color.h"
 #include "game_assets.h"
+#include "game_rpg.h"
 #include "game_static.h"
 #include "heroes_base.h"
 #include "image.h"
@@ -511,7 +513,9 @@ uint32_t Battle::Unit::getPotentialDamage( const Unit & enemy ) const
         return CalculateMaxDamage( enemy );
     }
 
-    return ( CalculateMinDamage( enemy ) + CalculateMaxDamage( enemy ) ) / 2;
+    const uint32_t minimum = CalculateMinDamage( enemy );
+    const uint32_t maximum = CalculateMaxDamage( enemy );
+    return minimum + ( maximum - minimum ) / 2;
 }
 
 uint32_t Battle::Unit::CalculateDamageUnit( const Unit & enemy, double dmg ) const
@@ -584,6 +588,9 @@ uint32_t Battle::Unit::CalculateDamageUnit( const Unit & enemy, double dmg ) con
     // Attack bonus is 20% to 300%
     dmg *= 1 + ( 0 < r ? 0.1 * std::min( r, 20 ) : 0.05 * std::max( r, -16 ) );
 
+    dmg = std::min( dmg * fheroes2::RPG::damageMultiplier( GetColor(), enemy.GetColor(), isArchers(), GetCount() < enemy.GetCount() ),
+                    static_cast<double>( std::numeric_limits<uint32_t>::max() ) );
+
     return std::max<uint32_t>( fheroes2::checkedCast<uint32_t>( dmg ).value(), 1U );
 }
 
@@ -602,7 +609,7 @@ uint32_t Battle::Unit::GetDamage( const Unit & enemy, Rand::PCG32 & randomGenera
     }
 
     if ( Modes( LUCK_GOOD ) ) {
-        res *= 2;
+        res = res > std::numeric_limits<uint32_t>::max() / 2 ? std::numeric_limits<uint32_t>::max() : res * 2;
     }
     else if ( Modes( LUCK_BAD ) ) {
         res /= 2;
@@ -1420,6 +1427,12 @@ uint32_t Battle::Unit::CalculateSpellDamage( const Spell & spell, uint32_t spell
         default:
             break;
         }
+    }
+
+    if ( applyingHero != nullptr ) {
+        const double adjustedDamage = static_cast<double>( dmg ) * fheroes2::RPG::spellMultiplier( applyingHero->GetColor(), GetColor(), spell.GetID() );
+        const double boundedDamage = std::min( adjustedDamage, static_cast<double>( std::numeric_limits<uint32_t>::max() ) );
+        dmg = dmg == 0 ? 0 : std::max<uint32_t>( 1, static_cast<uint32_t>( boundedDamage ) );
     }
 
     return dmg;

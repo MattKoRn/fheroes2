@@ -36,6 +36,7 @@
 #include "game.h"
 #include "game_language.h"
 #include "game_over.h"
+#include "game_rpg.h"
 #include "logging.h"
 #include "maps_fileinfo.h"
 #include "save_format_version.h"
@@ -376,7 +377,7 @@ void Game::SetLastSaveName( const std::string & name )
 
 std::string Game::GetSaveDir()
 {
-    return System::concatPath( System::concatPath( System::GetDataDirectory( "fheroes2" ), "files" ), "save" );
+    return fheroes2::RPG::dataDirectory();
 }
 
 std::string Game::GetSaveFileBaseName()

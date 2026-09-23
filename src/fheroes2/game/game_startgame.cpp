@@ -59,6 +59,7 @@
 #include "game_interface.h" // IWYU pragma: associated
 #include "game_io.h"
 #include "game_mode.h"
+#include "game_rpg.h"
 #include "game_over.h"
 #include "heroes.h"
 #include "icn.h"
@@ -83,7 +84,6 @@
 #include "mp2.h"
 #include "mus.h"
 #include "players.h"
-#include "rand.h"
 #include "resource.h"
 #include "resource_trading.h"
 #include "screen.h"
@@ -118,9 +118,6 @@ namespace
     constexpr std::array<int, 7> offlineResourceTypes{ Resource::WOOD, Resource::MERCURY, Resource::ORE, Resource::SULFUR,
                                                        Resource::CRYSTAL, Resource::GEMS, Resource::GOLD };
 
-    constexpr size_t persistentCreatureTypeCount = static_cast<size_t>( Monster::MONSTER_COUNT );
-    using PersistentCreatureRoster = std::array<uint64_t, persistentCreatureTypeCount>;
-
     struct OfflineProgressData
     {
         int64_t lastSeenUnix{ 0 };
@@ -143,9 +140,6 @@ namespace
         uint32_t stateArtifacts{ 0 };
         uint32_t stateEfficiencyPercent{ 100 };
         uint32_t supplyRushMeter{ 0 };
-        PersistentCreatureRoster creatureRoster{};
-        PersistentCreatureRoster creatureReserve{};
-        PersistentCreatureRoster creatureRecruitCarry{};
     };
 
     struct OfflineEvent
@@ -158,6 +152,7 @@ namespace
     struct OfflineProgressSummary
     {
         int64_t elapsedSeconds{ 0 };
+        uint64_t xpEarned{ 0 };
         Funds productionRewards;
         Funds bonusRewards;
         Funds rewards;
@@ -208,154 +203,7 @@ namespace
         uint32_t supplyRushEarned{ 0 };
         uint32_t supplyRushAfter{ 0 };
         bool supplyRushTriggered{ false };
-        uint64_t recruitedCreatures{ 0 };
-        uint32_t recruitedStacks{ 0 };
-        uint32_t recruitmentSettlements{ 0 };
-        Funds recruitmentSpent;
-        PersistentCreatureRoster recruitedCreatureRoster{};
         bool showPopup{ false };
-    };
-
-    class OfflineRecruitmentDialogElement final : public fheroes2::DialogElement
-    {
-    public:
-        OfflineRecruitmentDialogElement( const PersistentCreatureRoster & roster, const int32_t maxHeight )
-        {
-            _creatures.reserve( roster.size() );
-
-            for ( size_t monsterId = 0; monsterId < roster.size(); ++monsterId ) {
-                if ( roster[monsterId] == 0 ) {
-                    continue;
-                }
-
-                const Monster monster( static_cast<int>( monsterId ) );
-                if ( monster.isValid() ) {
-                    _creatures.emplace_back( monster, roster[monsterId] );
-                }
-            }
-
-            if ( _creatures.empty() ) {
-                _area = { fheroes2::boxAreaWidthPx, 0 };
-                return;
-            }
-
-            const fheroes2::Sprite & sampleFrame = Assets::getImage( ICN::STRIP, 12 );
-            const fheroes2::Text sampleCountText( "x999", fheroes2::FontType::smallWhite() );
-            _countTextHeight = sampleCountText.height();
-            _spriteRowHeight = sampleFrame.height() + _countTextHeight + 4;
-
-            const int32_t columns = std::min<int32_t>( 4, static_cast<int32_t>( _creatures.size() ) );
-            const int32_t totalRows = ( static_cast<int32_t>( _creatures.size() ) + columns - 1 ) / columns;
-            const int32_t totalHeightAllSprites = totalRows * _spriteRowHeight;
-
-            if ( totalHeightAllSprites <= maxHeight ) {
-                _visibleCreaturesCount = _creatures.size();
-                _overflowCreaturesCount = 0;
-                _area = { fheroes2::boxAreaWidthPx, totalHeightAllSprites };
-                return;
-            }
-
-            const fheroes2::Text sampleOverflowText( _( "Recruited 999 more creatures!" ), fheroes2::FontType::normalWhite() );
-            const int32_t overflowSpacer = 8;
-            const int32_t overflowTextHeight = sampleOverflowText.height( fheroes2::boxAreaWidthPx );
-            const int32_t overflowTotalHeight = overflowTextHeight + overflowSpacer;
-
-            const int32_t availableForSprites = maxHeight - overflowTotalHeight;
-            const int32_t maxRows = std::max<int32_t>( 0, availableForSprites / _spriteRowHeight );
-
-            _visibleCreaturesCount = std::min( _creatures.size(), static_cast<size_t>( maxRows * 4 ) );
-            _overflowCreaturesCount = 0;
-            for ( size_t i = _visibleCreaturesCount; i < _creatures.size(); ++i ) {
-                _overflowCreaturesCount += _creatures[i].second;
-            }
-
-            const int32_t visibleColumns = _visibleCreaturesCount > 0 ? std::min<int32_t>( 4, static_cast<int32_t>( _visibleCreaturesCount ) ) : 1;
-            const int32_t visibleRows = _visibleCreaturesCount > 0 ? ( static_cast<int32_t>( _visibleCreaturesCount ) + visibleColumns - 1 ) / visibleColumns : 0;
-
-            const int32_t totalHeight = visibleRows * _spriteRowHeight + ( _overflowCreaturesCount > 0 ? overflowTotalHeight : 0 );
-            _area = { fheroes2::boxAreaWidthPx, totalHeight };
-        }
-
-        void draw( fheroes2::Image & output, const fheroes2::Point & offset ) const override
-        {
-            if ( _area.height <= 0 ) {
-                return;
-            }
-
-            if ( _visibleCreaturesCount > 0 ) {
-                const int32_t columns = std::min<int32_t>( 4, static_cast<int32_t>( _visibleCreaturesCount ) );
-                const int32_t cellWidth = _area.width / columns;
-
-                for ( size_t i = 0; i < _visibleCreaturesCount; ++i ) {
-                    const Monster & monster = _creatures[i].first;
-                    const uint64_t count = _creatures[i].second;
-
-                    const int32_t column = static_cast<int32_t>( i ) % columns;
-                    const int32_t row = static_cast<int32_t>( i ) / columns;
-                    const int32_t cellX = offset.x + column * cellWidth;
-                    const int32_t cellY = offset.y + row * _spriteRowHeight;
-
-                    fheroes2::Sprite sprite = Assets::getImage( ICN::STRIP, 12 );
-                    sprite._disableTransformLayer();
-                    fheroes2::renderMonsterFrame( monster, sprite, { 6, 6 } );
-
-                    const int32_t iconX = cellX + ( cellWidth - sprite.width() ) / 2;
-                    fheroes2::Blit( sprite, output, iconX, cellY );
-
-                    const fheroes2::Text countText( "x" + std::to_string( count ), fheroes2::FontType::smallWhite() );
-                    countText.draw( cellX + ( cellWidth - countText.width() ) / 2, cellY + _spriteRowHeight - countText.height(), output );
-                }
-            }
-
-            if ( _overflowCreaturesCount > 0 ) {
-                std::string overflowMsg;
-                if ( _overflowCreaturesCount == 1 ) {
-                    overflowMsg = _( "Recruited 1 more creature!" );
-                }
-                else {
-                    overflowMsg = _( "Recruited %{count} more creatures!" );
-                    StringReplace( overflowMsg, "%{count}", std::to_string( _overflowCreaturesCount ) );
-                }
-
-                const fheroes2::Text overflowText( std::move( overflowMsg ), fheroes2::FontType::normalWhite() );
-                const int32_t textY = offset.y + _area.height - overflowText.height( fheroes2::boxAreaWidthPx );
-                overflowText.draw( offset.x, textY, fheroes2::boxAreaWidthPx, output );
-            }
-        }
-
-        void processEvents( const fheroes2::Point & offset ) const override
-        {
-            if ( _visibleCreaturesCount == 0 || _area.height <= 0 ) {
-                return;
-            }
-
-            const int32_t columns = std::min<int32_t>( 4, static_cast<int32_t>( _visibleCreaturesCount ) );
-            const int32_t cellWidth = _area.width / columns;
-
-            LocalEvent & eventHandler = LocalEvent::Get();
-            for ( size_t i = 0; i < _visibleCreaturesCount; ++i ) {
-                const int32_t column = static_cast<int32_t>( i ) % columns;
-                const int32_t row = static_cast<int32_t>( i ) / columns;
-                const fheroes2::Rect cellRoi{ offset.x + column * cellWidth, offset.y + row * _spriteRowHeight, cellWidth, _spriteRowHeight };
-
-                if ( eventHandler.isMouseRightButtonPressedInArea( cellRoi ) ) {
-                    Dialog::ArmyInfo( Troop{ _creatures[i].first, 1 }, Dialog::ZERO );
-                    return;
-                }
-            }
-        }
-
-        void showPopup( const int /* buttons */ ) const override
-        {
-            // Individual creature details are available through right-click in processEvents().
-        }
-
-    private:
-        std::vector<std::pair<Monster, uint64_t>> _creatures;
-        size_t _visibleCreaturesCount{ 0 };
-        uint64_t _overflowCreaturesCount{ 0 };
-        int32_t _spriteRowHeight{ 0 };
-        int32_t _countTextHeight{ 0 };
     };
 
     int64_t getCurrentUnixTime()
@@ -365,7 +213,7 @@ namespace
 
     std::string getOfflineProgressFilePath()
     {
-        return System::concatPath( System::GetConfigDirectory( "fheroes2" ), offlineProgressFileName );
+        return System::concatPath( fheroes2::RPG::dataDirectory(), offlineProgressFileName );
     }
 
     int32_t clampResourceValue( const int64_t value )
@@ -512,27 +360,18 @@ namespace
             }
             else if ( key == "creature_roster" ) {
                 hasCreatureRoster = true;
-                for ( uint64_t & count : candidate.creatureRoster ) {
-                    if ( !( input >> count ) ) {
-                        return false;
-                    }
-                }
+                std::string ignoredLine;
+                std::getline( input, ignoredLine );
             }
             else if ( key == "creature_reserve" ) {
                 hasCreatureReserve = true;
-                for ( uint64_t & count : candidate.creatureReserve ) {
-                    if ( !( input >> count ) ) {
-                        return false;
-                    }
-                }
+                std::string ignoredLine;
+                std::getline( input, ignoredLine );
             }
             else if ( key == "creature_recruit_carry" ) {
                 hasCreatureRecruitCarry = true;
-                for ( uint64_t & value : candidate.creatureRecruitCarry ) {
-                    if ( !( input >> value ) ) {
-                        return false;
-                    }
-                }
+                std::string ignoredLine;
+                std::getline( input, ignoredLine );
             }
             else {
                 std::string ignoredLine;
@@ -563,8 +402,11 @@ namespace
               || ( version == 9 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
                    && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
                    && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter && hasCreatureRoster && hasCreatureReserve
-                   && hasCreatureRecruitCarry );
-        return ( version >= 1 && version <= 9 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && candidate.lastSeenUnix > 0;
+                   && hasCreatureRecruitCarry )
+              || ( version == 10 && hasStreak && hasTotalOfflineSeconds && hasOfflineRenown && hasContractId && hasContractProgress && hasContractTarget
+                   && hasContractsCompleted && hasTreasureFragments && hasTreasureMapsCompleted && hasStateCastles && hasStateTowns && hasStateHeroes
+                   && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter );
+        return ( version >= 1 && version <= 10 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && candidate.lastSeenUnix > 0;
 
         };
 
@@ -607,7 +449,7 @@ namespace
             output << '\n';
         };
 
-        output << "version 9\n";
+        output << "version 10\n";
         output << "last_seen_unix " << data.lastSeenUnix << '\n';
         output << "resources ";
         writeFunds( data.resources );
@@ -637,24 +479,6 @@ namespace
         output << "state_artifacts " << data.stateArtifacts << '\n';
         output << "state_efficiency_percent " << data.stateEfficiencyPercent << '\n';
         output << "supply_rush_meter " << data.supplyRushMeter << '\n';
-
-        output << "creature_roster";
-        for ( const uint64_t count : data.creatureRoster ) {
-            output << ' ' << count;
-        }
-        output << '\n';
-
-        output << "creature_reserve";
-        for ( const uint64_t count : data.creatureReserve ) {
-            output << ' ' << count;
-        }
-        output << '\n';
-
-        output << "creature_recruit_carry";
-        for ( const uint64_t value : data.creatureRecruitCarry ) {
-            output << ' ' << value;
-        }
-        output << '\n';
 
         output.flush();
         if ( !output ) {
@@ -698,30 +522,11 @@ namespace
         System::Unlink( backupFilePath );
     }
 
-    void setKingdomFundsExact( Kingdom & kingdom, const Funds & target )
-    {
-        const Funds current = kingdom.GetFunds();
-        Funds toAdd;
-        Funds toRemove;
-
-        for ( const FundsMember member : offlineFundMembers ) {
-            if ( target.*member >= current.*member ) {
-                toAdd.*member = target.*member - current.*member;
-            }
-            else {
-                toRemove.*member = current.*member - target.*member;
-            }
-        }
-
-        kingdom.AddFundsResource( toAdd );
-        kingdom.OddFundsResource( toRemove );
-    }
-
     PlayerColor getPersistentResourcePlayerColor( Settings & conf )
     {
         // Offline progression belongs to one deterministic local-human kingdom. Do not prefer
-        // the current turn's player: in Hot Seat that would make the persistent wallet and
-        // creature roster jump between colors depending on whose turn a save was made on.
+        // the current turn's player: in Hot Seat that would make offline progress jump
+        // between colors depending on whose turn a save was made on.
         for ( Player * player : conf.GetPlayers().getVector() ) {
             if ( player != nullptr && player->isPlay() && ( player->isControlHuman() || player->isAIAutoControlMode() ) ) {
                 return player->GetColor();
@@ -765,399 +570,6 @@ namespace
             = getOfflineStateEfficiencyPercent( data.stateCastles, data.stateTowns, data.stateHeroes, data.stateMines, data.stateArtifacts );
     }
 
-    void addArmyToPersistentRoster( PersistentCreatureRoster & roster, const Army & army )
-    {
-        for ( size_t slot = 0; slot < army.Size(); ++slot ) {
-            const Troop * troop = army.GetTroop( slot );
-            if ( troop == nullptr || !troop->isValid() ) {
-                continue;
-            }
-
-            const int monsterId = troop->GetID();
-            if ( monsterId <= Monster::UNKNOWN || static_cast<size_t>( monsterId ) >= roster.size() ) {
-                continue;
-            }
-
-            uint64_t & count = roster[static_cast<size_t>( monsterId )];
-            const uint64_t troopCount = troop->GetCount();
-            count = std::numeric_limits<uint64_t>::max() - count < troopCount ? std::numeric_limits<uint64_t>::max() : count + troopCount;
-        }
-    }
-
-    void capturePersistentCreatureRoster( OfflineProgressData & data, const Kingdom & kingdom )
-    {
-        PersistentCreatureRoster roster{};
-
-        for ( const Heroes * hero : kingdom.GetHeroes() ) {
-            if ( hero != nullptr ) {
-                addArmyToPersistentRoster( roster, hero->GetArmy() );
-            }
-        }
-
-        for ( const Castle * castle : kingdom.GetCastles() ) {
-            if ( castle != nullptr ) {
-                addArmyToPersistentRoster( roster, castle->GetArmy() );
-            }
-        }
-
-        for ( size_t i = 0; i < roster.size(); ++i ) {
-            const uint64_t reserve = data.creatureReserve[i];
-            roster[i] = std::numeric_limits<uint64_t>::max() - roster[i] < reserve ? std::numeric_limits<uint64_t>::max() : roster[i] + reserve;
-        }
-
-        data.creatureRoster = roster;
-    }
-
-    double getPersistentRosterStrength( const PersistentCreatureRoster & roster )
-    {
-        double strength = 0.0;
-        for ( size_t i = 0; i < roster.size(); ++i ) {
-            const uint64_t count = roster[i];
-            if ( count == 0 ) {
-                continue;
-            }
-
-            const Monster monster( static_cast<int>( i ) );
-            if ( !monster.isValid() ) {
-                continue;
-            }
-
-            strength += monster.GetMonsterStrength() * static_cast<double>( count );
-        }
-
-        return strength;
-    }
-
-    double getKingdomArmyStrength( const Kingdom & kingdom )
-    {
-        double strength = 0.0;
-        for ( const Heroes * hero : kingdom.GetHeroes() ) {
-            if ( hero != nullptr ) {
-                strength += hero->GetArmy().GetStrength();
-            }
-        }
-        for ( const Castle * castle : kingdom.GetCastles() ) {
-            if ( castle != nullptr ) {
-                strength += castle->GetArmy().GetStrength();
-            }
-        }
-        return strength;
-    }
-
-    double getRandomizedEnemyMultiplier( const double baseMultiplier, const uint32_t seed, const uint32_t minBonusPercent,
-                                         const uint32_t maxBonusPercent, const double maxMultiplier )
-    {
-        if ( baseMultiplier <= 1.0 ) {
-            return 1.0;
-        }
-
-        const uint32_t bonusPercent = Rand::GetWithSeed( minBonusPercent, maxBonusPercent, seed );
-        const double randomizedMultiplier = 1.0 + ( baseMultiplier - 1.0 ) * static_cast<double>( bonusPercent ) / 100.0;
-
-        return std::clamp( randomizedMultiplier, 1.0, maxMultiplier );
-    }
-
-    void scaleArmyStrength( Army & army, const double multiplier, const uint32_t seed )
-    {
-        if ( multiplier <= 1.0 ) {
-            return;
-        }
-
-        for ( size_t slot = 0; slot < army.Size(); ++slot ) {
-            Troop * troop = army.GetTroop( slot );
-            if ( troop == nullptr || !troop->isValid() ) {
-                continue;
-            }
-
-            // Keep a smaller second layer of variance inside each army so different creature
-            // stacks do not all grow by exactly the same percentage.
-            const uint32_t slotSeed = seed ^ static_cast<uint32_t>( 0x9E3779B9u + slot * 0x85EBCA6Bu );
-            const double stackMultiplier = getRandomizedEnemyMultiplier( multiplier, slotSeed, 90, 110, 2.85 );
-
-            const uint64_t scaledCount = static_cast<uint64_t>( std::ceil( static_cast<double>( troop->GetCount() ) * stackMultiplier ) );
-            troop->SetCount( static_cast<uint32_t>( std::min<uint64_t>( scaledCount, std::numeric_limits<uint32_t>::max() ) ) );
-        }
-    }
-
-    void scaleNewMapEnemies( const PlayerColor playerColor, const double carriedStrength, const double mapStartingStrength )
-    {
-        if ( carriedStrength <= 0.0 ) {
-            return;
-        }
-
-        const double baseline = std::max( 1000.0, mapStartingStrength );
-        const double rawStrengthRatio = carriedStrength / baseline;
-        if ( rawStrengthRatio <= 1.25 ) {
-            return;
-        }
-
-        const double strengthRatio = rawStrengthRatio / 1.25;
-
-        // A 25% dead-zone lets modest carry-over feel rewarding. Beyond that, square-root
-        // scaling progressively strengthens opposition without matching the player 1:1.
-        const double enemyMultiplier = std::clamp( 1.0 + ( std::sqrt( strengthRatio ) - 1.0 ) * 0.75, 1.0, 2.5 );
-        const double neutralMultiplier = std::clamp( 1.0 + ( enemyMultiplier - 1.0 ) * 0.70, 1.0, 2.0 );
-
-        if ( enemyMultiplier > 1.0 ) {
-            for ( Player * player : Settings::Get().GetPlayers().getVector() ) {
-                if ( player == nullptr || player->GetColor() == playerColor || player->isControlHuman()
-                     || Players::isFriends( playerColor, static_cast<PlayerColorsSet>( player->GetColor() ) ) ) {
-                    continue;
-                }
-
-                Kingdom & enemyKingdom = world.GetKingdom( player->GetColor() );
-                const uint32_t mapSeed = world.GetMapSeed();
-
-                for ( Heroes * hero : enemyKingdom.GetHeroes() ) {
-                    if ( hero != nullptr ) {
-                        const uint32_t seed = mapSeed ^ static_cast<uint32_t>( hero->GetID() * 0x45D9F3Bu )
-                                              ^ static_cast<uint32_t>( player->GetColor() ) * 0x27D4EB2Du;
-                        const double randomizedMultiplier = getRandomizedEnemyMultiplier( enemyMultiplier, seed, 70, 140, 2.85 );
-                        scaleArmyStrength( hero->GetArmy(), randomizedMultiplier, seed );
-                    }
-                }
-
-                for ( Castle * castle : enemyKingdom.GetCastles() ) {
-                    if ( castle != nullptr ) {
-                        const uint32_t seed = mapSeed ^ static_cast<uint32_t>( castle->GetIndex() ) * 0x165667B1u
-                                              ^ static_cast<uint32_t>( player->GetColor() ) * 0x9E3779B9u;
-                        const double randomizedMultiplier = getRandomizedEnemyMultiplier( enemyMultiplier, seed, 70, 140, 2.85 );
-                        scaleArmyStrength( castle->GetArmy(), randomizedMultiplier, seed );
-                    }
-                }
-            }
-        }
-
-        if ( neutralMultiplier > 1.0 ) {
-            for ( size_t tileIndex = 0; tileIndex < world.getSize(); ++tileIndex ) {
-                Maps::Tile & tile = world.getTile( static_cast<int32_t>( tileIndex ) );
-                if ( tile.getMainObjectType( false ) != MP2::OBJ_MONSTER ) {
-                    continue;
-                }
-
-                const uint32_t count = Maps::getMonsterCountFromTile( tile );
-                if ( count == 0 ) {
-                    continue;
-                }
-
-                const uint32_t seed = world.GetMapSeed() ^ static_cast<uint32_t>( tileIndex ) * 0x7FEB352Du ^ 0xA24BAED5u;
-                const double randomizedMultiplier = getRandomizedEnemyMultiplier( neutralMultiplier, seed, 60, 150, 2.35 );
-
-                const uint64_t scaledCount = static_cast<uint64_t>( std::ceil( static_cast<double>( count ) * randomizedMultiplier ) );
-                Maps::setMonsterCountOnTile( tile, static_cast<uint32_t>( std::min<uint64_t>( scaledCount, std::numeric_limits<uint32_t>::max() ) ) );
-            }
-        }
-    }
-
-    uint64_t deployCreatureCountToArmy( Army & army, const Monster & monster, uint64_t remaining )
-    {
-        if ( remaining == 0 || !monster.isValid() ) {
-            return remaining;
-        }
-
-        // Fill existing stacks first without ever overflowing the engine's uint32 troop count.
-        for ( size_t slot = 0; slot < army.Size() && remaining > 0; ++slot ) {
-            Troop * troop = army.GetTroop( slot );
-            if ( troop == nullptr || !troop->isValid() || !troop->isMonster( monster.GetID() ) ) {
-                continue;
-            }
-
-            const uint64_t capacity = std::numeric_limits<uint32_t>::max() - static_cast<uint64_t>( troop->GetCount() );
-            const uint32_t amount = static_cast<uint32_t>( std::min<uint64_t>( remaining, capacity ) );
-            if ( amount == 0 ) {
-                continue;
-            }
-
-            troop->SetCount( troop->GetCount() + amount );
-            remaining -= amount;
-        }
-
-        // If one stack reaches uint32 max, continue into free army slots instead of wrapping
-        // the existing stack or silently banking creatures that can still be deployed.
-        for ( size_t slot = 0; slot < army.Size() && remaining > 0; ++slot ) {
-            Troop * troop = army.GetTroop( slot );
-            if ( troop == nullptr || troop->isValid() ) {
-                continue;
-            }
-
-            const uint32_t amount = static_cast<uint32_t>( std::min<uint64_t>( remaining, std::numeric_limits<uint32_t>::max() ) );
-            if ( amount == 0 ) {
-                break;
-            }
-
-            troop->Set( monster, amount );
-            remaining -= amount;
-        }
-
-        return remaining;
-    }
-
-    void restorePersistentCreaturesForNewMap( Kingdom & kingdom )
-    {
-        OfflineProgressData data;
-        if ( !loadOfflineProgressData( data ) ) {
-            return;
-        }
-
-        const bool hasRoster = std::any_of( data.creatureRoster.cbegin(), data.creatureRoster.cend(), []( const uint64_t count ) { return count > 0; } );
-        if ( !hasRoster ) {
-            return;
-        }
-
-        const double mapStartingStrength = getKingdomArmyStrength( kingdom );
-        const double carriedStrength = getPersistentRosterStrength( data.creatureRoster );
-
-        std::vector<Army *> targetArmies;
-        targetArmies.reserve( kingdom.GetHeroes().size() + kingdom.GetCastles().size() );
-
-        for ( Heroes * hero : kingdom.GetHeroes() ) {
-            if ( hero != nullptr ) {
-                hero->GetArmy().Clean();
-                targetArmies.push_back( &hero->GetArmy() );
-            }
-        }
-        for ( Castle * castle : kingdom.GetCastles() ) {
-            if ( castle != nullptr ) {
-                castle->GetArmy().Clean();
-                targetArmies.push_back( &castle->GetArmy() );
-            }
-        }
-
-        PersistentCreatureRoster reserve{};
-        PersistentCreatureRoster remainingRoster = data.creatureRoster;
-        std::vector<size_t> monsterIds;
-        monsterIds.reserve( data.creatureRoster.size() );
-        for ( size_t i = 0; i < data.creatureRoster.size(); ++i ) {
-            if ( data.creatureRoster[i] > 0 ) {
-                const Monster monster( static_cast<int>( i ) );
-                if ( monster.isValid() ) {
-                    monsterIds.push_back( i );
-                }
-            }
-        }
-
-        std::sort( monsterIds.begin(), monsterIds.end(), []( const size_t lhs, const size_t rhs ) {
-            return Monster( static_cast<int>( lhs ) ).GetMonsterStrength() > Monster( static_cast<int>( rhs ) ).GetMonsterStrength();
-        } );
-
-        if ( !monsterIds.empty() ) {
-            const size_t seedMonsterId = monsterIds.front();
-            const Monster seedMonster( static_cast<int>( seedMonsterId ) );
-            uint64_t & seedCount = remainingRoster[seedMonsterId];
-
-            for ( Heroes * hero : kingdom.GetHeroes() ) {
-                if ( hero == nullptr || seedCount == 0 ) {
-                    continue;
-                }
-
-                if ( hero->GetArmy().JoinTroop( seedMonster, 1, false ) ) {
-                    --seedCount;
-                }
-            }
-        }
-
-        for ( const size_t monsterId : monsterIds ) {
-            uint64_t remaining = remainingRoster[monsterId];
-            const Monster monster( static_cast<int>( monsterId ) );
-
-            for ( Army * army : targetArmies ) {
-                if ( army == nullptr || remaining == 0 ) {
-                    continue;
-                }
-
-                remaining = deployCreatureCountToArmy( *army, monster, remaining );
-            }
-
-            reserve[monsterId] = remaining;
-        }
-
-        data.creatureReserve = reserve;
-        saveOfflineProgressData( data );
-
-        scaleNewMapEnemies( kingdom.GetColor(), carriedStrength, mapStartingStrength );
-    }
-
-    void assignPersistentCreatureReservesToHeroes( Kingdom & kingdom )
-    {
-        OfflineProgressData data;
-        if ( !loadOfflineProgressData( data ) ) {
-            return;
-        }
-
-        if ( std::none_of( data.creatureReserve.cbegin(), data.creatureReserve.cend(), []( const uint64_t count ) { return count > 0; } ) ) {
-            return;
-        }
-
-        std::vector<Heroes *> heroes;
-        heroes.reserve( kingdom.GetHeroes().size() );
-        for ( Heroes * hero : kingdom.GetHeroes() ) {
-            if ( hero != nullptr ) {
-                heroes.push_back( hero );
-            }
-        }
-
-        // Freshly recruited heroes tend to have the weakest armies, so fill them first. Castles
-        // are still valid reserve destinations when the kingdom currently has no heroes.
-        std::sort( heroes.begin(), heroes.end(), []( const Heroes * lhs, const Heroes * rhs ) {
-            return lhs->GetArmy().GetStrength() < rhs->GetArmy().GetStrength();
-        } );
-
-        std::vector<size_t> monsterIds;
-        for ( size_t i = 0; i < data.creatureReserve.size(); ++i ) {
-            if ( data.creatureReserve[i] == 0 ) {
-                continue;
-            }
-
-            const Monster monster( static_cast<int>( i ) );
-            if ( monster.isValid() ) {
-                monsterIds.push_back( i );
-            }
-        }
-
-        std::sort( monsterIds.begin(), monsterIds.end(), []( const size_t lhs, const size_t rhs ) {
-            return Monster( static_cast<int>( lhs ) ).GetMonsterStrength() > Monster( static_cast<int>( rhs ) ).GetMonsterStrength();
-        } );
-
-        bool changed = false;
-
-        for ( const size_t monsterId : monsterIds ) {
-            uint64_t & reserveCount = data.creatureReserve[monsterId];
-            const Monster monster( static_cast<int>( monsterId ) );
-            const uint64_t originalReserve = reserveCount;
-
-            for ( Heroes * hero : heroes ) {
-                if ( reserveCount == 0 ) {
-                    break;
-                }
-
-                reserveCount = deployCreatureCountToArmy( hero->GetArmy(), monster, reserveCount );
-            }
-
-            if ( reserveCount > 0 ) {
-                for ( Castle * castle : kingdom.GetCastles() ) {
-                    if ( castle == nullptr ) {
-                        continue;
-                    }
-
-                    reserveCount = deployCreatureCountToArmy( castle->GetArmy(), monster, reserveCount );
-                    if ( reserveCount == 0 ) {
-                        break;
-                    }
-                }
-            }
-
-            changed = changed || reserveCount != originalReserve;
-        }
-
-        if ( changed ) {
-            // Keep the aggregate roster synchronized with the reserve mutation. Otherwise a crash
-            // between this save and the normal end-of-turn snapshot can restore already-deployed
-            // reserve creatures again on the next map.
-            capturePersistentCreatureRoster( data, kingdom );
-            saveOfflineProgressData( data );
-        }
-    }
-
     void persistOfflineProgressSnapshot( Kingdom & kingdom, const int64_t snapshotUnix = 0 )
     {
         OfflineProgressData data;
@@ -1169,7 +581,6 @@ namespace
         data.lastSeenUnix = hasSavedData ? std::max( data.lastSeenUnix, now ) : now;
         data.resources = kingdom.GetFunds();
         captureOfflineKingdomState( data, kingdom );
-        capturePersistentCreatureRoster( data, kingdom );
 
         saveOfflineProgressData( data );
     }
@@ -1772,200 +1183,7 @@ namespace
         data.resources.*member += summary.rankUpBonus;
     }
 
-    double getOfflineRecruitmentGoldEquivalentCost( const Funds & cost, const uint32_t marketplaceCount )
-    {
-        const uint32_t markets = std::max<uint32_t>( 1, marketplaceCount );
-
-        const double commonResourceValue = static_cast<double>( fheroes2::getTradeCost( markets, Resource::WOOD, Resource::GOLD ) );
-        const double rareResourceValue = static_cast<double>( fheroes2::getTradeCost( markets, Resource::MERCURY, Resource::GOLD ) );
-
-        return static_cast<double>( cost.gold )
-               + static_cast<double>( cost.wood + cost.ore ) * commonResourceValue
-               + static_cast<double>( cost.mercury + cost.sulfur + cost.crystal + cost.gems ) * rareResourceValue;
-    }
-
-    void applyOfflineCreatureRecruitment( OfflineProgressSummary & summary, OfflineProgressData & data, Kingdom & kingdom )
-    {
-        if ( summary.elapsedSeconds <= 0 ) {
-            return;
-        }
-
-        VecCastles & castles = kingdom.GetCastles();
-        if ( castles.empty() ) {
-            return;
-        }
-
-        constexpr std::array<uint32_t, 6> baseDwellings{ DWELLING_MONSTER1, DWELLING_MONSTER2, DWELLING_MONSTER3,
-                                                         DWELLING_MONSTER4, DWELLING_MONSTER5, DWELLING_MONSTER6 };
-
-        struct RecruitmentOption
-        {
-            Castle * castle;
-            size_t settlementIndex;
-            int tier;
-            Monster monster;
-            double returnOnInvestment;
-        };
-
-        std::vector<RecruitmentOption> options;
-        options.reserve( castles.size() * baseDwellings.size() );
-
-        const uint32_t marketplaceCount = kingdom.GetCountMarketplace();
-
-        // Every currently owned town participates. Offline recruitment no longer truncates the
-        // candidate list to the number of settlements stored in the previous offline snapshot.
-        for ( size_t castleIndex = 0; castleIndex < castles.size(); ++castleIndex ) {
-            Castle * castle = castles[castleIndex];
-            if ( castle == nullptr || castle->GetColor() != kingdom.GetColor() ) {
-                continue;
-            }
-
-            for ( int tier = 0; tier < Castle::maxNumOfDwellings; ++tier ) {
-                const uint32_t baseDwelling = baseDwellings[static_cast<size_t>( tier )];
-                if ( !castle->isBuild( baseDwelling ) ) {
-                    continue;
-                }
-
-                const uint32_t actualDwelling = castle->GetActualDwelling( baseDwelling );
-                if ( actualDwelling == BUILD_NOTHING ) {
-                    continue;
-                }
-
-                const Monster monster( castle->GetRace(), actualDwelling );
-                if ( !monster.isValid() ) {
-                    continue;
-                }
-
-                const double goldEquivalentCost = getOfflineRecruitmentGoldEquivalentCost( monster.GetCost(), marketplaceCount );
-                if ( goldEquivalentCost <= 0.0 ) {
-                    continue;
-                }
-
-                const double roi = monster.GetMonsterStrength() / goldEquivalentCost;
-                options.push_back( { castle, castleIndex, tier, monster, roi } );
-            }
-        }
-
-        // Buy the most army strength per resource spent across the whole kingdom. Tier is only a
-        // tie-breaker now, so a cheaper lower-tier creature can correctly outrank an inefficient
-        // high-tier creature.
-        std::sort( options.begin(), options.end(), []( const RecruitmentOption & lhs, const RecruitmentOption & rhs ) {
-            if ( std::fabs( lhs.returnOnInvestment - rhs.returnOnInvestment ) > 0.0000001 ) {
-                return lhs.returnOnInvestment > rhs.returnOnInvestment;
-            }
-
-            const double lhsStrength = lhs.monster.GetMonsterStrength();
-            const double rhsStrength = rhs.monster.GetMonsterStrength();
-            if ( lhsStrength != rhsStrength ) {
-                return lhsStrength > rhsStrength;
-            }
-
-            if ( lhs.tier != rhs.tier ) {
-                return lhs.tier > rhs.tier;
-            }
-
-            return lhs.settlementIndex < rhs.settlementIndex;
-        } );
-
-        data.creatureRecruitCarry.fill( 0 );
-        std::vector<bool> recruitedAtSettlement( castles.size(), false );
-
-        for ( const RecruitmentOption & option : options ) {
-            Castle * castle = option.castle;
-            const Monster & monster = option.monster;
-
-            const int affordable = kingdom.GetFunds().getLowestQuotient( monster.GetCost() );
-            if ( affordable <= 0 ) {
-                continue;
-            }
-
-            const uint32_t recruitCount = static_cast<uint32_t>( affordable );
-            const Funds cost = monster.GetCost() * recruitCount;
-            if ( !kingdom.AllowPayment( cost ) ) {
-                continue;
-            }
-
-            uint64_t remaining = recruitCount;
-
-            // Prefer the settlement that produced the creatures, then its visiting hero.
-            remaining = deployCreatureCountToArmy( castle->GetArmy(), monster, remaining );
-
-            Heroes * guestHero = castle->GetHero();
-            if ( remaining > 0 && guestHero != nullptr ) {
-                remaining = deployCreatureCountToArmy( guestHero->GetArmy(), monster, remaining );
-            }
-
-            // If that settlement is full, immediately place the paid creatures into any
-            // other owned army with capacity instead of leaving them invisible until turn end.
-            if ( remaining > 0 ) {
-                for ( Heroes * hero : kingdom.GetHeroes() ) {
-                    if ( hero == nullptr || hero == guestHero ) {
-                        continue;
-                    }
-
-                    remaining = deployCreatureCountToArmy( hero->GetArmy(), monster, remaining );
-                    if ( remaining == 0 ) {
-                        break;
-                    }
-                }
-            }
-
-            if ( remaining > 0 ) {
-                for ( Castle * otherCastle : castles ) {
-                    if ( otherCastle == nullptr || otherCastle == castle ) {
-                        continue;
-                    }
-
-                    remaining = deployCreatureCountToArmy( otherCastle->GetArmy(), monster, remaining );
-                    if ( remaining == 0 ) {
-                        break;
-                    }
-                }
-            }
-
-            if ( remaining > 0 ) {
-                const size_t monsterId = static_cast<size_t>( monster.GetID() );
-                if ( monsterId < data.creatureReserve.size() ) {
-                    uint64_t & reserve = data.creatureReserve[monsterId];
-                    const uint64_t reserveCapacity = std::numeric_limits<uint64_t>::max() - reserve;
-                    const uint64_t storedCount = std::min( remaining, reserveCapacity );
-                    reserve += storedCount;
-                    remaining -= storedCount;
-                }
-            }
-
-            const uint64_t purchasedCount = static_cast<uint64_t>( recruitCount ) - remaining;
-            if ( purchasedCount == 0 ) {
-                continue;
-            }
-
-            // Charge only for creatures that were actually deployed or represented in persistent
-            // storage. This prevents silent losses if the reserve ever reaches uint64 capacity.
-            const Funds actualCost = monster.GetCost() * static_cast<uint32_t>( purchasedCount );
-            kingdom.OddFundsResource( actualCost );
-            summary.recruitmentSpent += actualCost;
-            summary.recruitedCreatures += purchasedCount;
-            ++summary.recruitedStacks;
-
-            const size_t monsterId = static_cast<size_t>( monster.GetID() );
-            if ( monsterId < summary.recruitedCreatureRoster.size() ) {
-                uint64_t & recruitedCount = summary.recruitedCreatureRoster[monsterId];
-                recruitedCount = std::numeric_limits<uint64_t>::max() - recruitedCount < purchasedCount
-                                     ? std::numeric_limits<uint64_t>::max()
-                                     : recruitedCount + purchasedCount;
-            }
-
-            if ( !recruitedAtSettlement[option.settlementIndex] ) {
-                recruitedAtSettlement[option.settlementIndex] = true;
-                ++summary.recruitmentSettlements;
-            }
-        }
-
-        data.resources = kingdom.GetFunds();
-        capturePersistentCreatureRoster( data, kingdom );
-    }
-
-    OfflineProgressSummary applyOfflineProgress( Kingdom & kingdom, const int64_t elapsedOverrideSeconds = -1, const bool restorePersistentWallet = true )
+    OfflineProgressSummary applyOfflineProgress( Kingdom & kingdom, const int64_t elapsedOverrideSeconds = -1 )
     {
         OfflineProgressData data;
         const int64_t now = getCurrentUnixTime();
@@ -1974,20 +1192,13 @@ namespace
             data.lastSeenUnix = now;
             data.resources = kingdom.GetFunds();
             captureOfflineKingdomState( data, kingdom );
-            capturePersistentCreatureRoster( data, kingdom );
             saveOfflineProgressData( data );
             return {};
         }
 
-        if ( restorePersistentWallet ) {
-            // The persistent wallet is authoritative when entering a map or loading a game.
-            setKingdomFundsExact( kingdom, data.resources );
-        }
-        else {
-            // Resume-time rewards are applied on top of the live game state so a battle, purchase
-            // or AI action completed after foregrounding can never be rolled back by offline progress.
-            data.resources = kingdom.GetFunds();
-        }
+        // The map or loaded save owns the treasury. Offline production is calculated in a
+        // temporary wallet solely to determine RPG XP and never changes game resources.
+        data.resources = {};
 
         OfflineProgressSummary summary;
         const int64_t previousLastSeenUnix = data.lastSeenUnix;
@@ -2043,14 +1254,28 @@ namespace
         applyOfflineSupplyRush( summary, data );
         applyOfflineRenownProgress( summary, data );
 
-        setKingdomFundsExact( kingdom, data.resources );
-        applyOfflineCreatureRecruitment( summary, data, kingdom );
+        // Compute XP from the entire elapsed interval. The virtual resource wallet above is
+        // limited to int32 for legacy event calculations, so it cannot set an XP duration cap.
+        const long double dailyGoldEquivalent = static_cast<long double>( std::max( 0, data.dailyIncome.gold ) ) * 15
+                                                + ( static_cast<long double>( std::max( 0, data.dailyIncome.wood ) )
+                                                    + std::max( 0, data.dailyIncome.ore ) ) * 100
+                                                + ( static_cast<long double>( std::max( 0, data.dailyIncome.mercury ) )
+                                                    + std::max( 0, data.dailyIncome.sulfur ) + std::max( 0, data.dailyIncome.crystal )
+                                                    + std::max( 0, data.dailyIncome.gems ) ) * 500;
+        const long double bonusEquivalent = static_cast<long double>( summary.bonusRewards.gold )
+                                            + ( static_cast<long double>( summary.bonusRewards.wood ) + summary.bonusRewards.ore ) * 100
+                                            + ( static_cast<long double>( summary.bonusRewards.mercury ) + summary.bonusRewards.sulfur
+                                                + summary.bonusRewards.crystal + summary.bonusRewards.gems ) * 500;
+        const long double xpValue = dailyGoldEquivalent * summary.stateEfficiencyPercent / 100
+                                    * static_cast<long double>( summary.elapsedSeconds ) / offlineSecondsPerDay + bonusEquivalent;
+        summary.xpEarned = static_cast<uint64_t>( std::min( xpValue, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) );
+        summary.xpEarned = fheroes2::RPG::addExperience( kingdom.GetColor(), summary.xpEarned, fheroes2::RPG::ExperienceKind::OFFLINE );
+        data.resources = kingdom.GetFunds();
 
         // The next offline interval uses the active map and player state at this snapshot.
         // Preserve a future saved timestamp if the local system clock temporarily moves backwards.
         data.lastSeenUnix = std::max( previousLastSeenUnix, now );
         captureOfflineKingdomState( data, kingdom );
-        capturePersistentCreatureRoster( data, kingdom );
         saveOfflineProgressData( data );
 
         return summary;
@@ -2093,58 +1318,14 @@ namespace
 
         message += "\n";
 
-        if ( summary.rewards.GetValidItemsCount() == 0 ) {
-            message += _( "Rewards: none." );
-            fheroes2::showStandardTextMessage( _( "Offline Progress" ), std::move( message ), Dialog::OK );
-            return;
-        }
-
-        message += _( "Rewards:" );
-
-        fheroes2::showResourceMessage( fheroes2::Text( _( "Offline Progress" ), fheroes2::FontType::normalYellow() ),
-                                       fheroes2::Text( std::move( message ), fheroes2::FontType::normalWhite() ), Dialog::OK, summary.rewards );
-    }
-
-    void showOfflineRecruitmentPopup( const OfflineProgressSummary & summary )
-    {
-        if ( !summary.showPopup ) {
-            return;
-        }
-
-        if ( summary.recruitedCreatures == 0 ) {
-            fheroes2::showStandardTextMessage( _( "Offline Recruitment" ), _( "No creatures were recruited while you were away." ), Dialog::OK );
-            return;
-        }
-
-        std::string message = _( "Recruited %{count} creatures while you were away." );
-        StringReplace( message, "%{count}", std::to_string( summary.recruitedCreatures ) );
-        message += "\n";
-        message += _( "Counts are shown below. Right-click a creature for details." );
-
-        const fheroes2::Text headerText( _( "Offline Recruitment" ), fheroes2::FontType::normalYellow() );
-        const fheroes2::Text bodyText( std::move( message ), fheroes2::FontType::normalWhite() );
-
-        const int32_t fixedDialogHeight = fheroes2::getDialogHeight( headerText, bodyText, Dialog::OK );
-        const int32_t maxGridHeight = std::max<int32_t>( 1, fheroes2::Display::instance().height() - fixedDialogHeight - 20 );
-
-        const OfflineRecruitmentDialogElement recruitedCreaturesUI( summary.recruitedCreatureRoster, maxGridHeight );
-        fheroes2::showMessage( headerText, bodyText, Dialog::OK, { &recruitedCreaturesUI } );
+        message += _( "RPG XP earned: " );
+        message += fheroes2::RPG::formatExperience( summary.xpEarned );
+        fheroes2::showStandardTextMessage( _( "Offline Progress" ), std::move( message ), Dialog::OK );
     }
 
     void showOfflineProgressPopups( const OfflineProgressSummary & summary )
     {
         showOfflineProgressPopup( summary );
-
-        if ( !summary.showPopup ) {
-            return;
-        }
-
-        // The first modal can leave its OK/click/key state active for the current event cycle.
-        // Clear it before opening the second popup so the recruitment summary cannot be
-        // immediately dismissed by the input that closed Offline Progress.
-        LocalEvent::Get().reset();
-
-        showOfflineRecruitmentPopup( summary );
     }
 
     OfflineProgressSummary consumePendingOfflineResumeProgress( Kingdom & kingdom )
@@ -2157,7 +1338,7 @@ namespace
         offlineResumePending = false;
         offlineResumeElapsedSeconds = 0;
 
-        return applyOfflineProgress( kingdom, elapsedSeconds, false );
+        return applyOfflineProgress( kingdom, elapsedSeconds );
     }
 
     bool SortPlayers( const Player * player1, const Player * player2 )
@@ -2861,6 +2042,8 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
 
     const PlayerColor persistentResourcePlayerColor = isAutoPlaytest ? PlayerColor::NONE : getPersistentResourcePlayerColor( conf );
 
+    fheroes2::RPG::beginMap( persistentResourcePlayerColor );
+
     offlineProgressActivePlayerColor = persistentResourcePlayerColor;
     offlineSuspendStartedUnix = 0;
     offlineResumeElapsedSeconds = 0;
@@ -2869,9 +2052,6 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
     OfflineProgressSummary offlineProgressSummary;
     if ( persistentResourcePlayerColor != PlayerColor::NONE ) {
         Kingdom & persistentKingdom = world.GetKingdom( persistentResourcePlayerColor );
-        if ( !conf.LoadedGameVersion() ) {
-            restorePersistentCreaturesForNewMap( persistentKingdom );
-        }
         offlineProgressSummary = applyOfflineProgress( persistentKingdom );
     }
 
@@ -3087,7 +2267,6 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
                 }
 
                 if ( !isAutoPlaytest && playerColor == persistentResourcePlayerColor ) {
-                    assignPersistentCreatureReservesToHeroes( kingdom );
                     persistOfflineProgressSnapshot( kingdom );
                 }
 
@@ -3124,8 +2303,8 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
         conf.SetCurrentColor( PlayerColor::NONE );
     }
 
-    // Capture the final surviving roster as well. This matters when a victory/defeat or
-    // menu transition ends the map before another normal end-of-turn snapshot can happen.
+    // Capture the final offline-income state when a victory, defeat, or menu transition
+    // ends the map before another normal end-of-turn snapshot can happen.
     if ( !isAutoPlaytest && persistentResourcePlayerColor != PlayerColor::NONE ) {
         Kingdom & persistentKingdom = world.GetKingdom( persistentResourcePlayerColor );
 
@@ -3141,6 +2320,7 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
     }
 
     offlineProgressActivePlayerColor = PlayerColor::NONE;
+    fheroes2::RPG::endMap();
     offlineSuspendStartedUnix = 0;
     offlineResumeElapsedSeconds = 0;
     offlineResumePending = false;
@@ -3317,6 +2497,9 @@ fheroes2::GameMode Interface::AdventureMap::HumanTurn( const bool isLoadedFromSa
                         player->setAIAutoControlMode( true );
                         return fheroes2::GameMode::END_TURN;
                     }
+                }
+                else if ( HotKeyPressEvent( Game::HotKeyEvent::WORLD_RPG_MENU ) ) {
+                    fheroes2::RPG::showMenu();
                 }
                 else if ( HotKeyPressEvent( Game::HotKeyEvent::WORLD_END_TURN ) ) {
                     res = EventEndTurn();

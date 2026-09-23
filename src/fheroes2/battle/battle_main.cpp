@@ -43,11 +43,14 @@
 #include "dialog.h"
 #include "game.h"
 #include "game_delays.h"
+#include "game_rpg.h"
 #include "heroes.h"
 #include "heroes_base.h"
 #include "kingdom.h"
 #include "logging.h"
 #include "monster.h"
+#include "mp2.h"
+#include "maps_tiles.h"
 #include "players.h"
 #include "rand.h"
 #include "resource.h"
@@ -532,6 +535,10 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
 
     attackingArmy.resetInvalidMonsters();
     defendingArmy.resetInvalidMonsters();
+
+    const bool siege = tileIndex >= 0 && world.getTile( tileIndex ).getMainObjectType() == MP2::OBJ_CASTLE;
+    fheroes2::RPG::awardBattle( attackingArmy.GetColor(), defendingArmy.GetColor(), result.attackerExperience, result.isAttackerWin(), false, siege );
+    fheroes2::RPG::awardBattle( defendingArmy.GetColor(), attackingArmy.GetColor(), result.defenderExperience, result.isDefenderWin(), true, siege );
 
     DEBUG_LOG( DBG_BATTLE, DBG_INFO,
                "attacker: " << ( result.attacker & RESULT_WINS ? "wins" : "loss" ) << ", defender: " << ( result.defender & RESULT_WINS ? "wins" : "loss" ) )
