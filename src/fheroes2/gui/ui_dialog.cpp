@@ -223,8 +223,11 @@ namespace fheroes2
             return {};
         }
 
-        if ( !autoPlayDialogDecisionStack.empty() && !autoPlayDialogDecisionStack.back().text.empty() ) {
-            return autoPlayDialogDecisionStack.back().text;
+        if ( !autoPlayDialogDecisionStack.empty() ) {
+            const AutoPlayDialogDecision & plannedDecision = autoPlayDialogDecisionStack.back();
+            if ( !plannedDecision.text.empty() && ( plannedDecision.result == Dialog::ZERO || ( buttons & plannedDecision.result ) != 0 ) ) {
+                return plannedDecision.text;
+            }
         }
 
         return getDialogDecisionName( getAutoPlayDialogDecisionResult( buttons ) );
