@@ -55,6 +55,10 @@ namespace Game
 
     void runMainGameLoop();
 
+    // Called by the engine when the application enters or leaves the foreground.
+    // Offline progress uses this to snapshot state at suspension without mutating gameplay in the SDL layer.
+    void onApplicationFocusChanged( bool isFocused );
+
     fheroes2::GameMode MainMenu( const bool isFirstGameRun );
     fheroes2::GameMode NewGame( const bool isProbablyDemoVersion );
     fheroes2::GameMode LoadGame();
