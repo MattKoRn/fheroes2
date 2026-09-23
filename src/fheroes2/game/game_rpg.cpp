@@ -581,7 +581,9 @@ namespace
             message += "\nNext rank costs: " + formatNumber( cost( rank ) ) + " points";
         }
         message += "\nAvailable points: " + formatNumber( playerProfile.points );
-        message += "\nTimes triggered: " + formatNumber( playerProfile.useCounts[id] );
+        if ( id >= MONSTER_HUNTER ) {
+            message += "\nTimes triggered: " + formatNumber( playerProfile.useCounts[id] );
+        }
         if ( id >= MONSTER_HUNTER && id <= SURVIVOR ) {
             message += "\nBattle rewards are paid after the matching battle condition is resolved.";
         }
@@ -1101,7 +1103,7 @@ void fheroes2::RPG::showMenu()
                 const int32_t textX = rowArea.x + 48;
                 const int32_t buyWidth = 63;
                 buyAreas[row] = { rowArea.x + rowArea.width - buyWidth - 7, rowArea.y + 27, buyWidth, 20 };
-                drawBeveledPanel( buyAreas[row], canBuy );
+                drawBeveledPanel( buyAreas[row], !canBuy );
                 drawSingleLine( upgrades[i].name, textX, rowArea.y + 4, rowArea.width - 150, fheroes2::FontType::normalYellow() );
                 drawSingleLine( "Rank " + formatNumber( playerProfile.ranks[i] ), rowArea.x + rowArea.width - 94, rowArea.y + 7, 84,
                                 fheroes2::FontType::smallWhite() );
