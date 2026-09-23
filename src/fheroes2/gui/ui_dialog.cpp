@@ -75,6 +75,7 @@ namespace
     };
 
     std::vector<AutoPlayDialogDecision> autoPlayDialogDecisionStack;
+    uint32_t autoPlayPopupTimeoutOverrideDepth = 0;
 
     int getFallbackAutoPlayDialogDecision( const int buttons )
     {
@@ -185,6 +186,22 @@ namespace
 
 namespace fheroes2
 {
+    AutoPlayPopupTimeoutScope::AutoPlayPopupTimeoutScope( const bool enable )
+    {
+        if ( enable ) {
+            ++autoPlayPopupTimeoutOverrideDepth;
+            _active = true;
+        }
+    }
+
+    AutoPlayPopupTimeoutScope::~AutoPlayPopupTimeoutScope()
+    {
+        if ( _active ) {
+            assert( autoPlayPopupTimeoutOverrideDepth > 0 );
+            --autoPlayPopupTimeoutOverrideDepth;
+        }
+    }
+
     AutoPlayDialogDecisionScope::AutoPlayDialogDecisionScope( const int result, std::string decisionText )
     {
         if ( isAutoPlayPopupTimeoutEnabled() ) {
@@ -235,6 +252,10 @@ namespace fheroes2
 
     bool isAutoPlayPopupTimeoutEnabled()
     {
+        if ( autoPlayPopupTimeoutOverrideDepth > 0 ) {
+            return true;
+        }
+
         const Player * currentPlayer = Settings::Get().GetPlayers().GetCurrent();
         return currentPlayer != nullptr && currentPlayer->isAIAutoControlMode();
     }
