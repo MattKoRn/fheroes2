@@ -213,7 +213,7 @@ namespace
     class OfflineRecruitmentDialogElement final : public fheroes2::DialogElement
     {
     public:
-        explicit OfflineRecruitmentDialogElement( const PersistentCreatureRoster & roster )
+        OfflineRecruitmentDialogElement( const PersistentCreatureRoster & roster, const int32_t maxHeight )
         {
             _creatures.reserve( roster.size() );
 
@@ -236,10 +236,9 @@ namespace
             const int32_t columns = std::min<int32_t>( 8, static_cast<int32_t>( _creatures.size() ) );
             const int32_t rows = ( static_cast<int32_t>( _creatures.size() ) + columns - 1 ) / columns;
 
-            // Reserve enough vertical room for the title, explanatory text, OK button and frame.
-            // The creature grid consumes only the remaining space and shrinks its icons if needed.
-            const int32_t maxGridHeight = std::max<int32_t>( 60, fheroes2::Display::instance().height() - 200 );
-            _area = { fheroes2::boxAreaWidthPx, std::min<int32_t>( rows * 34, maxGridHeight ) };
+            // The caller calculates the exact vertical space left by the dialog title, body,
+            // button and frame. Shrink only the grid when the screen is tight.
+            _area = { fheroes2::boxAreaWidthPx, std::min<int32_t>( rows * 34, std::max<int32_t>( 1, maxHeight ) ) };
         }
 
         void draw( fheroes2::Image & output, const fheroes2::Point & offset ) const override
@@ -2070,10 +2069,19 @@ namespace
         std::string message = _( "Recruited %{count} creatures while you were away." );
         StringReplace( message, "%{count}", fheroes2::abbreviateNumber( summary.recruitedCreatures ) );
         message += "\n";
-        message += _( "The number below each creature is the amount recruited. Right-click a creature for details." );
+        message += _( "Counts are shown below. Right-click a creature for details." );
 
-        const OfflineRecruitmentDialogElement recruitedCreaturesUI( summary.recruitedCreatureRoster );
-        fheroes2::showStandardTextMessage( _( "Offline Recruitment" ), std::move( message ), Dialog::OK, { &recruitedCreaturesUI } );
+        const fheroes2::Text headerText( _( "Offline Recruitment" ), fheroes2::FontType::normalYellow() );
+        const fheroes2::Text bodyText( std::move( message ), fheroes2::FontType::normalWhite() );
+
+        // getDialogHeight() without the grid gives us the exact fixed cost of this popup,
+        // including translated text, the OK button and the frame. A DialogElement adds 20 pixels
+        // of vertical spacing around its content, so subtract that too.
+        const int32_t fixedDialogHeight = fheroes2::getDialogHeight( headerText, bodyText, Dialog::OK );
+        const int32_t maxGridHeight = std::max<int32_t>( 1, fheroes2::Display::instance().height() - fixedDialogHeight - 20 );
+
+        const OfflineRecruitmentDialogElement recruitedCreaturesUI( summary.recruitedCreatureRoster, maxGridHeight );
+        fheroes2::showMessage( headerText, bodyText, Dialog::OK, { &recruitedCreaturesUI } );
     }
 
     bool SortPlayers( const Player * player1, const Player * player2 )
