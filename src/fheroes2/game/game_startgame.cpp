@@ -2261,6 +2261,36 @@ namespace
     }
 }
 
+void Game::onApplicationFocusChanged( const bool isFocused )
+{
+    if ( offlineProgressActivePlayerColor == PlayerColor::NONE ) {
+        return;
+    }
+
+    if ( !isFocused ) {
+        if ( offlineSuspendStartedUnix > 0 ) {
+            return;
+        }
+
+        const int64_t now = getCurrentUnixTime();
+        persistOfflineProgressSnapshot( world.GetKingdom( offlineProgressActivePlayerColor ), now );
+
+        offlineSuspendStartedUnix = now;
+        offlineResumeElapsedSeconds = 0;
+        offlineResumePending = false;
+        return;
+    }
+
+    if ( offlineSuspendStartedUnix <= 0 ) {
+        return;
+    }
+
+    const int64_t now = getCurrentUnixTime();
+    offlineResumeElapsedSeconds = now > offlineSuspendStartedUnix ? now - offlineSuspendStartedUnix : 0;
+    offlineSuspendStartedUnix = 0;
+    offlineResumePending = offlineResumeElapsedSeconds > 0;
+}
+
 fheroes2::GameMode Game::StartBattleOnly()
 {
     static Battle::Only battleOnlySetup;
@@ -2803,6 +2833,12 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
     _statusPanel.Reset();
 
     const PlayerColor persistentResourcePlayerColor = isAutoPlaytest ? PlayerColor::NONE : getPersistentResourcePlayerColor( conf );
+
+    offlineProgressActivePlayerColor = persistentResourcePlayerColor;
+    offlineSuspendStartedUnix = 0;
+    offlineResumeElapsedSeconds = 0;
+    offlineResumePending = false;
+
     OfflineProgressSummary offlineProgressSummary;
     if ( persistentResourcePlayerColor != PlayerColor::NONE ) {
         Kingdom & persistentKingdom = world.GetKingdom( persistentResourcePlayerColor );
@@ -3018,6 +3054,12 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
                     break;
                 }
 
+                if ( !isAutoPlaytest && offlineResumePending && persistentResourcePlayerColor != PlayerColor::NONE ) {
+                    Kingdom & persistentKingdom = world.GetKingdom( persistentResourcePlayerColor );
+                    const OfflineProgressSummary resumeSummary = consumePendingOfflineResumeProgress( persistentKingdom );
+                    showOfflineProgressPopups( resumeSummary );
+                }
+
                 if ( !isAutoPlaytest && playerColor == persistentResourcePlayerColor ) {
                     assignPersistentCreatureReservesToHeroes( kingdom );
                     persistOfflineProgressSnapshot( kingdom );
@@ -3059,8 +3101,23 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
     // Capture the final surviving roster as well. This matters when a victory/defeat or
     // menu transition ends the map before another normal end-of-turn snapshot can happen.
     if ( !isAutoPlaytest && persistentResourcePlayerColor != PlayerColor::NONE ) {
-        persistOfflineProgressSnapshot( world.GetKingdom( persistentResourcePlayerColor ) );
+        Kingdom & persistentKingdom = world.GetKingdom( persistentResourcePlayerColor );
+
+        if ( offlineResumePending ) {
+            consumePendingOfflineResumeProgress( persistentKingdom );
+        }
+
+        // If the app is still backgrounded, the focus-loss snapshot is the correct start of the
+        // next offline interval. Do not replace it with a later shutdown timestamp.
+        if ( offlineSuspendStartedUnix == 0 ) {
+            persistOfflineProgressSnapshot( persistentKingdom );
+        }
     }
+
+    offlineProgressActivePlayerColor = PlayerColor::NONE;
+    offlineSuspendStartedUnix = 0;
+    offlineResumeElapsedSeconds = 0;
+    offlineResumePending = false;
 
     // If we are here, the res value should never be fheroes2::GameMode::END_TURN
     assert( res != fheroes2::GameMode::END_TURN );
@@ -3182,6 +3239,16 @@ fheroes2::GameMode Interface::AdventureMap::HumanTurn( const bool isLoadedFromSa
             }
 
             continue;
+        }
+
+        if ( offlineResumePending && myKingdom.GetColor() == offlineProgressActivePlayerColor ) {
+            const OfflineProgressSummary resumeSummary = consumePendingOfflineResumeProgress( myKingdom );
+            showOfflineProgressPopups( resumeSummary );
+
+            _iconsPanel.resetIcons( ICON_ANY );
+            _iconsPanel.showIcons( ICON_ANY );
+            redraw( REDRAW_GAMEAREA | REDRAW_ICONS | REDRAW_STATUS );
+            validateFadeInAndRender();
         }
 
         {
