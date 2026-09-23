@@ -51,15 +51,7 @@ int Dialog::BuyBoat( bool enable )
     fheroes2::Text text{ _( "Build a new ship:" ), fheroes2::FontType::normalWhite() };
     const int spacer = 10;
 
-    std::string decisionMessage;
-    if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
-        decisionMessage = _( "AI will choose in 5 seconds: %{decision}" );
-        StringReplace( decisionMessage, "%{decision}", fheroes2::getAutoPlayDialogDecisionText( Dialog::OK | Dialog::CANCEL ) );
-    }
-    const fheroes2::Text decisionText( decisionMessage, fheroes2::FontType::smallYellow() );
-    const int32_t decisionHeight = decisionMessage.empty() ? 0 : decisionText.height( fheroes2::boxAreaWidthPx ) + spacer;
-
-    Dialog::FrameBox box( text.height() + spacer + sprite.height() + spacer + text.height() + spacer + rbs.GetArea().height - 20 + decisionHeight, true );
+    Dialog::FrameBox box( text.height() + spacer + sprite.height() + spacer + text.height() + spacer + rbs.GetArea().height - 20, true );
 
     const fheroes2::Rect & box_rt = box.GetArea();
     fheroes2::Point dst_pt( box_rt.x + ( box_rt.width - text.width() ) / 2, box_rt.y );
@@ -76,10 +68,6 @@ int Dialog::BuyBoat( bool enable )
 
     rbs.SetPos( box_rt.x, dst_pt.y + spacer );
     rbs.Redraw();
-
-    if ( !decisionMessage.empty() ) {
-        decisionText.draw( box_rt.x, rbs.GetArea().y + rbs.GetArea().height + spacer, fheroes2::boxAreaWidthPx, display );
-    }
 
     // buttons
     fheroes2::ButtonGroup buttonGroup( box_rt, Dialog::OK | Dialog::CANCEL );

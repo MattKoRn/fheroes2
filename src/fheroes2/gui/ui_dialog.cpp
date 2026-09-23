@@ -265,12 +265,6 @@ namespace fheroes2
         outputInTextSupportMode( header, body, buttons );
 
         const bool autoDismiss = isAutoPlayPopupTimeoutEnabled();
-        std::string autoDecisionMessage;
-        if ( autoDismiss ) {
-            autoDecisionMessage = _( "AI will choose in 5 seconds: %{decision}" );
-            StringReplace( autoDecisionMessage, "%{decision}", getAutoPlayDialogDecisionText( buttons ) );
-        }
-        const Text autoDecisionText( autoDecisionMessage, FontType::smallYellow() );
 
         const bool isProperDialog = ( buttons != 0 );
 
@@ -286,11 +280,6 @@ namespace fheroes2
         const int32_t bodyTextHeight = body.height( fheroes2::boxAreaWidthPx );
         if ( bodyTextHeight > 0 ) {
             overallTextHeight += bodyTextHeight + textOffsetY;
-        }
-
-        const int32_t autoDecisionTextHeight = autoDismiss ? autoDecisionText.height( fheroes2::boxAreaWidthPx ) : 0;
-        if ( autoDecisionTextHeight > 0 ) {
-            overallTextHeight += autoDecisionTextHeight + textOffsetY;
         }
 
         std::vector<int32_t> rowElementIndex;
@@ -354,11 +343,6 @@ namespace fheroes2
         Display & display = Display::instance();
         header.draw( pos.x, pos.y + textOffsetY, fheroes2::boxAreaWidthPx, display );
         body.draw( pos.x, pos.y + textOffsetY + headerHeight, fheroes2::boxAreaWidthPx, display );
-
-        if ( autoDecisionTextHeight > 0 ) {
-            const int32_t decisionY = pos.y + textOffsetY + headerHeight + bodyTextHeight + ( bodyTextHeight > 0 ? textOffsetY : 0 );
-            autoDecisionText.draw( pos.x, decisionY, fheroes2::boxAreaWidthPx, display );
-        }
 
         elementHeight = overallTextHeight + textOffsetY;
         if ( bodyTextHeight > 0 ) {

@@ -2008,7 +2008,7 @@ namespace
             const int64_t baseResource = data.resources.*member;
             int64_t savedDailyIncome = std::max<int64_t>( 0, data.dailyIncome.*member );
             if ( offlineResourceTypes[i] == Resource::GOLD ) {
-                savedDailyIncome = savedDailyIncome * 750 / 100;
+                savedDailyIncome = savedDailyIncome * 1500 / 100;
             }
             const int64_t dailyIncome = savedDailyIncome * summary.stateEfficiencyPercent / 100;
             const int64_t capacity = std::numeric_limits<int32_t>::max() - baseResource;
@@ -2124,20 +2124,7 @@ namespace
         const fheroes2::Text headerText( _( "Offline Recruitment" ), fheroes2::FontType::normalYellow() );
         const fheroes2::Text bodyText( std::move( message ), fheroes2::FontType::normalWhite() );
 
-        // getDialogHeight() without the grid gives us the exact fixed cost of this popup,
-        // including translated text, the OK button and the frame. A DialogElement adds 20 pixels
-        // of vertical spacing around its content, so subtract that too.
-        int32_t fixedDialogHeight = fheroes2::getDialogHeight( headerText, bodyText, Dialog::OK );
-
-        // showMessage() adds one extra small-yellow decision line during F8 auto-play, while
-        // getDialogHeight() intentionally describes only the caller-supplied content.
-        if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
-            std::string decisionMessage = _( "AI will choose in 5 seconds: %{decision}" );
-            StringReplace( decisionMessage, "%{decision}", fheroes2::getAutoPlayDialogDecisionText( Dialog::OK ) );
-            const fheroes2::Text decisionText( std::move( decisionMessage ), fheroes2::FontType::smallYellow() );
-            fixedDialogHeight += decisionText.height( fheroes2::boxAreaWidthPx ) + 10;
-        }
-
+        const int32_t fixedDialogHeight = fheroes2::getDialogHeight( headerText, bodyText, Dialog::OK );
         const int32_t maxGridHeight = std::max<int32_t>( 1, fheroes2::Display::instance().height() - fixedDialogHeight - 20 );
 
         const OfflineRecruitmentDialogElement recruitedCreaturesUI( summary.recruitedCreatureRoster, maxGridHeight );

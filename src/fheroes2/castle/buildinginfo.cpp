@@ -451,13 +451,6 @@ bool BuildingInfo::DialogBuyBuilding( bool buttons ) const
         }
     }
 
-    if ( buttons && fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
-        std::string decisionMessage = _( "AI will choose in 5 seconds: %{decision}" );
-        StringReplace( decisionMessage, "%{decision}", fheroes2::getAutoPlayDialogDecisionText( Dialog::OK | Dialog::CANCEL ) );
-        extendedDescription.append( "\n\n" );
-        extendedDescription.append( decisionMessage );
-    }
-
     const fheroes2::Text descriptionText( std::move( extendedDescription ), fheroes2::FontType::normalWhite() );
 
     // prepare requirement build string

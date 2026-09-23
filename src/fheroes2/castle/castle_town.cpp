@@ -100,13 +100,6 @@ int Castle::DialogBuyHero( const Heroes * hero ) const
     StringReplace( str, "%{race}", Race::String( hero->GetRace() ) );
     StringReplace( str, "%{count}", count );
 
-    if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
-        std::string decisionMessage = _( "AI will choose in 5 seconds: %{decision}" );
-        StringReplace( decisionMessage, "%{decision}", fheroes2::getAutoPlayDialogDecisionText( Dialog::OK | Dialog::CANCEL ) );
-        str.append( "\n\n" );
-        str.append( decisionMessage );
-    }
-
     const fheroes2::Text heroDescriptionText( std::move( str ), fheroes2::FontType::normalWhite() );
 
     Resource::BoxSprite rbs( PaymentConditions::RecruitHero(), fheroes2::boxAreaWidthPx );

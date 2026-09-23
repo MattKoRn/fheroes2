@@ -654,6 +654,37 @@ namespace
         }
     }
 
+    bool isRoutineAutoPlayAdventureAction( const Heroes & hero, const MP2::MapObjectType objectType, const int32_t dstIndex, const bool isHeroDisembarking )
+    {
+        if ( isHeroDisembarking ) {
+            return true;
+        }
+
+        switch ( objectType ) {
+        case MP2::OBJ_CASTLE: {
+            const Castle * castle = world.getCastleEntrance( Maps::GetPoint( dstIndex ) );
+            return castle != nullptr && castle->GetColor() == hero.GetColor();
+        }
+        case MP2::OBJ_HERO: {
+            const Heroes * otherHero = world.getTile( dstIndex ).getHero();
+            return otherHero != nullptr && otherHero->GetColor() == hero.GetColor();
+        }
+        case MP2::OBJ_BOAT:
+        case MP2::OBJ_BARREL:
+        case MP2::OBJ_BOTTLE:
+        case MP2::OBJ_CAMPFIRE:
+        case MP2::OBJ_RESOURCE:
+        case MP2::OBJ_LEAN_TO:
+        case MP2::OBJ_MAGIC_GARDEN:
+        case MP2::OBJ_WINDMILL:
+        case MP2::OBJ_WATER_WHEEL:
+        case MP2::OBJ_FLOTSAM:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     bool hasDetailedAutoPlayAdventureDecision( const MP2::MapObjectType objectType )
     {
         switch ( objectType ) {
@@ -2176,7 +2207,7 @@ void AI::HeroesAction( Heroes & hero, const int32_t dst_index )
     Player * heroPlayer = Players::Get( hero.GetColor() );
     const bool showAutoPlayAdventurePopup
         = isHeroActing && heroPlayer != nullptr && heroPlayer->isAIAutoControlMode() && fheroes2::isAutoPlayPopupTimeoutEnabled()
-          && !hasDetailedAutoPlayAdventureDecision( objectType );
+          && !hasDetailedAutoPlayAdventureDecision( objectType ) && !isRoutineAutoPlayAdventureAction( hero, objectType, dst_index, isHeroDisembarking );
 
     if ( showAutoPlayAdventurePopup ) {
         std::string message = _( "Auto-play has chosen this adventure action:" );

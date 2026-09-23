@@ -634,11 +634,6 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
         = allowToRestart ? fheroes2::StandardWindow::Padding::BOTTOM_LEFT : fheroes2::StandardWindow::Padding::BOTTOM_CENTER;
     background.renderButton( buttonOk, buttonOkICN, 0, 1, { buttonHorizontalMargin, buttonVerticalMargin }, buttonOkPadding );
 
-    if ( autoDismiss ) {
-        const fheroes2::Text decisionText( _( "AI will choose in 5 seconds: Continue" ), fheroes2::FontType::smallYellow() );
-        decisionText.draw( roi.x, roi.y + roi.height - decisionText.height( roi.width ) - 2, roi.width, display );
-    }
-
     if ( Game::validateDisplayFadeIn() ) {
         fheroes2::fadeInDisplay();
     }
