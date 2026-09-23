@@ -949,6 +949,32 @@ namespace
     const double dangerousTaskPenalty = 50000.0;
     const double fogDiscoveryBaseValue = -10000.0;
 
+    double getEnemyHeroBattleEfficiencyModifier( const Heroes & hero, const Heroes & enemyHero )
+    {
+        const double heroStrength = hero.GetArmy().GetStrength();
+        const double enemyStrength = enemyHero.GetArmy().GetStrength();
+        if ( heroStrength <= 0.0 || enemyStrength <= 0.0 ) {
+            return 1.0;
+        }
+
+        const double strengthRatio = heroStrength / enemyStrength;
+
+        // Open-field interceptions are best when they remove an enemy hero without consuming much
+        // of the pursuing army. Barely favorable fights remain valid, but should lose to cleaner
+        // attacks when several enemy heroes are available.
+        if ( strengthRatio >= 3.0 ) {
+            return 1.25;
+        }
+        if ( strengthRatio >= 1.75 ) {
+            return 1.12;
+        }
+        if ( strengthRatio < 1.25 ) {
+            return 0.80;
+        }
+
+        return 1.0;
+    }
+
     double getDistanceModifier( const MP2::MapObjectType objectType )
     {
         // The value above 1.0 means that the object is useful only if it is nearby.
@@ -1409,10 +1435,14 @@ double AI::Planner::getGeneralObjectValue( const Heroes & hero, const int32_t in
                 // castle, so it's worth adding the value of the castle to the value of the enemy hero
                 value += calculateCastleValue( castle );
             }
-            else if ( otherHero->GetControl() == CONTROL_AI ) {
-                // AI heroes should not attack other AI heroes so aggressively as human heroes.
-                // This is done to avoid situations when human players just wait when AI heroes kill each other.
-                value *= 0.8;
+            else {
+                value *= getEnemyHeroBattleEfficiencyModifier( hero, *otherHero );
+
+                if ( otherHero->GetControl() == CONTROL_AI ) {
+                    // AI heroes should not attack other AI heroes so aggressively as human heroes.
+                    // This is done to avoid situations when human players just wait when AI heroes kill each other.
+                    value *= 0.8;
+                }
             }
         }
 
@@ -2069,10 +2099,14 @@ double AI::Planner::getFighterObjectValue( const Heroes & hero, const int32_t in
                 // castle, so it's worth adding the value of the castle to the value of the enemy hero
                 value += calculateCastleValue( castle );
             }
-            else if ( otherHero->GetControl() == CONTROL_AI ) {
-                // AI heroes should not attack other AI heroes so aggressively as human heroes.
-                // This is done to avoid situations when human players just wait when AI heroes kill each other.
-                value *= 0.8;
+            else {
+                value *= getEnemyHeroBattleEfficiencyModifier( hero, *otherHero );
+
+                if ( otherHero->GetControl() == CONTROL_AI ) {
+                    // AI heroes should not attack other AI heroes so aggressively as human heroes.
+                    // This is done to avoid situations when human players just wait when AI heroes kill each other.
+                    value *= 0.8;
+                }
             }
         }
 
