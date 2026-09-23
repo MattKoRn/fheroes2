@@ -1284,7 +1284,9 @@ bool LocalEvent::HandleEvents( const bool sleepAfterEventProcessing /* = true */
 
     // Freeze game simulation while the app is not focused. Keep pumping SDL events so a
     // foreground/focus event or quit request can still be handled.
+    bool resumedFromApplicationPause = false;
     while ( !_isApplicationFocused ) {
+        resumedFromApplicationPause = true;
         EventProcessing::EventEngine::sleep( 20 );
 
         bool refreshRequired = false;
@@ -1293,6 +1295,22 @@ bool LocalEvent::HandleEvents( const bool sleepAfterEventProcessing /* = true */
         }
 
         isDisplayRefreshRequired = isDisplayRefreshRequired || refreshRequired;
+    }
+
+    if ( resumedFromApplicationPause ) {
+        // Never deliver keyboard, mouse, touch or controller state collected while the app was
+        // backgrounded. Otherwise a stale click/key can dismiss the first resumed popup and a
+        // held controller axis can immediately move or scroll the adventure map.
+        reset();
+        _currentKeyboardValue = fheroes2::Key::NONE;
+        _currentMouseButton = MouseButtonType::MOUSE_BUTTON_UNKNOWN;
+        _controllerLeftXAxis = 0;
+        _controllerLeftYAxis = 0;
+        _controllerRightXAxis = 0;
+        _controllerRightYAxis = 0;
+        _controllerScrollActive = false;
+        _fingerIds = {};
+        _isTwoFingerGestureInProgress = false;
     }
 
     if ( _engine->isControllerValid() ) {
