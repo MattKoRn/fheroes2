@@ -453,10 +453,15 @@ double AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::U
             }
 
             if ( !target.isRetaliationAllowed() ) {
-                // The monster has retaliated. Apply the spell might not be that good.
-                // TODO: check whether we are going to attack the monster right now or the next turn.
-                //       Plus Blind spell is useful if the monster is faster than other troops.
-                return 0;
+                // Retaliation has already been spent, so Blind loses much of its immediate value.
+                // It can still be worthwhile if this last stack is fast enough to act before most
+                // of our army on the next exchange.
+                if ( target.GetSpeed( false, true ) <= _myArmyAverageSpeed ) {
+                    return 0;
+                }
+
+                ratio = 0.2;
+                break;
             }
 
             // The final ratio is smaller than the original one but not that much.
@@ -500,17 +505,21 @@ double AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::U
                 return 0;
             }
 
-            if ( !target.isRetaliationAllowed() ) {
-                // The monster has retaliated. Apply the spell might not be that good.
-                // TODO: check whether we are going to attack the monster right now or the next turn.
-                //       Plus Paralyze spell is useful if the monster is faster than other troops.
-                return 0;
-            }
-
             const int32_t spellDuration = spellDurationMultiplier( target );
             if ( spellDuration < 1 ) {
                 // This spell might not be useful at all.
                 return 0;
+            }
+
+            if ( !target.isRetaliationAllowed() ) {
+                // As with Blind, a spent retaliation reduces the immediate payoff, but denying the
+                // next action of a faster final stack can still be decisive.
+                if ( target.GetSpeed( false, true ) <= _myArmyAverageSpeed ) {
+                    return 0;
+                }
+
+                ratio = 0.25;
+                break;
             }
 
             // The final ratio is smaller than the original one but not that much.
