@@ -505,33 +505,55 @@ namespace
         }
     }
 
+    long double autoBuyMarginalReturn( const Profile & profile, const size_t id )
+    {
+        const uint64_t rank = profile.ranks[id];
+        if ( rank == std::numeric_limits<uint64_t>::max() || effect( id, rank + 1 ) <= effect( id, rank )
+             || ( id == BRUTAL_CRITICALS && profile.ranks[CRITICAL_TRAINING] == 0 ) ) {
+            return 0.0L;
+        }
+
+        return autoBuyUtility( profile, id ) * autoBuyActivityFactor( profile, id ) / static_cast<long double>( cost( id, rank ) );
+    }
+
     void autoBuy( Profile & profile )
     {
+        // The marginal value of almost every doctrine only changes when that doctrine itself
+        // gains a rank. Cache these values so a large stored point balance does not recalculate
+        // logarithmic effects for all 40 doctrines on every single purchase.
+        std::array<long double, upgradeCount> marginalReturns{};
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            marginalReturns[id] = autoBuyMarginalReturn( profile, id );
+        }
+
         for ( size_t purchases = 0; purchases < 100000; ++purchases ) {
             size_t bestId = upgradeCount;
             long double bestReturn = 0;
 
             for ( size_t id = 0; id < upgradeCount; ++id ) {
-                const uint64_t rank = profile.ranks[id];
-                if ( rank == std::numeric_limits<uint64_t>::max() || profile.points < cost( id, rank )
-                     || effect( id, rank + 1 ) <= effect( id, rank ) ) {
+                if ( profile.points < cost( id, profile.ranks[id] ) ) {
                     continue;
                 }
 
-                if ( id == BRUTAL_CRITICALS && profile.ranks[CRITICAL_TRAINING] == 0 ) {
-                    continue;
-                }
-
-                const long double marginalReturn
-                    = autoBuyUtility( profile, id ) * autoBuyActivityFactor( profile, id ) / static_cast<long double>( cost( id, rank ) );
-                if ( marginalReturn > bestReturn ) {
-                    bestReturn = marginalReturn;
+                if ( marginalReturns[id] > bestReturn ) {
+                    bestReturn = marginalReturns[id];
                     bestId = id;
                 }
             }
 
             if ( bestId == upgradeCount || !buy( profile, bestId ) ) {
                 break;
+            }
+
+            marginalReturns[bestId] = autoBuyMarginalReturn( profile, bestId );
+
+            // These two doctrines are the only cross-dependent pair: Brutal Criticals is locked
+            // behind Critical Training, and each doctrine's utility depends on the other's effect.
+            if ( bestId == CRITICAL_TRAINING ) {
+                marginalReturns[BRUTAL_CRITICALS] = autoBuyMarginalReturn( profile, BRUTAL_CRITICALS );
+            }
+            else if ( bestId == BRUTAL_CRITICALS ) {
+                marginalReturns[CRITICAL_TRAINING] = autoBuyMarginalReturn( profile, CRITICAL_TRAINING );
             }
         }
     }
