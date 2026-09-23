@@ -251,7 +251,8 @@ namespace
     }
 }
 
-Troop Dialog::RecruitMonster( const Monster & monster0, const uint32_t available, const bool allowDowngradedMonster, const int32_t windowOffsetY )
+Troop Dialog::RecruitMonster( const Monster & monster0, const uint32_t available, const bool allowDowngradedMonster, const int32_t windowOffsetY,
+                              const uint32_t selectedCount )
 {
     const bool isEvilInterface = Settings::Get().isEvilInterfaceEnabled();
 
@@ -267,7 +268,11 @@ Troop Dialog::RecruitMonster( const Monster & monster0, const uint32_t available
     const Kingdom & kingdom = world.GetKingdom( Settings::Get().CurrentColor() );
 
     uint32_t max = CalculateMax( monster, kingdom, available );
-    uint32_t result = max;
+
+    // Auto-play callers pass the count the AI has already decided to buy. Keep that exact
+    // amount visible instead of recomputing the human dialog's default maximum.
+    const bool lockAutoPlaySelection = fheroes2::isAutoPlayPopupTimeoutEnabled() && selectedCount > 0;
+    uint32_t result = lockAutoPlaySelection ? std::min( selectedCount, available ) : max;
 
     Funds paymentCosts( paymentMonster * result );
 
@@ -345,7 +350,8 @@ Troop Dialog::RecruitMonster( const Monster & monster0, const uint32_t available
     fheroes2::ButtonSprite monsterSwitchLeft;
     fheroes2::ButtonSprite monsterSwitchRight;
 
-    const bool showDowngradedMonsterSwitchButtons = allowDowngradedMonster && ( monster0.GetDowngrade() != monster0 );
+    const bool showDowngradedMonsterSwitchButtons
+        = !lockAutoPlaySelection && allowDowngradedMonster && ( monster0.GetDowngrade() != monster0 );
 
     if ( showDowngradedMonsterSwitchButtons ) {
         const fheroes2::Sprite & leftButtonSprite = Assets::getImage( ICN::MONSTER_SWITCH_LEFT_ARROW, 0 );
@@ -392,7 +398,16 @@ Troop Dialog::RecruitMonster( const Monster & monster0, const uint32_t available
     }
 
     const Funds & funds = kingdom.GetFunds();
-    std::string maxmin = SwitchMaxMinButtons( buttonMax, buttonMin, true );
+    std::string maxmin;
+    if ( lockAutoPlaySelection ) {
+        buttonMax.disable();
+        buttonMin.disable();
+        buttonUp.disable();
+        buttonDn.disable();
+    }
+    else {
+        maxmin = SwitchMaxMinButtons( buttonMax, buttonMin, result == max );
+    }
     RedrawCurrentInfo( dialogOffset, result, paymentMonster, paymentCosts, funds, maxmin );
 
     buttonOk.draw();
@@ -579,51 +594,53 @@ Troop Dialog::RecruitMonster( const Monster & monster0, const uint32_t available
             continue;
         }
 
-        if ( const auto value = fheroes2::processIntegerValueTyping( 0, static_cast<int32_t>( max ), typedValueBuf ); value ) {
-            result = *value;
+        if ( !lockAutoPlaySelection ) {
+            if ( const auto value = fheroes2::processIntegerValueTyping( 0, static_cast<int32_t>( max ), typedValueBuf ); value ) {
+                result = *value;
 
-            updateCurrentInfo();
+                updateCurrentInfo();
 
-            redraw = true;
-        }
-        else if ( le.MouseClickLeft( recruitCountInputArea ) ) {
-            int32_t temp = static_cast<int32_t>( result );
+                redraw = true;
+            }
+            else if ( le.MouseClickLeft( recruitCountInputArea ) ) {
+                int32_t temp = static_cast<int32_t>( result );
 
-            fheroes2::openVirtualNumpad( temp, 0, static_cast<int32_t>( max ) );
-            assert( temp >= 0 && temp <= static_cast<int32_t>( max ) );
+                fheroes2::openVirtualNumpad( temp, 0, static_cast<int32_t>( max ) );
+                assert( temp >= 0 && temp <= static_cast<int32_t>( max ) );
 
-            resetResult( temp );
-            updateCurrentInfo();
+                resetResult( temp );
+                updateCurrentInfo();
 
-            redraw = true;
-        }
-        else if ( ( le.isMouseWheelUpInArea( rtWheel ) || le.MouseClickLeft( buttonUp.area() ) || Game::HotKeyPressEvent( Game::HotKeyEvent::DEFAULT_UP )
-                    || timedButtonUp.isDelayPassed() )
-                  && result < max ) {
-            resetResult( result + 1 );
-            updateCurrentInfo();
+                redraw = true;
+            }
+            else if ( ( le.isMouseWheelUpInArea( rtWheel ) || le.MouseClickLeft( buttonUp.area() ) || Game::HotKeyPressEvent( Game::HotKeyEvent::DEFAULT_UP )
+                        || timedButtonUp.isDelayPassed() )
+                      && result < max ) {
+                resetResult( result + 1 );
+                updateCurrentInfo();
 
-            redraw = true;
-        }
-        else if ( ( le.isMouseWheelDownInArea( rtWheel ) || le.MouseClickLeft( buttonDn.area() ) || Game::HotKeyPressEvent( Game::HotKeyEvent::DEFAULT_DOWN )
-                    || timedButtonDn.isDelayPassed() )
-                  && result > 0 ) {
-            resetResult( result - 1 );
-            updateCurrentInfo();
+                redraw = true;
+            }
+            else if ( ( le.isMouseWheelDownInArea( rtWheel ) || le.MouseClickLeft( buttonDn.area() ) || Game::HotKeyPressEvent( Game::HotKeyEvent::DEFAULT_DOWN )
+                        || timedButtonDn.isDelayPassed() )
+                      && result > 0 ) {
+                resetResult( result - 1 );
+                updateCurrentInfo();
 
-            redraw = true;
-        }
-        else if ( buttonMax.isEnabled() && le.MouseClickLeft( buttonMax.area() ) && result != max ) {
-            resetResult( max );
-            updateCurrentInfo();
+                redraw = true;
+            }
+            else if ( buttonMax.isEnabled() && le.MouseClickLeft( buttonMax.area() ) && result != max ) {
+                resetResult( max );
+                updateCurrentInfo();
 
-            redraw = true;
-        }
-        else if ( buttonMin.isEnabled() && le.MouseClickLeft( buttonMin.area() ) && result != 1 ) {
-            resetResult( 1 );
-            updateCurrentInfo();
+                redraw = true;
+            }
+            else if ( buttonMin.isEnabled() && le.MouseClickLeft( buttonMin.area() ) && result != 1 ) {
+                resetResult( 1 );
+                updateCurrentInfo();
 
-            redraw = true;
+                redraw = true;
+            }
         }
         else if ( buttonOk.isEnabled() && ( le.MouseClickLeft( buttonOk.area() ) || Game::HotKeyPressEvent( Game::HotKeyEvent::DEFAULT_OKAY ) ) ) {
             break;
