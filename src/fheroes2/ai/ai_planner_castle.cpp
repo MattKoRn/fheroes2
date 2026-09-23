@@ -240,7 +240,13 @@ namespace
 
         // If yes, then buy a boat. During auto-play show the normal purchase window first.
         if ( buyBoat ) {
-            if ( !fheroes2::isAutoPlayPopupTimeoutEnabled() || Dialog::BuyBoat( true ) == Dialog::OK ) {
+            if ( fheroes2::isAutoPlayPopupTimeoutEnabled() ) {
+                const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::OK, "Buy boat" );
+                if ( Dialog::BuyBoat( true ) == Dialog::OK ) {
+                    castle.BuyBoat();
+                }
+            }
+            else {
                 castle.BuyBoat();
             }
         }
@@ -333,6 +339,12 @@ void AI::Planner::reinforceCastle( Castle & castle )
             }
 
             if ( hasRoom ) {
+                std::string decisionText = "Recruit ";
+                decisionText += std::to_string( troop.GetCount() );
+                decisionText += ' ';
+                decisionText += troop.GetPluralName( troop.GetCount() );
+                const fheroes2::AutoPlayDialogDecisionScope decisionScope( Dialog::OK, std::move( decisionText ) );
+
                 selectedTroop = Dialog::RecruitMonster( troop.GetMonster(), troop.GetCount(), false, 0 );
                 if ( !selectedTroop.isValid() ) {
                     // Treat a manual cancellation as a handled choice so the AI does not start
