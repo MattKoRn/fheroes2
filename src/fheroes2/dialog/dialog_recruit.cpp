@@ -243,12 +243,12 @@ namespace
 
     uint32_t CalculateMax( const Monster & monster, const Kingdom & kingdom, const uint32_t available )
     {
-        uint32_t max = 0;
-        while ( kingdom.AllowPayment( monster.GetCost() * ( max + 1 ) ) && ( max + 1 ) <= available ) {
-            ++max;
+        const int affordable = kingdom.GetFunds().getLowestQuotient( monster.GetCost() );
+        if ( affordable <= 0 ) {
+            return 0;
         }
 
-        return max;
+        return std::min<uint32_t>( available, static_cast<uint32_t>( affordable ) );
     }
 }
 
