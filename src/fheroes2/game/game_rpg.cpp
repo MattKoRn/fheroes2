@@ -1050,10 +1050,10 @@ double fheroes2::RPG::regenerationPercent( const PlayerColor color )
     return profile == nullptr ? 0.0 : static_cast<double>( effect( REGENERATION, profile->ranks[REGENERATION] ) );
 }
 
-uint32_t fheroes2::RPG::criticalChance( const PlayerColor color )
+double fheroes2::RPG::criticalChance( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
-    return profile == nullptr ? 0 : static_cast<uint32_t>( effect( CRITICAL_TRAINING, profile->ranks[CRITICAL_TRAINING] ) );
+    return profile == nullptr ? 0.0 : static_cast<double>( effect( CRITICAL_TRAINING, profile->ranks[CRITICAL_TRAINING] ) );
 }
 
 double fheroes2::RPG::criticalDamageBonusPercent( const PlayerColor color )
@@ -1062,10 +1062,10 @@ double fheroes2::RPG::criticalDamageBonusPercent( const PlayerColor color )
     return profile == nullptr ? 50.0 : 50.0 + static_cast<double>( effect( BRUTAL_CRITICALS, profile->ranks[BRUTAL_CRITICALS] ) );
 }
 
-uint32_t fheroes2::RPG::evasionChance( const PlayerColor color )
+double fheroes2::RPG::evasionChance( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
-    return profile == nullptr ? 0 : static_cast<uint32_t>( effect( EVASION, profile->ranks[EVASION] ) );
+    return profile == nullptr ? 0.0 : static_cast<double>( effect( EVASION, profile->ranks[EVASION] ) );
 }
 
 double fheroes2::RPG::rangedMeleePenaltyRecoveryPercent( const PlayerColor color )
