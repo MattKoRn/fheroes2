@@ -485,6 +485,7 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
 
     const bool attackerGetsSummary = attackerIsHuman || attackerIsAutoPlay;
     const bool defenderGetsSummary = defenderIsHuman || defenderIsAutoPlay;
+    const bool autoDismiss = fheroes2::isAutoPlayPopupTimeoutEnabled();
 
     if ( !attackerGetsSummary && !defenderGetsSummary ) {
         // Normal AI vs AI battle: this dialog should not be shown.
@@ -634,6 +635,11 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
         = allowToRestart ? fheroes2::StandardWindow::Padding::BOTTOM_LEFT : fheroes2::StandardWindow::Padding::BOTTOM_CENTER;
     background.renderButton( buttonOk, buttonOkICN, 0, 1, { buttonHorizontalMargin, buttonVerticalMargin }, buttonOkPadding );
 
+    if ( autoDismiss ) {
+        const fheroes2::Text decisionText( _( "AI will choose in 5 seconds: Continue" ), fheroes2::FontType::smallYellow() );
+        decisionText.draw( roi.x, roi.y + roi.height - decisionText.height( roi.width ) - 2, roi.width, display );
+    }
+
     if ( Game::validateDisplayFadeIn() ) {
         fheroes2::fadeInDisplay();
     }
@@ -645,7 +651,6 @@ bool Battle::Arena::DialogBattleSummary( const Result & res, const std::vector<A
 
     int sequenceId = sequence.id();
 
-    const bool autoDismiss = fheroes2::isAutoPlayPopupTimeoutEnabled();
     fheroes2::TimeDelay autoDismissDelay( fheroes2::autoPlayPopupDisplayTimeMs );
 
     while ( le.HandleEvents() ) {
