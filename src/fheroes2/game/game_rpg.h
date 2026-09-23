@@ -17,6 +17,13 @@ namespace fheroes2::RPG
         ADVENTURE = 3
     };
 
+    // These IDs are part of the RPG progression contract. Keep this guard next to the enum so a
+    // future refactor cannot accidentally renumber an award source while still compiling cleanly.
+    static_assert( static_cast<uint8_t>( ExperienceKind::HERO ) == 0 );
+    static_assert( static_cast<uint8_t>( ExperienceKind::OFFLINE ) == 1 );
+    static_assert( static_cast<uint8_t>( ExperienceKind::BATTLE ) == 2 );
+    static_assert( static_cast<uint8_t>( ExperienceKind::ADVENTURE ) == 3 );
+
     // The local player's kingdom owns the persistent profile. Enemy profiles only live for this map.
     [[nodiscard]] std::string dataDirectory();
     void beginMap( PlayerColor playerColor );
