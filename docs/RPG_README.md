@@ -23,7 +23,7 @@ Left-click or tap the **BUY** plaque to purchase a rank. Left-click anywhere on 
 
 You can freely reallocate your build at any time using the **Respec** button (or **R** key). Confirming a respec refunds 100% of all guild points spent across every doctrine, resets all ranks to zero, pauses Steward auto-buy, and saves immediately.
 
-Right-click or hold any of the 8 category tabs to inspect that guild hall's doctrinal focus. Click or right-click the top header panel (or press **O** / **I**) to view the **Royal Guild Overview** modal, which breaks down your total Renown across Hero, Battle, Adventure, and Offline experience, tracks visited adventure sites, shows total points invested, active doctrine count, and cumulative battle triggers recorded across all doctrines. The Royal Guild menu can also be opened directly while inside the Kingdom Overview dialog by pressing **F9**.
+Right-click or hold any of the 8 category tabs to inspect that guild hall's doctrinal focus. Click, right-click, or hold the Renown/stats panel (or press **O**) to view the **Royal Guild Overview** modal, which breaks down your total Renown across Hero, Battle, Adventure, and Offline experience, tracks visited adventure sites, shows total points invested, active doctrine count, and cumulative battle triggers recorded across all doctrines. Press **I** to inspect the currently selected doctrine. The Royal Guild menu can also be opened directly while inside the Kingdom Overview dialog by pressing **F9**.
 
 The menu supports full keyboard and touch controls:
 - **F9** or **Esc**: Toggle / close menu
