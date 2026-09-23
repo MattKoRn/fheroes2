@@ -3065,9 +3065,8 @@ fheroes2::GameMode Interface::AdventureMap::StartGame()
                     break;
                 }
 
-                if ( !isAutoPlaytest && offlineResumePending && persistentResourcePlayerColor != PlayerColor::NONE ) {
-                    Kingdom & persistentKingdom = world.GetKingdom( persistentResourcePlayerColor );
-                    const OfflineProgressSummary resumeSummary = consumePendingOfflineResumeProgress( persistentKingdom );
+                if ( !isAutoPlaytest && offlineResumePending && playerColor == persistentResourcePlayerColor ) {
+                    const OfflineProgressSummary resumeSummary = consumePendingOfflineResumeProgress( kingdom );
                     showOfflineProgressPopups( resumeSummary );
                 }
 
