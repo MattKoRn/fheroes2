@@ -401,7 +401,7 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
     const bool isAutoPlayBattle = ( attackingPlayer != nullptr && attackingPlayer->isAIAutoControlMode() )
                                   || ( defendingPlayer != nullptr && defendingPlayer->isAIAutoControlMode() );
 
-    const auto shouldShowLocalBattlePopup = []( const HeroBase * hero ) {
+    const auto shouldShowLocalBattlePopup = [&conf]( const HeroBase * hero ) {
         if ( hero == nullptr ) {
             return false;
         }
@@ -409,8 +409,9 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
             return true;
         }
 
+        const Player * currentPlayer = conf.GetPlayers().GetCurrent();
         const Player * player = Players::Get( hero->GetColor() );
-        return player != nullptr && player->isAIAutoControlMode();
+        return player != nullptr && player == currentPlayer && player->isAIAutoControlMode();
     };
 
     // Auto-play battles are never auto-resolved. They are shown in full while the battle AI
