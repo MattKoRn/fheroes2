@@ -40,6 +40,7 @@
 #include "audio_manager.h"
 #include "castle.h"
 #include "color.h"
+#include "dialog.h"
 #include "difficulty.h"
 #include "game.h"
 #include "game_interface.h"
@@ -61,6 +62,7 @@
 #include "route.h"
 #include "skill.h"
 #include "spell.h"
+#include "ui_dialog.h"
 #include "world.h"
 #include "world_pathfinding.h"
 #include "world_regions.h"
@@ -291,21 +293,23 @@ bool AI::Planner::recruitHero( Castle & castle, bool buyArmy )
     Heroes * firstRecruit = useIfPossible( rec.GetHero1() );
     Heroes * secondRecruit = useIfPossible( rec.GetHero2() );
 
+    Heroes * selectedRecruit = nullptr;
     if ( firstRecruit && secondRecruit ) {
-        if ( secondRecruit->getRecruitValue() > firstRecruit->getRecruitValue() ) {
-            recruit = castle.RecruitHero( secondRecruit );
-        }
-        else {
-            recruit = castle.RecruitHero( firstRecruit );
-        }
+        selectedRecruit = secondRecruit->getRecruitValue() > firstRecruit->getRecruitValue() ? secondRecruit : firstRecruit;
     }
-    else if ( firstRecruit ) {
-        recruit = castle.RecruitHero( firstRecruit );
-    }
-    else if ( secondRecruit ) {
-        recruit = castle.RecruitHero( secondRecruit );
+    else {
+        selectedRecruit = firstRecruit != nullptr ? firstRecruit : secondRecruit;
     }
 
+    if ( selectedRecruit == nullptr ) {
+        return false;
+    }
+
+    if ( fheroes2::isAutoPlayPopupTimeoutEnabled() && castle.DialogBuyHero( selectedRecruit ) != Dialog::OK ) {
+        return false;
+    }
+
+    recruit = castle.RecruitHero( selectedRecruit );
     if ( recruit == nullptr ) {
         return false;
     }
