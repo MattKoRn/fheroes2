@@ -1,6 +1,6 @@
 # Homm2RPG
 
-Homm2RPG adds a persistent, kingdom-wide RPG profile to fheroes2. Press **F9** on the adventure map to open the menu. The RPG screen uses a Heroes II-style royal-guild presentation: gem-decorated window framing, embossed/inset brown-and-gold panels, pressed category plaques, framed rank crests, guild-themed section names, and compact BUY plaques. Every visible upgrade row shows its current combat effect and the exact next-rank effect before you spend a point. The normal good/evil interface treatment is preserved. Each tab contains five upgrades and shows three at a time; use the mouse wheel or scrollbar to reach the others. Every level awards five guild points. Level 2 requires 250,000 RPG XP, and each later level requires another 100,000 XP. RPG levels and upgrade ranks have no fixed cap; saved numbers use 64-bit storage. Resistance is limited so armies cannot become invulnerable. No upgrade changes movement or game speed.
+Homm2RPG adds a persistent, kingdom-wide RPG profile to fheroes2. Press **F9** on the adventure map to open the menu. The RPG screen uses a Heroes II-style royal-guild presentation: gem-decorated window framing, embossed/inset brown-and-gold panels, pressed category plaques, framed rank crests, guild-themed section names, and compact BUY plaques. Every visible upgrade row shows its current combat effect and the exact next-rank effect before you spend a point. The normal good/evil interface treatment is preserved. Each tab contains five upgrades and shows three at a time; use the mouse wheel or scrollbar to reach the others. Every level awards five guild points. Level 2 requires 250,000 RPG XP, and each later level requires another 100,000 XP. RPG levels remain open-ended and saved counters use 64-bit storage. Individual upgrades that represent bounded mechanics—such as Morale, Evasion, resistance, or melee-penalty recovery—stop accepting ranks once their mechanical cap is reached. No upgrade changes movement or game speed.
 
 ## Tabs and upgrades
 
@@ -19,7 +19,7 @@ The upgrade tree is now built around direct RPG combat mechanics instead of reso
 
 **Life steal and Reaper healing never resurrect dead creatures.** They can only repair the currently surviving stack. Regeneration follows the same rule. Critical hits and Evasion use independent combat rolls. Towers do not receive the creature-specific RPG affixes.
 
-Left-click the **BUY** plaque to purchase a rank. Hold right-click on an upgrade to see the exact current effect, next-rank effect, scaling gained, cost, and available guild points. The **Steward** auto-buyer chooses the available next rank with the largest immediate mechanical gain per point and skips capped upgrades once another rank would add no effect.
+Left-click the **BUY** plaque to purchase a rank. Hold right-click on an upgrade to see the exact current effect, next-rank effect, cost, and available guild points. The **Steward** auto-buyer chooses the available next rank with the largest immediate mechanical gain per point and skips capped upgrades once another rank would add no effect.
 
 ## XP and economy
 
@@ -35,4 +35,4 @@ Offline progress still grants RPG XP for the full elapsed interval with no durat
 
 On Windows, RPG data, offline state, and standard game saves live in **Documents\\Homm2RPG**. `rpg_profile.dat` contains the RPG profile and the adventure tiles already rewarded. `offline_progress.dat` contains the offline timestamp and state. Normal game save files are in the same folder. The game copies older RPG and save files into this folder on first use without overwriting files already there. RPG profile writes use a temporary file and backup during replacement. The kingdom profile persists across maps and loaded saves.
 
-The RPG profile uses 64-bit counters, so its practical maximum is the 64-bit numeric limit even though the suffix formatter itself has no fixed suffix list. The game's original hero levels and resources retain their own engine limits. Older offline snapshots with creature-roster fields remain readable, but those fields are ignored and are omitted from new snapshots.
+The RPG profile uses 64-bit counters, while individual bounded combat mechanics stop accepting ranks once another rank would no longer increase their effect. The suffix formatter itself has no fixed suffix list. The game's original hero levels and resources retain their own engine limits. Older offline snapshots with creature-roster fields remain readable, but those fields are ignored and are omitted from new snapshots.
