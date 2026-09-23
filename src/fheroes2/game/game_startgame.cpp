@@ -309,7 +309,7 @@ namespace
                 const fheroes2::Rect cellRoi{ offset.x + column * cellWidth, offset.y + row * cellHeight, cellWidth, cellHeight };
 
                 if ( eventHandler.isMouseRightButtonPressedInArea( cellRoi ) ) {
-                    Dialog::ArmyInfo( Troop{ _creatures[i].first, 0 }, Dialog::ZERO );
+                    Dialog::ArmyInfo( Troop{ _creatures[i].first, 1 }, Dialog::ZERO );
                     return;
                 }
             }
@@ -341,22 +341,11 @@ namespace
 
     bool loadOfflineProgressData( OfflineProgressData & data )
     {
-        const std::string filePath = getOfflineProgressFilePath();
-        std::ifstream input( filePath );
-        if ( !input ) {
-            // A backup can exist if the process was interrupted while replacing the state file.
-            input.clear();
-            input.open( filePath + ".bak" );
-        }
-        if ( !input ) {
-            // On the very first transactional save there may be no primary or backup yet. If the
-            // process stops after flushing the temp file but before promoting it, recover from it.
-            input.clear();
-            input.open( filePath + ".tmp" );
-        }
-        if ( !input ) {
-            return false;
-        }
+        const auto loadFromPath = []( const std::string & candidatePath, OfflineProgressData & candidate ) {
+            std::ifstream input( candidatePath );
+            if ( !input ) {
+                return false;
+            }
 
         int version = 0;
         bool hasTimestamp = false;
@@ -542,6 +531,21 @@ namespace
                    && hasStateMines && hasStateArtifacts && hasStateEfficiency && hasSupplyRushMeter && hasCreatureRoster && hasCreatureReserve
                    && hasCreatureRecruitCarry );
         return ( version >= 1 && version <= 9 ) && hasVersionSpecificFields && hasTimestamp && hasResources && hasIncome && hasCarry && data.lastSeenUnix > 0;
+
+        };
+
+        const std::string filePath = getOfflineProgressFilePath();
+        const std::array<std::string, 3> candidatePaths{ filePath, filePath + ".bak", filePath + ".tmp" };
+
+        for ( const std::string & candidatePath : candidatePaths ) {
+            OfflineProgressData candidate;
+            if ( loadFromPath( candidatePath, candidate ) ) {
+                data = std::move( candidate );
+                return true;
+            }
+        }
+
+        return false;
     }
 
     void saveOfflineProgressData( const OfflineProgressData & data )
@@ -651,9 +655,9 @@ namespace
             return;
         }
 
-        // If there was no primary file, an existing backup may be the snapshot we just recovered
-        // from. Do not delete it until the new primary has been installed successfully.
-        System::Unlink( backupFilePath );
+        // Keep the previous valid primary as a recovery snapshot. The next save replaces this
+        // backup only after its new temporary file has been fully written, so a malformed or
+        // partially corrupted primary can still recover the last known-good offline state.
     }
 
     void setKingdomFundsExact( Kingdom & kingdom, const Funds & target )
