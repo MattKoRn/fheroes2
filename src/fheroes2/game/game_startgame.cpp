@@ -2276,8 +2276,8 @@ void Game::onApplicationFocusChanged( const bool isFocused )
         persistOfflineProgressSnapshot( world.GetKingdom( offlineProgressActivePlayerColor ), now );
 
         offlineSuspendStartedUnix = now;
-        offlineResumeElapsedSeconds = 0;
-        offlineResumePending = false;
+        // Keep any earlier foregrounded interval pending. A player can background the app again
+        // before a battle or AI turn reaches the safe point where rewards are applied.
         return;
     }
 
@@ -2286,8 +2286,18 @@ void Game::onApplicationFocusChanged( const bool isFocused )
     }
 
     const int64_t now = getCurrentUnixTime();
-    offlineResumeElapsedSeconds = now > offlineSuspendStartedUnix ? now - offlineSuspendStartedUnix : 0;
+    const int64_t resumedInterval = now > offlineSuspendStartedUnix ? now - offlineSuspendStartedUnix : 0;
     offlineSuspendStartedUnix = 0;
+
+    if ( resumedInterval > 0 ) {
+        if ( offlineResumeElapsedSeconds > std::numeric_limits<int64_t>::max() - resumedInterval ) {
+            offlineResumeElapsedSeconds = std::numeric_limits<int64_t>::max();
+        }
+        else {
+            offlineResumeElapsedSeconds += resumedInterval;
+        }
+    }
+
     offlineResumePending = offlineResumeElapsedSeconds > 0;
 }
 
