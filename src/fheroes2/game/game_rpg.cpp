@@ -90,11 +90,11 @@ namespace
         { "Ruthless", "More damage to stacks below half health" }
     };
     constexpr std::array<const char *, upgradeCount> upgradeDetails{
-        "Adds a flat Attack bonus to every creature stack controlled by this RPG profile. Each rank adds +1 Attack.",
-        "Adds a flat Defense bonus to every creature stack controlled by this RPG profile. Each rank adds +1 Defense.",
-        "Adds both Attack and Defense to every creature stack. Each rank adds +1 to both stats.",
-        "Whenever one of your creature stacks deals attack damage, it heals for a percentage of the actual damage dealt. Healing repairs the surviving stack but does not resurrect killed creatures.",
-        "Whenever one of your attacks kills creatures, the attacking stack heals for a percentage of the slain creatures' hit points. It cannot resurrect creatures already lost from that stack.",
+        "Adds +1 Attack per rank to every creature stack controlled by this RPG profile, up to +8 Attack.",
+        "Adds +1 Defense per rank to every creature stack controlled by this RPG profile, up to +8 Defense.",
+        "Adds +1 Attack and +1 Defense per rank to every creature stack, up to +4 of each. Its ranks cost more because both stats increase together.",
+        "Whenever one of your creature stacks deals attack damage, it heals for up to 20% of the actual damage dealt. Healing repairs the surviving stack but does not resurrect killed creatures.",
+        "Whenever one of your attacks kills creatures, the attacking stack heals for up to 30% of the slain creatures' hit points. It cannot resurrect creatures already lost from that stack.",
 
         "Increases all physical damage dealt by your creature stacks.",
         "Increases physical damage dealt by ranged attacks.",
@@ -106,9 +106,9 @@ namespace
         "Increases physical damage when the attacking stack has more creatures than its target.",
         "Increases physical damage while the attacking stack is below half of its starting battle hit points.",
         "Increases physical damage while the attacking stack is still at its full starting battle hit points.",
-        "Ignores a percentage of the defender's RPG physical damage reduction after all applicable defensive upgrades are combined.",
+        "Ignores up to 60% of the defender's RPG physical damage reduction after all applicable defensive upgrades are combined.",
 
-        "Reduces all physical damage received by your creature stacks.",
+        "Reduces all physical damage received by your creature stacks. Combined RPG physical reduction is capped at 70% before Armor Piercing.",
         "Adds extra damage reduction against ranged creature attacks.",
         "Adds extra damage reduction against melee creature attacks.",
         "Adds extra physical damage reduction while the defending stack is below half of its starting battle hit points.",
@@ -120,7 +120,7 @@ namespace
         "Adds damage to Lightning Bolt and Chain Lightning.",
         "Adds damage to Elemental Storm and Armageddon.",
 
-        "Reduces damage received from every damaging spell. Combined RPG spell resistance is capped so it cannot make a stack immune.",
+        "Reduces damage received from every damaging spell. Combined RPG spell reduction is capped at 70% before Arcane Piercing.",
         "Adds RPG resistance against Fireball and Fireblast.",
         "Adds RPG resistance against Cold Ray and Cold Ring.",
         "Adds RPG resistance against Lightning Bolt and Chain Lightning.",
@@ -128,12 +128,12 @@ namespace
 
         "Adds Morale to your creature stacks during combat, up to +3 from this upgrade.",
         "Adds Luck to your creature stacks during combat, up to +3 from this upgrade.",
-        "At the beginning of a stack's turn, restores a percentage of one creature's maximum hit points to the surviving stack. This repairs the wounded top creature but never resurrects dead creatures.",
-        "Gives each creature attack a chance to become a critical hit. A critical hit deals 50% extra damage before Brutal Criticals is added.",
-        "Increases the bonus damage of critical hits beyond their normal +50% damage.",
+        "At the beginning of a stack's turn, restores up to 15% of one creature's maximum hit points to the surviving stack. This repairs the wounded top creature but never resurrects dead creatures.",
+        "Gives each creature attack up to a 20% chance to become a critical hit. A critical hit deals 50% extra damage before Brutal Criticals is added.",
+        "Increases the bonus damage of critical hits beyond their normal +50%. Requires at least one rank of Critical Training.",
 
-        "Gives your creature stacks a chance to evade part of an incoming creature attack, reducing that attack's final damage by 50%.",
-        "Ignores a percentage of the target's combined RPG spell resistance when your hero casts a damaging spell.",
+        "Gives your creature stacks up to a 15% chance to reduce an incoming creature attack's final damage by 50%.",
+        "Ignores up to 60% of the target's combined RPG spell resistance when your hero casts a damaging spell.",
         "Recovers part of the normal 50% melee penalty suffered by ranged creatures forced into hand-to-hand combat. At 100% recovery, the RPG penalty modifier removes that penalty.",
         "Reduces physical damage while the defending stack is still at its full starting battle hit points.",
         "Adds another damage bonus against enemy stacks below half of their starting battle hit points, rewarding aggressive finishing attacks."
@@ -621,8 +621,15 @@ namespace
     std::string formatEffect( const long double value )
     {
         std::ostringstream text;
-        text << std::fixed << std::setprecision( 3 ) << static_cast<double>( value ) << '%';
-        return text.str();
+        text << std::fixed << std::setprecision( 2 ) << static_cast<double>( value );
+        std::string result = text.str();
+        while ( result.size() > 1 && result.back() == '0' ) {
+            result.pop_back();
+        }
+        if ( !result.empty() && result.back() == '.' ) {
+            result.pop_back();
+        }
+        return result + '%';
     }
 
     void drawBeveledPanel( const fheroes2::Rect & roi, const bool inset )
@@ -772,15 +779,15 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     saveProfile();
 
     // Temporary enemy RPG builds are deterministic for the same map/profile level and
-    // spend a point budget instead of receiving free ranks in every upgrade. This avoids
-    // level-1 neutral stacks quietly spawning with dozens of combat bonuses.
+    // scale only upgrades the player has actually purchased. This avoids fresh profiles
+    // facing invisible free enemy perks and keeps opponent power tied to real RPG choices.
     uint64_t seed = static_cast<uint64_t>( world.GetMapSeed() ) << 32;
     // Unsigned multiplication intentionally wraps here: this is a hash mix, not arithmetic progression.
     seed ^= playerProfile.level * 0x9E3779B185EBCA87ULL;
     seed ^= static_cast<uint64_t>( playerColor ) * 0xC2B2AE3D27D4EB4FULL;
     std::mt19937_64 rng( seed );
 
-    const auto makeTemporaryProfile = [&rng]( const int minimumPower, const int maximumPower ) {
+    const auto makeTemporaryProfile = [&rng]( const int minimumPower, const int maximumPower, const bool roundUpSmallRanks ) {
         std::uniform_int_distribution<int> variation( minimumPower, maximumPower );
         Profile temporary;
         temporary.level = std::max<uint64_t>( 1, scaledValue( playerProfile.level, variation( rng ) ) );
@@ -792,8 +799,9 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
 
             const int percent = variation( rng );
             const long double scaledRank = static_cast<long double>( playerProfile.ranks[id] ) * percent / 100.0L;
-            temporary.ranks[id] = static_cast<uint64_t>(
-                std::min<long double>( std::numeric_limits<uint64_t>::max(), std::max<long double>( 1.0L, std::floor( scaledRank + 0.5L ) ) ) );
+            const long double roundedRank = roundUpSmallRanks ? std::floor( scaledRank + 0.5L ) : std::floor( scaledRank );
+            temporary.ranks[id]
+                = static_cast<uint64_t>( std::min<long double>( std::numeric_limits<uint64_t>::max(), std::max<long double>( 0.0L, roundedRank ) ) );
         }
 
         return temporary;
@@ -805,9 +813,9 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
             continue;
         }
 
-        enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 85, 115 ) );
+        enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 85, 115, true ) );
     }
-    enemyProfiles.emplace( PlayerColor::NONE, makeTemporaryProfile( 60, 90 ) );
+    enemyProfiles.emplace( PlayerColor::NONE, makeTemporaryProfile( 60, 90, false ) );
 }
 
 void fheroes2::RPG::endMap()
@@ -878,7 +886,7 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
                                       : std::clamp( static_cast<long double>( opponentProfile->level )
                                                         / std::max<long double>( 1.0L, static_cast<long double>( playerProfile.level ) ),
                                                     0.5L, 2.0L );
-    const long double base = ( won ? 250.0L : 100.0L ) + static_cast<long double>( battleExperience ) * ( won ? 0.5L : 0.2L );
+    const long double base = ( won ? 200.0L : 75.0L ) + static_cast<long double>( battleExperience ) * ( won ? 0.2L : 0.08L );
     const long double earned = base * challenge;
     addExperience( color, static_cast<uint64_t>( std::min( earned, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) ),
                    ExperienceKind::BATTLE );
