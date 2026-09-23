@@ -398,8 +398,13 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
 
     const Player * attackingPlayer = Players::Get( attackingArmy.GetColor() );
     const Player * defendingPlayer = Players::Get( defendingArmy.GetColor() );
-    const bool isAutoPlayBattle = ( attackingPlayer != nullptr && attackingPlayer->isAIAutoControlMode() )
-                                  || ( defendingPlayer != nullptr && defendingPlayer->isAIAutoControlMode() );
+    const Player * currentPlayer = conf.GetPlayers().GetCurrent();
+
+    const bool attackerIsLocalAutoPlay
+        = attackingPlayer != nullptr && attackingPlayer == currentPlayer && attackingPlayer->isAIAutoControlMode();
+    const bool defenderIsLocalAutoPlay
+        = defendingPlayer != nullptr && defendingPlayer == currentPlayer && defendingPlayer->isAIAutoControlMode();
+    const bool isAutoPlayBattle = attackerIsLocalAutoPlay || defenderIsLocalAutoPlay;
 
     const auto shouldShowLocalBattlePopup = [&conf]( const HeroBase * hero ) {
         if ( hero == nullptr ) {
