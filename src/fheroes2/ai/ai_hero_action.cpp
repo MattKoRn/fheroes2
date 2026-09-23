@@ -417,9 +417,36 @@ namespace
         Army & takerArmy = taker.GetArmy();
         Army & giverArmy = giver.GetArmy();
 
-        // TODO: do not transfer the whole army from one hero to another. Add logic to leave a fast unit for Scout and Courier. Also 3-5 monsters are better than
-        // having 1 Peasant in one stack which leads to an instant death if the hero is attacked by an opponent.
         takerArmy.JoinStrongestFromArmy( giverArmy );
+
+        const Heroes::Role giverRole = giver.getAIRole();
+        if ( ( giverRole == Heroes::Role::SCOUT || giverRole == Heroes::Role::COURIER ) && giverArmy.GetOccupiedSlotCount() == 1 ) {
+            Troop * currentReserve = giverArmy.GetFirstValid();
+            Troop * fastestTakerTroop = takerArmy.GetFastestTroop();
+
+            assert( currentReserve != nullptr );
+            assert( fastestTakerTroop != nullptr );
+
+            if ( currentReserve != nullptr && fastestTakerTroop != nullptr && fastestTakerTroop->GetSpeed() > currentReserve->GetSpeed()
+                 && fastestTakerTroop->GetCount() > 1 ) {
+                const uint32_t countToKeep = std::min<uint32_t>( 3, fastestTakerTroop->GetCount() - 1 );
+                const Troop fastReserve( fastestTakerTroop->GetMonster(), countToKeep );
+
+                // Do not weaken the receiving hero materially just to improve a Scout/Courier's
+                // movement. A small fast reserve is useful; handing away an elite stack is not.
+                const double takerTroopsStrength = Troops( takerArmy.getTroops() ).GetStrength();
+                if ( fastReserve.GetStrength() <= takerTroopsStrength / 20.0
+                     && giverArmy.JoinTroop( fastestTakerTroop->GetMonster(), countToKeep, false ) ) {
+                    fastestTakerTroop->SetCount( fastestTakerTroop->GetCount() - countToKeep );
+
+                    // If possible, return the original slow reserve to the main hero. If there is
+                    // no room for it, keeping both stacks is still better for the support hero.
+                    if ( takerArmy.JoinTroop( *currentReserve ) ) {
+                        currentReserve->Reset();
+                    }
+                }
+            }
+        }
 
         AI::OptimizeTroopsOrder( takerArmy );
         AI::OptimizeTroopsOrder( giverArmy );
