@@ -540,7 +540,10 @@ namespace
         };
 
         const std::string filePath = getOfflineProgressFilePath();
-        const std::array<std::string, 3> candidatePaths{ filePath, filePath + ".bak", filePath + ".tmp" };
+        // A crash can occur after the old primary was moved to .bak but before the fully-written
+        // .tmp was promoted. In that state .tmp is the newest valid snapshot, so try it before
+        // the older backup whenever the primary cannot be used.
+        const std::array<std::string, 3> candidatePaths{ filePath, filePath + ".tmp", filePath + ".bak" };
 
         for ( const std::string & candidatePath : candidatePaths ) {
             OfflineProgressData candidate;
