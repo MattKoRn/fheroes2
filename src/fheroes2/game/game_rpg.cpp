@@ -305,6 +305,10 @@ namespace
                     continue;
                 }
 
+                if ( id == BRUTAL_CRITICALS && profile.ranks[CRITICAL_TRAINING] == 0 ) {
+                    continue;
+                }
+
                 const long double marginalReturn
                     = ( effect( id, rank + 1 ) - effect( id, rank ) ) / static_cast<long double>( cost( rank ) );
                 if ( marginalReturn > bestReturn ) {
@@ -575,9 +579,7 @@ namespace
         message += "\n\nCurrent rank: " + formatNumber( rank );
         message += "\nCurrent: " + shortEffectSummary( id, rank );
         if ( canAdvance ) {
-            const long double nextEffect = effect( id, rank + 1 );
             message += "\nNext rank: " + shortEffectSummary( id, rank + 1 );
-            message += "\nScaling gained: +" + formatEffect( nextEffect - currentEffect );
             message += "\nNext rank costs: " + formatNumber( cost( rank ) ) + " points";
         }
         message += "\nAvailable points: " + formatNumber( playerProfile.points );
