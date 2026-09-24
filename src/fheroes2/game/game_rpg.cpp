@@ -48,7 +48,11 @@ namespace
     constexpr size_t upgradeCount = static_cast<size_t>( fheroes2::RPG::UPGRADE_COUNT );
     constexpr size_t upgradesPerTab = 5;
     constexpr uint64_t pointsPerLevel = 5;
-    constexpr int profileVersion = 6;
+    constexpr uint64_t baseLevelExperience = 100000;
+    constexpr uint64_t experiencePerLevel = 50000;
+    constexpr uint64_t legacyBaseLevelExperience = 150000;
+    constexpr uint64_t legacyExperiencePerLevel = 100000;
+    constexpr int profileVersion = 7;
     using namespace fheroes2::RPG;
 
     uint64_t xpToNextLevel( uint64_t level );
@@ -702,20 +706,40 @@ namespace
             candidate.heroExperience = candidate.fieldExperience;
         }
 
-        // Version 6 replaces the previous economy-oriented tree with combat affixes.
-        // Refund the old investment and reset the slots so legacy ranks cannot silently
-        // turn into oversized Attack, Defense, critical or sustain bonuses.
-        if ( version < profileVersion ) {
-            // The migration is a complete respec. Reconstruct the closed guild-point ledger
-            // from level instead of trusting legacy rank/cost data that is about to be discarded.
+        // Version 6 replaced the previous economy-oriented tree with combat affixes.
+        // Only pre-v6 profiles need that one-time full respec.
+        if ( version < 6 ) {
             candidate.points = saturatedMultiply( candidate.level - 1, pointsPerLevel );
             candidate.ranks.fill( 0 );
             candidate.useCounts.fill( 0 );
         }
 
-        candidate.autoBuy = version < profileVersion ? false : autoBuyValue != 0;
-        if ( version == profileVersion && !isCurrentProfileStateValid( candidate ) ) {
+        candidate.autoBuy = version < 6 ? false : autoBuyValue != 0;
+
+        if ( version == 6 ) {
+            // Version 6 used the harder 250k + 100k/level progression curve. Validate it
+            // against that historical threshold before granting any levels made affordable
+            // by the new curve, so a legitimate partially-filled bar is never mistaken for corruption.
+            const uint64_t currentNextCost = xpToNextLevel( candidate.level );
+            const uint64_t legacyNextCost = legacyXpToNextLevel( candidate.level );
+            if ( !isCurrentProfileStateValid( candidate ) && !( candidate.progress <= candidate.experience && candidate.progress < legacyNextCost
+                                                                 && candidate.progress >= currentNextCost ) ) {
+                return false;
+            }
+        }
+        else if ( version == profileVersion && !isCurrentProfileStateValid( candidate ) ) {
             return false;
+        }
+
+        if ( version < profileVersion ) {
+            const uint64_t gainedLevels = consumeAffordableLevels( candidate );
+            if ( gainedLevels > 0 && candidate.autoBuy ) {
+                autoBuy( candidate );
+            }
+
+            if ( !isCurrentProfileStateValid( candidate ) ) {
+                return false;
+            }
         }
 
         // Profile snapshots are single-record files. Extra tokens indicate a partial append,
@@ -813,9 +837,21 @@ namespace
         return enemy == enemyProfiles.end() ? nullptr : &enemy->second;
     }
 
+    uint64_t xpToNextLevelForCurve( const uint64_t level, const uint64_t baseExperience, const uint64_t perLevelExperience )
+    {
+        return level > ( std::numeric_limits<uint64_t>::max() - baseExperience ) / perLevelExperience
+                   ? std::numeric_limits<uint64_t>::max()
+                   : baseExperience + level * perLevelExperience;
+    }
+
     uint64_t xpToNextLevel( const uint64_t level )
     {
-        return level > ( std::numeric_limits<uint64_t>::max() - 150000 ) / 100000 ? std::numeric_limits<uint64_t>::max() : 150000 + level * 100000;
+        return xpToNextLevelForCurve( level, baseLevelExperience, experiencePerLevel );
+    }
+
+    uint64_t legacyXpToNextLevel( const uint64_t level )
+    {
+        return xpToNextLevelForCurve( level, legacyBaseLevelExperience, legacyExperiencePerLevel );
     }
 
     bool canGainLevels( const Profile & profile, const uint64_t count )
@@ -824,21 +860,55 @@ namespace
             return true;
         }
         if ( count > std::numeric_limits<uint64_t>::max() - profile.level
-             || profile.level > ( std::numeric_limits<uint64_t>::max() - 150000 ) / 100000 ) {
+             || profile.level > ( std::numeric_limits<uint64_t>::max() - baseLevelExperience ) / experiencePerLevel ) {
             return false;
         }
 
         const uint64_t firstCost = xpToNextLevel( profile.level );
-        if ( count > profile.progress / firstCost ) {
+        if ( firstCost == 0 || count > profile.progress / firstCost ) {
             return false;
         }
+
         const uint64_t remaining = profile.progress - count * firstCost;
-        return count == 1 || count <= remaining / 50000 / ( count - 1 );
+        constexpr uint64_t triangularStep = experiencePerLevel / 2;
+        static_assert( experiencePerLevel % 2 == 0 );
+        return count == 1 || count <= remaining / triangularStep / ( count - 1 );
     }
 
     uint64_t xpForLevels( const Profile & profile, const uint64_t count )
     {
-        return count * xpToNextLevel( profile.level ) + 50000 * count * ( count - 1 );
+        return saturatedAdd( saturatedMultiply( count, xpToNextLevel( profile.level ) ),
+                             saturatedMultiply( experiencePerLevel, saturatedTriangular( count ) ) );
+    }
+
+    uint64_t consumeAffordableLevels( Profile & profile )
+    {
+        const uint64_t firstCost = xpToNextLevel( profile.level );
+        if ( firstCost == 0 || profile.progress < firstCost ) {
+            return 0;
+        }
+
+        uint64_t low = 0;
+        uint64_t high = std::min( saturatedAdd( profile.progress / firstCost, 1 ),
+                                  std::numeric_limits<uint64_t>::max() - profile.level );
+        while ( low < high ) {
+            const uint64_t middle = low + ( high - low + 1 ) / 2;
+            if ( canGainLevels( profile, middle ) ) {
+                low = middle;
+            }
+            else {
+                high = middle - 1;
+            }
+        }
+
+        if ( low == 0 ) {
+            return 0;
+        }
+
+        profile.progress -= xpForLevels( profile, low );
+        profile.level += low;
+        profile.points = saturatedAdd( profile.points, saturatedMultiply( low, pointsPerLevel ) );
+        return low;
     }
 
     void drawText( const std::string & value, const int32_t x, const int32_t y, const int32_t width, const fheroes2::FontType & font )
@@ -1283,26 +1353,9 @@ uint64_t fheroes2::RPG::addExperience( const PlayerColor color, const uint64_t a
         *detailedSource = saturatedAdd( *detailedSource, credited );
     }
 
-    uint64_t low = 0;
-    uint64_t high = std::min( playerProfile.progress / 250000 + 1, std::numeric_limits<uint64_t>::max() - playerProfile.level );
-    while ( low < high ) {
-        const uint64_t middle = low + ( high - low + 1 ) / 2;
-        if ( canGainLevels( playerProfile, middle ) ) {
-            low = middle;
-        }
-        else {
-            high = middle - 1;
-        }
-    }
-    if ( low > 0 ) {
-        playerProfile.progress -= xpForLevels( playerProfile, low );
-        playerProfile.level += low;
-        playerProfile.points = saturatedAdd( playerProfile.points, low > std::numeric_limits<uint64_t>::max() / pointsPerLevel
-                                                                  ? std::numeric_limits<uint64_t>::max()
-                                                                  : low * pointsPerLevel );
-        if ( kind != ExperienceKind::OFFLINE ) {
-            AudioManager::PlaySound( M82::NWHEROLV );
-        }
+    const uint64_t gainedLevels = consumeAffordableLevels( playerProfile );
+    if ( gainedLevels > 0 && kind != ExperienceKind::OFFLINE ) {
+        AudioManager::PlaySound( M82::NWHEROLV );
     }
 
     if ( playerProfile.autoBuy ) {
