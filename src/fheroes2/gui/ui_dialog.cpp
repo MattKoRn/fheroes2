@@ -781,7 +781,7 @@ namespace fheroes2
         showStandardTextMessage( MoraleString( moraleType ), Morale::Description( moraleType ), buttons, { this } );
     }
 
-    ExperienceDialogElement::ExperienceDialogElement( const int32_t experience )
+    ExperienceDialogElement::ExperienceDialogElement( const uint64_t experience )
         : _experience( experience )
     {
         const Sprite & icn = Assets::getImage( ICN::EXPMRL, 4 );
