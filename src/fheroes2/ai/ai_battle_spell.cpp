@@ -62,6 +62,21 @@ namespace
         return std::max<uint32_t>( 1, result );
     }
 
+    double getRpgBattleUnitValueFactor( const Battle::Unit & unit )
+    {
+        if ( unit.Modes( Battle::CAP_TOWER ) ) {
+            return 1.0;
+        }
+
+        const PlayerColor color = unit.GetColor();
+        const double criticalFactor = std::sqrt( std::max( 1.0, fheroes2::RPG::expectedCriticalDamageMultiplier( color ) ) );
+        const double evasionDamageTakenFactor = std::max( 0.50, 1.0 - fheroes2::RPG::evasionChance( color ) / 200.0 );
+        const double durabilityFactor = 1.0 / std::sqrt( evasionDamageTakenFactor );
+        const double sustainFactor = 1.0 + std::min( 0.15, fheroes2::RPG::sustainValuePercent( color ) / 200.0 );
+
+        return criticalFactor * durabilityFactor * sustainFactor;
+    }
+
     int32_t getSpellPower( const HeroBase * hero )
     {
         assert( hero != nullptr );
@@ -216,12 +231,17 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
             return 0.0;
         }
 
-        const auto applyTacticalPriority = [this, unit]( const double value ) {
+        const auto applyTacticalPriority = [this, unit, armySpeed]( const double value ) {
+            double result = value * getRpgBattleUnitValueFactor( *unit );
             if ( unit->GetCurrentColor() == _myColor ) {
-                return value;
+                return result;
             }
 
-            double result = value;
+            const uint32_t targetSpeed = unit->GetSpeed( false, true );
+            const bool targetCanStillAct = !unit->Modes( Battle::TR_MOVED ) && targetSpeed > Speed::STANDING;
+            if ( targetCanStillAct ) {
+                result *= targetSpeed > armySpeed ? 1.10 : 1.06;
+            }
 
             if ( unit->isArchers() && !unit->isHandFighting() && unit->GetShots() > 0 ) {
                 result *= 1.15;
@@ -259,7 +279,9 @@ AI::SpellcastOutcome AI::BattlePlanner::spellDamageValue( const Spell & spell, B
         }
         if ( damage >= hitPoints ) {
             double overallStrength = unit->GetStrength();
-            const double bonus = ( unit->GetSpeed() > armySpeed ) ? 0.07 : 0.035;
+            const uint32_t targetSpeed = unit->GetSpeed( false, true );
+            const bool targetCanStillAct = !unit->Modes( Battle::TR_MOVED ) && targetSpeed > Speed::STANDING;
+            const double bonus = targetCanStillAct ? ( targetSpeed > armySpeed ? 0.10 : 0.07 ) : ( targetSpeed > armySpeed ? 0.06 : 0.035 );
 
             if ( unit->Modes( Battle::CAP_MIRROROWNER ) ) {
                 // This monster has Mirror Image copies.
@@ -758,7 +780,7 @@ AI::SpellcastOutcome AI::BattlePlanner::spellResurrectValue( const Spell & spell
         uint32_t missingHP = unit->GetMissingHitPoints();
         missingHP = ( missingHP < hpRestored ) ? missingHP : hpRestored;
 
-        double spellValue = missingHP * unit->GetMonsterStrength() / monsterHitPoints;
+        double spellValue = missingHP * unit->GetMonsterStrength() / monsterHitPoints * getRpgBattleUnitValueFactor( *unit );
 
         // Prefer restoring a stack that has not acted yet. A unit killed before its turn retains
         // that turn state when resurrected, so restoring it can immediately add another action to
