@@ -59,7 +59,8 @@ namespace fheroes2::RPG
         SORCERY, PYROMANCY, CRYOMANCY, STORMCRAFT, CATACLYSM,
         SPELL_WARD, FIRE_WARD, COLD_WARD, STORM_WARD, CATACLYSM_WARD,
         LEADERSHIP, FORTUNE, REGENERATION, CRITICAL_TRAINING, BRUTAL_CRITICALS,
-        EVASION, ARCANE_PIERCING, CLOSE_QUARTERS, UNYIELDING, RUTHLESS
+        EVASION, ARCANE_PIERCING, CLOSE_QUARTERS, UNYIELDING, RUTHLESS,
+        UPGRADE_COUNT
     };
 
     static_assert( ARMS_TRAINING == 0 );
@@ -72,6 +73,14 @@ namespace fheroes2::RPG
     static_assert( LEADERSHIP == 30 );
     static_assert( EVASION == 35 );
     static_assert( RUTHLESS == 39 );
+    static_assert( UPGRADE_COUNT == 40 );
+
+    // Spell specialties and their matching wards intentionally share the same relative layout.
+    // Combat, telemetry and UI helpers rely on this mapping, so guard it at compile time.
+    static_assert( FIRE_WARD - PYROMANCY == 5 );
+    static_assert( COLD_WARD - CRYOMANCY == 5 );
+    static_assert( STORM_WARD - STORMCRAFT == 5 );
+    static_assert( CATACLYSM_WARD - CATACLYSM == 5 );
 
     void recordDoctrineUse( PlayerColor color, size_t upgradeId, uint64_t count = 1 );
     void recordSpellDoctrineUse( PlayerColor attacker, PlayerColor defender, int spellId );
