@@ -598,7 +598,12 @@ namespace
                     continue;
                 }
 
-                if ( marginalReturns[id] > bestReturn ) {
+                if ( marginalReturns[id] <= 0.0L ) {
+                    continue;
+                }
+
+                if ( bestId == upgradeCount || marginalReturns[id] > bestReturn
+                     || ( marginalReturns[id] == bestReturn && profile.ranks[id] < profile.ranks[bestId] ) ) {
                     bestReturn = marginalReturns[id];
                     bestId = id;
                 }
@@ -932,6 +937,7 @@ namespace
         const uint64_t refund = totalSpentPoints( profile );
         profile.points = saturatedAdd( profile.points, refund );
         profile.ranks.fill( 0 );
+        profile.useCounts.fill( 0 );
         profile.autoBuy = false;
         saveProfile();
     }
@@ -1365,7 +1371,7 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
         return;
     }
 
-    const long double levelScale = 1.0L + std::log1p( static_cast<long double>( playerProfile.level ) ) / 5.0L;
+    const long double levelScale = 1.0L + std::log1p( static_cast<long double>( playerProfile.level - 1 ) ) / 5.0L;
     static_cast<void>( addExperience( color, static_cast<uint64_t>( static_cast<long double>( base ) * levelScale ), ExperienceKind::ADVENTURE ) );
 }
 
@@ -2049,8 +2055,10 @@ void fheroes2::RPG::showMenu()
                 redraw = true;
             }
             else {
+                const uint64_t pointsAfterRefund = saturatedAdd( playerProfile.points, refund );
                 const std::string prompt = "Reset all upgrade ranks and refund " + formatNumber( refund )
-                                           + " guild points?\n\nSteward auto-buy will be paused so you can redistribute your points.";
+                                           + " guild points?\n\nYou will have " + formatNumber( pointsAfterRefund )
+                                           + " available points. Steward auto-buy will be paused and battle-trigger familiarity will be cleared.";
                 if ( fheroes2::showStandardTextMessage( "Respec Doctrines", prompt, Dialog::YES | Dialog::NO ) == Dialog::YES ) {
                     respecProfile( playerProfile );
                     redraw = true;
