@@ -706,7 +706,7 @@ namespace
         }
         if ( version < 2 ) {
             // Version 1 predates source ledgers. Its Renown came from normal in-game progression,
-            // so classify it as field/hero Renown before rewriting the profile as version 6.
+            // so classify it as field/hero Renown before rewriting it to the current profile format.
             candidate.fieldExperience = candidate.experience;
             candidate.heroExperience = candidate.experience;
         }
