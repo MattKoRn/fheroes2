@@ -350,6 +350,34 @@ namespace
         }
     }
 
+    bool isCurrentProfileStateValid( const Profile & profile )
+    {
+        // Current-format profiles have a closed guild-point ledger: every point is either
+        // still available or was spent through the current doctrine price curve.
+        uint64_t investedPoints = 0;
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            const uint64_t rank = profile.ranks[id];
+
+            // A stored rank must have produced a real mechanical increase when it was bought.
+            // This rejects parseable corruption that pushes bounded doctrines beyond their
+            // effective cap, which could otherwise mint saturated refunds during a respec.
+            if ( rank > 0 && effect( id, rank ) <= effect( id, rank - 1 ) ) {
+                return false;
+            }
+
+            investedPoints = saturatedAdd( investedPoints, rankInvestment( id, rank ) );
+        }
+
+        const uint64_t earnedPoints = saturatedMultiply( profile.level - 1, pointsPerLevel );
+        if ( investedPoints > earnedPoints || profile.points != earnedPoints - investedPoints ) {
+            return false;
+        }
+
+        // Progress is always a remainder of total earned Renown. A larger value cannot be
+        // produced by normal progression and is therefore a damaged recovery candidate.
+        return profile.progress <= profile.experience;
+    }
+
     uint64_t cost( const size_t id, const uint64_t rank )
     {
         switch ( id ) {
@@ -640,6 +668,10 @@ namespace
         }
 
         candidate.autoBuy = version < profileVersion ? false : autoBuyValue != 0;
+        if ( version == profileVersion && !isCurrentProfileStateValid( candidate ) ) {
+            return false;
+        }
+
         profile = std::move( candidate );
         visitedTiles = std::move( candidateVisited );
         return true;
