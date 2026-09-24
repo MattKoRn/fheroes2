@@ -136,7 +136,7 @@ namespace
     {
         double value = spell.getStrategicValue( hero.GetArmy().GetStrength(), hero.GetMaxSpellPoints(), hero.GetPower() );
         if ( spell.isDamage() ) {
-            value *= fheroes2::RPG::spellMultiplier( hero.GetColor(), PlayerColor::NONE, spell.GetID() );
+            value *= fheroes2::RPG::spellMultiplier( hero.GetColor(), PlayerColor::UNUSED, spell.GetID() );
         }
         return value;
     }
