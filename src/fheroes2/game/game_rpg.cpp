@@ -1218,7 +1218,7 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
     if ( won && siege ) {
         base *= 1.25L;
     }
-    else if ( won && defending ) {
+    if ( won && defending ) {
         base *= 1.10L;
     }
     const long double earned = base * challenge;
