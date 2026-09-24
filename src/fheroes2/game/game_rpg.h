@@ -47,9 +47,12 @@ namespace fheroes2::RPG
     [[nodiscard]] double evasionChance( PlayerColor color );
     [[nodiscard]] double rangedMeleePenaltyRecoveryPercent( PlayerColor color );
 
+    // Upgrade IDs index persistent rank/use-count arrays and are also shared by combat and AI code.
+    // Keep their layout stable: accidental insertion or reordering would silently reinterpret saved
+    // profiles and doctrine telemetry even though the project would still compile.
     enum UpgradeId : size_t
     {
-        ARMS_TRAINING, ARMOR_TRAINING, VETERAN_CORE, BLOOD_DRINKER, REAPER,
+        ARMS_TRAINING = 0, ARMOR_TRAINING, VETERAN_CORE, BLOOD_DRINKER, REAPER,
         FEROCITY, MARKSMAN, BRAWLER, EXECUTIONER, OPENING_BLOW,
         GIANT_SLAYER, OVERWHELM, FRENZY, DISCIPLINE, ARMOR_PIERCING,
         IRON_SKIN, ARROW_WARD, MELEE_GUARD, LAST_STAND, BULWARK,
@@ -58,6 +61,17 @@ namespace fheroes2::RPG
         LEADERSHIP, FORTUNE, REGENERATION, CRITICAL_TRAINING, BRUTAL_CRITICALS,
         EVASION, ARCANE_PIERCING, CLOSE_QUARTERS, UNYIELDING, RUTHLESS
     };
+
+    static_assert( ARMS_TRAINING == 0 );
+    static_assert( REAPER == 4 );
+    static_assert( FEROCITY == 5 );
+    static_assert( ARMOR_PIERCING == 14 );
+    static_assert( IRON_SKIN == 15 );
+    static_assert( SORCERY == 20 );
+    static_assert( SPELL_WARD == 25 );
+    static_assert( LEADERSHIP == 30 );
+    static_assert( EVASION == 35 );
+    static_assert( RUTHLESS == 39 );
 
     void recordDoctrineUse( PlayerColor color, size_t upgradeId, uint64_t count = 1 );
     void recordSpellDoctrineUse( PlayerColor attacker, PlayerColor defender, int spellId );
