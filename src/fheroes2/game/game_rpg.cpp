@@ -984,7 +984,7 @@ namespace
         line.draw( x, y, fheroes2::Display::instance() );
     }
 
-    std::string formatEffect( const long double value )
+    std::string formatDecimal( const long double value )
     {
         std::ostringstream text;
         text << std::fixed << std::setprecision( 2 ) << static_cast<double>( value );
@@ -995,7 +995,12 @@ namespace
         if ( !result.empty() && result.back() == '.' ) {
             result.pop_back();
         }
-        return result + '%';
+        return result;
+    }
+
+    std::string formatEffect( const long double value )
+    {
+        return formatDecimal( value ) + '%';
     }
 
     void drawBeveledPanel( const fheroes2::Rect & roi, const bool inset )
@@ -1129,8 +1134,25 @@ namespace
             const uint64_t price = cost( id, rank );
             message += "\nNext rank costs: " + formatNumber( price ) + " points";
             if ( price > 0 ) {
-                const long double gain = nextEffect - currentEffect;
-                message += "\nGain per point: " + formatEffect( gain / static_cast<long double>( price ) );
+                const long double gainPerPoint = ( nextEffect - currentEffect ) / static_cast<long double>( price );
+                if ( id == ARMS_TRAINING ) {
+                    message += "\nGain per point: " + formatDecimal( gainPerPoint ) + " Attack";
+                }
+                else if ( id == ARMOR_TRAINING ) {
+                    message += "\nGain per point: " + formatDecimal( gainPerPoint ) + " Defense";
+                }
+                else if ( id == VETERAN_CORE ) {
+                    message += "\nGain per point: " + formatDecimal( gainPerPoint ) + " Attack & Defense";
+                }
+                else if ( id == LEADERSHIP ) {
+                    message += "\nGain per point: " + formatDecimal( gainPerPoint ) + " Morale";
+                }
+                else if ( id == FORTUNE ) {
+                    message += "\nGain per point: " + formatDecimal( gainPerPoint ) + " Luck";
+                }
+                else {
+                    message += "\nGain per point: " + formatEffect( gainPerPoint );
+                }
             }
             if ( !prerequisiteMet ) {
                 message += "\nPurchase status: LOCKED - requires Critical Training rank 1.";
