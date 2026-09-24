@@ -1251,11 +1251,13 @@ namespace
             // Don't check castles/spell availability since high Wisdom drives building priority.
             // Value the real diminishing-return spell bonuses instead of raw ranks: otherwise a
             // late-game RPG profile can make Wisdom dominate every secondary-skill choice.
-            const double spellDoctrineEffect = fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::SORCERY )
-                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::PYROMANCY )
-                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::CRYOMANCY )
-                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::STORMCRAFT )
-                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::CATACLYSM );
+            const double strongestElement
+                = std::max( { fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::PYROMANCY ),
+                              fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::CRYOMANCY ),
+                              fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::STORMCRAFT ),
+                              fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::CATACLYSM ) } );
+            const double spellDoctrineEffect = fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::SORCERY ) + strongestElement
+                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::ARCANE_PIERCING ) * 0.25;
             const double baseWisdom = level == Skill::Level::BASIC ? 2500.0 : 1000.0;
             return baseWisdom + std::min( 1500.0, spellDoctrineEffect * 50.0 );
         }
@@ -1299,7 +1301,9 @@ namespace
                 return 100.0;
             }
             const double baseArchery = hero.GetArmy().isMeleeDominantArmy() ? 100.0 : 500.0;
-            return baseArchery + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::MARKSMAN ) * 55.0;
+            const double marksmanSynergy = fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::MARKSMAN ) * 55.0;
+            const double closeQuartersSynergy = fheroes2::RPG::rangedMeleePenaltyRecoveryPercent( hero.GetColor() ) * 4.0;
+            return baseArchery + marksmanSynergy + closeQuartersSynergy;
         }
         case Skill::Secondary::ESTATES: {
             const Heroes::Role role = hero.getAIRole();
@@ -1325,9 +1329,14 @@ namespace
         }
         case Skill::Secondary::MYSTICISM: {
             const double baseMysticism = hero.HaveSpellBook() ? 500.0 : 100.0;
-            const double spellDoctrineEffect = fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::SORCERY )
-                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::ARCANE_PIERCING );
-            return baseMysticism + ( hero.HaveSpellBook() ? std::min( 600.0, spellDoctrineEffect * 30.0 ) : 0.0 );
+            const double strongestElement
+                = std::max( { fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::PYROMANCY ),
+                              fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::CRYOMANCY ),
+                              fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::STORMCRAFT ),
+                              fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::CATACLYSM ) } );
+            const double spellDoctrineEffect = fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::SORCERY ) + strongestElement * 0.5
+                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::ARCANE_PIERCING ) * 0.5;
+            return baseMysticism + ( hero.HaveSpellBook() ? std::min( 700.0, spellDoctrineEffect * 30.0 ) : 0.0 );
         }
         case Skill::Secondary::EAGLE_EYE:
             return hero.HaveSpellBook() ? 250.0 : 0.0;
@@ -2562,23 +2571,58 @@ double AI::Planner::getObjectValue( const Heroes & hero, const int32_t index, co
     (void)objectType;
 #endif
 
+    double value = 0.0;
     switch ( hero.getAIRole() ) {
     case Heroes::Role::HUNTER:
-        return getGeneralObjectValue( hero, index, valueToIgnore, distanceToObject );
+        value = getGeneralObjectValue( hero, index, valueToIgnore, distanceToObject );
+        break;
     case Heroes::Role::SCOUT:
-        return getScoutObjectValue( hero, index, valueToIgnore, distanceToObject );
+        value = getScoutObjectValue( hero, index, valueToIgnore, distanceToObject );
+        break;
     case Heroes::Role::CHAMPION:
     case Heroes::Role::FIGHTER:
-        return getFighterObjectValue( hero, index, valueToIgnore, distanceToObject );
+        value = getFighterObjectValue( hero, index, valueToIgnore, distanceToObject );
+        break;
     case Heroes::Role::COURIER:
-        return getCourierObjectValue( hero, index, valueToIgnore, distanceToObject );
+        value = getCourierObjectValue( hero, index, valueToIgnore, distanceToObject );
+        break;
     default:
         // If you set a new type of a hero you must add the logic here.
         assert( 0 );
-        break;
+        return 0.0;
     }
 
-    return 0;
+    if ( value <= 0.0 ) {
+        return value;
+    }
+
+    const uint64_t adventureRenown = fheroes2::RPG::previewAdventureActionExperience( hero.GetColor(), static_cast<int>( objectType ), index );
+    if ( adventureRenown > 0 ) {
+        // Exploration-focused roles care more about persistent discoveries; fighters stay mission
+        // focused, and couriers only take RPG detours when the normal courier logic already likes them.
+        double roleWeight = 1.0;
+        switch ( hero.getAIRole() ) {
+        case Heroes::Role::SCOUT:
+            roleWeight = 2.0;
+            break;
+        case Heroes::Role::HUNTER:
+            roleWeight = 1.4;
+            break;
+        case Heroes::Role::CHAMPION:
+        case Heroes::Role::FIGHTER:
+            roleWeight = 0.8;
+            break;
+        case Heroes::Role::COURIER:
+            roleWeight = 0.35;
+            break;
+        default:
+            break;
+        }
+
+        value += std::min( 1200.0, static_cast<double>( adventureRenown ) * roleWeight );
+    }
+
+    return value;
 }
 
 double AI::Planner::getFutureObjectValue( const Heroes & hero, const int32_t index, const MP2::MapObjectType objectType, const double valueToIgnore,
