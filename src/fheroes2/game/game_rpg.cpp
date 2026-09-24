@@ -56,6 +56,7 @@ namespace
     using namespace fheroes2::RPG;
 
     uint64_t xpToNextLevel( uint64_t level );
+    uint64_t legacyXpToNextLevel( uint64_t level );
 
     struct UpgradeInfo
     {
@@ -170,6 +171,8 @@ namespace
         std::array<uint64_t, upgradeCount> useCounts{};
         bool autoBuy{ false };
     };
+
+    uint64_t consumeAffordableLevels( Profile & profile );
 
     Profile playerProfile;
     std::map<PlayerColor, Profile> enemyProfiles;
@@ -376,7 +379,7 @@ namespace
         return specialization == upgradeCount ? upgradeCount : specialization + ( FIRE_WARD - PYROMANCY );
     }
 
-    bool isCurrentProfileStateValid( const Profile & profile )
+    bool isProfileStateValid( const Profile & profile, const uint64_t nextLevelCost )
     {
         // Current-format profiles have a closed guild-point ledger: every point is either
         // still available or was spent through the current doctrine price curve.
@@ -415,7 +418,12 @@ namespace
         // the cost of the next level because addExperience() immediately consumes every
         // affordable level. Accepting a larger remainder would let a damaged snapshot mint
         // levels and guild points on the next XP award.
-        return profile.progress <= profile.experience && profile.progress < xpToNextLevel( profile.level );
+        return profile.progress <= profile.experience && profile.progress < nextLevelCost;
+    }
+
+    bool isCurrentProfileStateValid( const Profile & profile )
+    {
+        return isProfileStateValid( profile, xpToNextLevel( profile.level ) );
     }
 
     uint64_t cost( const size_t id, const uint64_t rank )
@@ -717,13 +725,10 @@ namespace
         candidate.autoBuy = version < 6 ? false : autoBuyValue != 0;
 
         if ( version == 6 ) {
-            // Version 6 used the harder 250k + 100k/level progression curve. Validate it
-            // against that historical threshold before granting any levels made affordable
-            // by the new curve, so a legitimate partially-filled bar is never mistaken for corruption.
-            const uint64_t currentNextCost = xpToNextLevel( candidate.level );
-            const uint64_t legacyNextCost = legacyXpToNextLevel( candidate.level );
-            if ( !isCurrentProfileStateValid( candidate ) && !( candidate.progress <= candidate.experience && candidate.progress < legacyNextCost
-                                                                 && candidate.progress >= currentNextCost ) ) {
+            // Version 6 used the harder 250k + 100k/level progression curve. Validate every
+            // invariant against that historical progress threshold before granting levels made
+            // affordable by the new curve.
+            if ( !isProfileStateValid( candidate, legacyXpToNextLevel( candidate.level ) ) ) {
                 return false;
             }
         }
