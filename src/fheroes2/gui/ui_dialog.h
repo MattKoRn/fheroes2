@@ -258,7 +258,7 @@ namespace fheroes2
     class ExperienceDialogElement final : public DialogElement
     {
     public:
-        explicit ExperienceDialogElement( const int32_t experience );
+        explicit ExperienceDialogElement( uint64_t experience );
 
         ~ExperienceDialogElement() override = default;
 
@@ -269,7 +269,7 @@ namespace fheroes2
         void showPopup( const int buttons ) const override;
 
     private:
-        const int32_t _experience;
+        const uint64_t _experience;
     };
 
     class PrimarySkillDialogElement : public DialogElement
