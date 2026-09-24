@@ -523,11 +523,13 @@ namespace
             }
 
             if ( skillType == Skill::Secondary::LEADERSHIP
-                 && ( army.AllTroopsAreUndead() || getEffectiveRpgMorale( hero ) >= Morale::BLOOD ) ) {
-                // Leadership cannot improve an undead army or morale already capped by the RPG profile.
+                 && ( army.AllTroopsAreUndead() || fheroes2::RPG::moraleBonus( hero.GetColor() ) >= Morale::BLOOD ) ) {
+                // Leadership cannot improve an undead army or a kingdom whose persistent RPG
+                // Morale bonus already fills the cap. Temporary map buffs must not suppress a
+                // permanently useful skill.
                 return false;
             }
-            if ( skillType == Skill::Secondary::LUCK && getEffectiveRpgLuck( hero ) >= Luck::IRISH ) {
+            if ( skillType == Skill::Secondary::LUCK && fheroes2::RPG::luckBonus( hero.GetColor() ) >= Luck::IRISH ) {
                 return false;
             }
 
@@ -1264,8 +1266,8 @@ namespace
                 return 100.0;
             }
 
-            const int effectiveMorale = getEffectiveRpgMorale( hero );
-            const int remainingMorale = std::max( 0, Morale::BLOOD - effectiveMorale );
+            const int rpgMorale = std::clamp( fheroes2::RPG::moraleBonus( hero.GetColor() ), 0, Morale::BLOOD );
+            const int remainingMorale = Morale::BLOOD - rpgMorale;
             return 100.0 + 900.0 * remainingMorale / Morale::BLOOD;
         }
         case Skill::Secondary::NECROMANCY:
@@ -1276,8 +1278,8 @@ namespace
                 return 100.0;
             }
 
-            const int effectiveLuck = getEffectiveRpgLuck( hero );
-            const int remainingLuck = std::max( 0, Luck::IRISH - effectiveLuck );
+            const int rpgLuck = std::clamp( fheroes2::RPG::luckBonus( hero.GetColor() ), 0, Luck::IRISH );
+            const int remainingLuck = Luck::IRISH - rpgLuck;
             const double baseLuckValue = 100.0 + 400.0 * remainingLuck / Luck::IRISH;
             const double luckHeadroom = static_cast<double>( remainingLuck ) / Luck::IRISH;
             const double criticalSynergy
