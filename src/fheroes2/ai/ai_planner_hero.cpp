@@ -2616,9 +2616,12 @@ double AI::Planner::getObjectValue( const Heroes & hero, const int32_t index, co
             // Completing the level immediately is exciting and also unlocks another five guild points.
             value += std::min( 900.0, explorationValue * 0.75 + 250.0 );
         }
-        else if ( adventureRenown * 2 >= remainingRenown ) {
-            // Give a softer push to discoveries that fill at least half of the remaining bar.
-            value += std::min( 350.0, explorationValue * 0.25 );
+        else {
+            const uint64_t halfRemainingRenown = remainingRenown / 2 + remainingRenown % 2;
+            if ( adventureRenown >= halfRemainingRenown ) {
+                // Give a softer push to discoveries that fill at least half of the remaining bar.
+                value += std::min( 350.0, explorationValue * 0.25 );
+            }
         }
     }
 
