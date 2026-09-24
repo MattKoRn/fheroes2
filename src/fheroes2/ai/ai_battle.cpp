@@ -200,6 +200,13 @@ namespace
             }
         }
 
+        if ( target.GetMissingHitPoints() > 0 ) {
+            const double sustainPercent = fheroes2::RPG::sustainValuePercent( target.GetColor() );
+            if ( sustainPercent > 0.0 ) {
+                value *= 1.0 + std::min( 0.15, sustainPercent / 200.0 );
+            }
+        }
+
         const uint32_t potentialDamage = attacker.getPotentialDamage( target );
         if ( potentialDamage >= target.GetHitPoints() ) {
             // Removing a stack completely denies all of its future turns and retaliation opportunities.
@@ -263,8 +270,12 @@ namespace
         if ( targetSurvives && attacker.GetHitPoints() > 0 && !attacker.isIgnoringRetaliation() && target.isRetaliationAllowed() ) {
             const uint32_t retaliatoryDamage = target.EstimateRetaliatoryDamage( potentialDamage );
             if ( retaliatoryDamage > 0 ) {
-                const double retaliationRatio
-                    = std::min( 1.0, static_cast<double>( retaliatoryDamage ) / static_cast<double>( attacker.GetHitPoints() ) );
+                const double regenerationPercent = fheroes2::RPG::regenerationPercent( attacker.GetColor() );
+                const double regenerationBuffer
+                    = std::min( static_cast<double>( attacker.Monster::GetHitPoints() ) * regenerationPercent / 100.0,
+                                static_cast<double>( attacker.GetMissingHitPoints() ) + retaliatoryDamage );
+                const double netRetaliatoryDamage = std::max( 0.0, static_cast<double>( retaliatoryDamage ) - regenerationBuffer );
+                const double retaliationRatio = std::min( 1.0, netRetaliatoryDamage / static_cast<double>( attacker.GetHitPoints() ) );
 
                 // Avoid expensive melee trades unless the target is important enough to justify them.
                 // Shooters receive a softer penalty because engaging them also disables ranged fire.
@@ -2172,7 +2183,9 @@ AI::BattleTargetPair AI::BattlePlanner::meleeUnitDefense( Battle::Arena & arena,
                 continue;
             }
 
-            const double archerValue = frnd->GetStrength() - dist * defenseDistanceModifier;
+            const double closeQuartersRecovery = fheroes2::RPG::rangedMeleePenaltyRecoveryPercent( frnd->GetColor() );
+            const double coverNeedFactor = 1.0 - std::clamp( closeQuartersRecovery / 200.0, 0.0, 0.50 );
+            const double archerValue = frnd->GetStrength() * coverNeedFactor - dist * defenseDistanceModifier;
             if ( archerValue < bestArcherValue ) {
                 continue;
             }
