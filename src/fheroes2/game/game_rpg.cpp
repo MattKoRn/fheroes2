@@ -583,6 +583,43 @@ namespace
         }
     }
 
+    long double autoBuySynergyFactor( const Profile & profile, const size_t id )
+    {
+        switch ( id ) {
+        case MARKSMAN:
+            return 1.0L + std::min<long double>( 0.18L, effect( CLOSE_QUARTERS, profile.ranks[CLOSE_QUARTERS] ) / 500.0L );
+        case CLOSE_QUARTERS:
+            return 1.0L + std::min<long double>( 0.18L, effect( MARKSMAN, profile.ranks[MARKSMAN] ) / 100.0L );
+
+        case SORCERY: {
+            const long double strongestElement = std::max( { effect( PYROMANCY, profile.ranks[PYROMANCY] ),
+                                                             effect( CRYOMANCY, profile.ranks[CRYOMANCY] ),
+                                                             effect( STORMCRAFT, profile.ranks[STORMCRAFT] ),
+                                                             effect( CATACLYSM, profile.ranks[CATACLYSM] ) } );
+            return 1.0L + std::min<long double>( 0.20L, strongestElement / 100.0L );
+        }
+        case PYROMANCY:
+        case CRYOMANCY:
+        case STORMCRAFT:
+        case CATACLYSM:
+            return 1.0L + std::min<long double>( 0.20L, effect( SORCERY, profile.ranks[SORCERY] ) / 100.0L
+                                                          + effect( ARCANE_PIERCING, profile.ranks[ARCANE_PIERCING] ) / 300.0L );
+        case ARCANE_PIERCING:
+            return 1.0L + std::min<long double>( 0.15L, effect( SORCERY, profile.ranks[SORCERY] ) / 150.0L );
+
+        case IRON_SKIN:
+            return 1.0L + std::min<long double>( 0.15L,
+                                                ( effect( ARROW_WARD, profile.ranks[ARROW_WARD] )
+                                                  + effect( MELEE_GUARD, profile.ranks[MELEE_GUARD] ) )
+                                                    / 250.0L );
+        case ARROW_WARD:
+        case MELEE_GUARD:
+            return 1.0L + std::min<long double>( 0.15L, effect( IRON_SKIN, profile.ranks[IRON_SKIN] ) / 150.0L );
+        default:
+            return 1.0L;
+        }
+    }
+
     long double autoBuyMarginalReturn( const Profile & profile, const size_t id )
     {
         const uint64_t rank = profile.ranks[id];
@@ -591,7 +628,8 @@ namespace
             return 0.0L;
         }
 
-        return autoBuyUtility( profile, id ) * autoBuyActivityFactor( profile, id ) / static_cast<long double>( cost( id, rank ) );
+        return autoBuyUtility( profile, id ) * autoBuyActivityFactor( profile, id ) * autoBuySynergyFactor( profile, id )
+               / static_cast<long double>( cost( id, rank ) );
     }
 
     void autoBuy( Profile & profile )
@@ -630,13 +668,31 @@ namespace
 
             marginalReturns[bestId] = autoBuyMarginalReturn( profile, bestId );
 
-            // These two doctrines are the only cross-dependent pair: Brutal Criticals is locked
-            // behind Critical Training, and each doctrine's utility depends on the other's effect.
-            if ( bestId == CRITICAL_TRAINING ) {
-                marginalReturns[BRUTAL_CRITICALS] = autoBuyMarginalReturn( profile, BRUTAL_CRITICALS );
+            const auto refresh = [&profile, &marginalReturns]( const size_t id ) {
+                marginalReturns[id] = autoBuyMarginalReturn( profile, id );
+            };
+
+            if ( bestId == CRITICAL_TRAINING || bestId == BRUTAL_CRITICALS ) {
+                refresh( CRITICAL_TRAINING );
+                refresh( BRUTAL_CRITICALS );
             }
-            else if ( bestId == BRUTAL_CRITICALS ) {
-                marginalReturns[CRITICAL_TRAINING] = autoBuyMarginalReturn( profile, CRITICAL_TRAINING );
+            if ( bestId == MARKSMAN || bestId == CLOSE_QUARTERS ) {
+                refresh( MARKSMAN );
+                refresh( CLOSE_QUARTERS );
+            }
+            if ( bestId == SORCERY || bestId == PYROMANCY || bestId == CRYOMANCY || bestId == STORMCRAFT || bestId == CATACLYSM
+                 || bestId == ARCANE_PIERCING ) {
+                refresh( SORCERY );
+                refresh( PYROMANCY );
+                refresh( CRYOMANCY );
+                refresh( STORMCRAFT );
+                refresh( CATACLYSM );
+                refresh( ARCANE_PIERCING );
+            }
+            if ( bestId == IRON_SKIN || bestId == ARROW_WARD || bestId == MELEE_GUARD ) {
+                refresh( IRON_SKIN );
+                refresh( ARROW_WARD );
+                refresh( MELEE_GUARD );
             }
         }
     }
@@ -1072,6 +1128,10 @@ namespace
 
             const uint64_t price = cost( id, rank );
             message += "\nNext rank costs: " + formatNumber( price ) + " points";
+            if ( price > 0 ) {
+                const long double gain = nextEffect - currentEffect;
+                message += "\nGain per point: " + formatEffect( gain / static_cast<long double>( price ) );
+            }
             if ( !prerequisiteMet ) {
                 message += "\nPurchase status: LOCKED - requires Critical Training rank 1.";
             }
@@ -1176,6 +1236,30 @@ namespace
                 message += "\nSignature Doctrine: " + std::string( upgrades[mostUsedId].name ) + " (" + formatNumber( *mostUsed ) + " triggers)";
             }
         }
+        std::array<uint64_t, tabNames.size()> investedByTab{};
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            investedByTab[id / upgradesPerTab] = saturatedAdd( investedByTab[id / upgradesPerTab], rankInvestment( id, playerProfile.ranks[id] ) );
+        }
+        const auto focusIt = std::max_element( investedByTab.begin(), investedByTab.end() );
+        if ( focusIt != investedByTab.end() && *focusIt > 0 ) {
+            const size_t focusTab = static_cast<size_t>( std::distance( investedByTab.begin(), focusIt ) );
+            message += "\nBuild Focus: " + std::string( tabNames[focusTab] ) + " (" + formatNumber( *focusIt ) + " points)";
+        }
+
+        size_t stewardPick = upgradeCount;
+        long double stewardPickValue = 0.0L;
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            const long double marginal = autoBuyMarginalReturn( playerProfile, id );
+            if ( marginal > stewardPickValue ) {
+                stewardPickValue = marginal;
+                stewardPick = id;
+            }
+        }
+        if ( stewardPick < upgradeCount ) {
+            const uint64_t stewardPrice = cost( stewardPick, playerProfile.ranks[stewardPick] );
+            message += "\nSteward Recommendation: " + std::string( upgrades[stewardPick].name ) + " (" + formatNumber( stewardPrice ) + " pts)";
+        }
+
         message += "\nNext Level Reward: +" + formatNumber( pointsPerLevel ) + " guild points";
         message += "\nSteward Auto-Buyer: ";
         message += playerProfile.autoBuy ? "Active (ON)" : "Paused (OFF)";
@@ -1861,6 +1945,31 @@ uint64_t fheroes2::RPG::availablePoints()
 uint64_t fheroes2::RPG::kingdomLevel()
 {
     return playerProfile.level;
+}
+
+uint64_t fheroes2::RPG::renownToNextLevel( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    if ( profile == nullptr ) {
+        return 0;
+    }
+
+    const uint64_t required = xpToNextLevel( profile->level );
+    return required > profile->progress ? required - profile->progress : 0;
+}
+
+double fheroes2::RPG::spellcastingInvestmentPercent( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    if ( profile == nullptr ) {
+        return 0.0;
+    }
+
+    const long double strongestElement
+        = std::max( { effect( PYROMANCY, profile->ranks[PYROMANCY] ), effect( CRYOMANCY, profile->ranks[CRYOMANCY] ),
+                      effect( STORMCRAFT, profile->ranks[STORMCRAFT] ), effect( CATACLYSM, profile->ranks[CATACLYSM] ) } );
+    return static_cast<double>( effect( SORCERY, profile->ranks[SORCERY] ) + strongestElement
+                                + effect( ARCANE_PIERCING, profile->ranks[ARCANE_PIERCING] ) * 0.25L );
 }
 
 bool fheroes2::RPG::isStewardActive()
