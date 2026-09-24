@@ -373,9 +373,11 @@ namespace
             return false;
         }
 
-        // Progress is always a remainder of total earned Renown. A larger value cannot be
-        // produced by normal progression and is therefore a damaged recovery candidate.
-        return profile.progress <= profile.experience;
+        // Progress is always a remainder of total earned Renown. It must be smaller than
+        // the cost of the next level because addExperience() immediately consumes every
+        // affordable level. Accepting a larger remainder would let a damaged snapshot mint
+        // levels and guild points on the next XP award.
+        return profile.progress <= profile.experience && profile.progress < xpToNextLevel( profile.level );
     }
 
     uint64_t cost( const size_t id, const uint64_t rank )
