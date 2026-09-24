@@ -164,9 +164,23 @@ namespace
         return bestAttackVector;
     }
 
+    double getRpgTacticalThreatFactor( const Battle::Unit & unit )
+    {
+        if ( unit.Modes( Battle::CAP_TOWER ) ) {
+            return 1.0;
+        }
+
+        const PlayerColor color = unit.GetColor();
+        const double criticalFactor = std::sqrt( std::max( 1.0, fheroes2::RPG::expectedCriticalDamageMultiplier( color ) ) );
+        const double evasionTakenFactor = std::max( 0.50, 1.0 - fheroes2::RPG::evasionChance( color ) / 200.0 );
+        const double evasionDurability = 1.0 / std::sqrt( evasionTakenFactor );
+        const double sustainFactor = 1.0 + std::min( 0.15, fheroes2::RPG::sustainValuePercent( color ) / 200.0 );
+        return criticalFactor * evasionDurability * sustainFactor;
+    }
+
     double getTacticalTargetValue( const Battle::Unit & attacker, const Battle::Unit & target )
     {
-        double value = target.evaluateThreatForUnit( attacker );
+        double value = target.evaluateThreatForUnit( attacker ) * getRpgTacticalThreatFactor( target );
 
         const uint32_t targetSpeed = target.GetSpeed( false, true );
         const bool targetCanStillAct = !target.Modes( Battle::TR_MOVED ) && targetSpeed > Speed::STANDING;
@@ -187,17 +201,26 @@ namespace
             value *= 1.20;
         }
 
-        // Focus already-damaged stacks. Removing a weakened stack denies an entire future turn
-        // and is usually stronger than spreading the same damage across several enemies.
+        // Focus already-damaged stacks. Use total hit points instead of creature count so a
+        // heavily wounded top creature is recognized even before the stack loses another unit.
         const uint32_t initialCount = target.GetInitialCount();
-        if ( initialCount > 0 ) {
-            const uint64_t currentCount = target.GetCount();
-            if ( currentCount * 4 <= initialCount ) {
+        const uint32_t monsterHitPoints = target.Monster::GetHitPoints();
+        if ( initialCount > 0 && monsterHitPoints > 0 ) {
+            const uint64_t initialHitPoints = static_cast<uint64_t>( initialCount ) * monsterHitPoints;
+            const uint64_t currentHitPoints = target.GetHitPoints();
+            if ( currentHitPoints * 4 <= initialHitPoints ) {
                 value *= 1.25;
             }
-            else if ( currentCount * 2 <= initialCount ) {
+            else if ( currentHitPoints * 2 <= initialHitPoints ) {
                 value *= 1.15;
             }
+        }
+
+        // An engaged archer with weak Close Quarters is a satisfying suppression target: keeping
+        // pressure on it preserves the normal melee penalty. A fully trained shooter gets no bonus.
+        if ( target.isArchers() && target.isHandFighting() ) {
+            const double recovery = fheroes2::RPG::rangedMeleePenaltyRecoveryPercent( target.GetColor() );
+            value *= 1.0 + std::clamp( ( 100.0 - recovery ) / 500.0, 0.0, 0.20 );
         }
 
         if ( target.GetMissingHitPoints() > 0 ) {
@@ -449,7 +472,7 @@ namespace
                 double totalThreat = 0.0;
                 double highestThreat = 0.0;
                 for ( const Battle::Unit * enemy : adjacentEnemies ) {
-                    const double threat = enemy->evaluateThreatForUnit( attacker );
+                    const double threat = enemy->evaluateThreatForUnit( attacker ) * getRpgTacticalThreatFactor( *enemy );
                     totalThreat += threat;
                     highestThreat = std::max( highestThreat, threat );
                 }
