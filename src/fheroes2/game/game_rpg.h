@@ -31,6 +31,7 @@ namespace fheroes2::RPG
     void endMap();
     [[nodiscard]] uint64_t addExperience( PlayerColor color, uint64_t amount, ExperienceKind kind = ExperienceKind::HERO );
     void awardAdventureAction( PlayerColor color, int objectType, int32_t tileIndex );
+    [[nodiscard]] uint64_t previewAdventureActionExperience( PlayerColor color, int objectType, int32_t tileIndex );
     void awardBattle( PlayerColor color, PlayerColor opponent, uint32_t battleExperience, bool won, bool defending, bool siege );
 
     // Persistent RPG combat affixes used by battle stacks. These accessors are intentionally
