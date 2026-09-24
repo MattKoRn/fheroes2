@@ -44,6 +44,8 @@ namespace fheroes2::RPG
     [[nodiscard]] double regenerationPercent( PlayerColor color );
     [[nodiscard]] double criticalChance( PlayerColor color );
     [[nodiscard]] double criticalDamageBonusPercent( PlayerColor color );
+    [[nodiscard]] double expectedCriticalDamageMultiplier( PlayerColor color );
+    [[nodiscard]] double sustainValuePercent( PlayerColor color );
     [[nodiscard]] double evasionChance( PlayerColor color );
     [[nodiscard]] double rangedMeleePenaltyRecoveryPercent( PlayerColor color );
 
