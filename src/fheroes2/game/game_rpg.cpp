@@ -147,6 +147,8 @@ namespace
     constexpr std::array<const char *, 8> tabPanelNames{
         "TRAINING YARD", "WAR COUNCIL", "TACTICS HALL", "GUARD HOUSE", "MAGE GUILD", "WARD HALL", "THRONE ROOM", "MASTER'S HALL"
     };
+    static_assert( tabNames.size() * upgradesPerTab == upgradeCount );
+    static_assert( tabPanelNames.size() == tabNames.size() );
 
     struct Profile
     {
@@ -340,6 +342,33 @@ namespace
         default:
             return percentEffect( rank );
         }
+    }
+
+    size_t spellSpecializationId( const int spellId )
+    {
+        switch ( spellId ) {
+        case Spell::FIREBALL:
+        case Spell::FIREBLAST:
+            return PYROMANCY;
+        case Spell::COLDRAY:
+        case Spell::COLDRING:
+            return CRYOMANCY;
+        case Spell::LIGHTNINGBOLT:
+        case Spell::CHAINLIGHTNING:
+            return STORMCRAFT;
+        case Spell::ELEMENTALSTORM:
+        case Spell::METEORSHOWER:
+        case Spell::ARMAGEDDON:
+            return CATACLYSM;
+        default:
+            return upgradeCount;
+        }
+    }
+
+    size_t spellWardId( const int spellId )
+    {
+        const size_t specialization = spellSpecializationId( spellId );
+        return specialization == upgradeCount ? upgradeCount : specialization + ( FIRE_WARD - PYROMANCY );
     }
 
     bool isCurrentProfileStateValid( const Profile & profile )
@@ -1481,25 +1510,7 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
 {
     const Profile * attackProfile = getProfile( attacker );
     const Profile * defenseProfile = getProfile( defender );
-    const size_t specialization = [spellId]() -> size_t {
-        switch ( spellId ) {
-        case Spell::FIREBALL:
-        case Spell::FIREBLAST:
-            return PYROMANCY;
-        case Spell::COLDRAY:
-        case Spell::COLDRING:
-            return CRYOMANCY;
-        case Spell::LIGHTNINGBOLT:
-        case Spell::CHAINLIGHTNING:
-            return STORMCRAFT;
-        case Spell::ELEMENTALSTORM:
-        case Spell::METEORSHOWER:
-        case Spell::ARMAGEDDON:
-            return CATACLYSM;
-        default:
-            return upgradeCount;
-        }
-    }();
+    const size_t specialization = spellSpecializationId( spellId );
 
     long double spellBonus = attackProfile == nullptr ? 0 : effect( SORCERY, attackProfile->ranks[SORCERY] );
     long double defenseReduction = defenseProfile == nullptr ? 0 : effect( SPELL_WARD, defenseProfile->ranks[SPELL_WARD] );
@@ -1509,7 +1520,7 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
             spellBonus += effect( specialization, attackProfile->ranks[specialization] );
         }
         if ( defenseProfile != nullptr ) {
-            const size_t ward = specialization + ( FIRE_WARD - PYROMANCY );
+            const size_t ward = spellWardId( spellId );
             defenseReduction += effect( ward, defenseProfile->ranks[ward] );
         }
     }
@@ -1551,30 +1562,12 @@ void fheroes2::RPG::recordSpellDoctrineUse( const PlayerColor attacker, const Pl
         if ( attackProfile->ranks[SORCERY] > 0 ) {
             recordDoctrineUse( attacker, SORCERY );
         }
-        const size_t specialization = [spellId]() -> size_t {
-            switch ( spellId ) {
-            case Spell::FIREBALL:
-            case Spell::FIREBLAST:
-                return PYROMANCY;
-            case Spell::COLDRAY:
-            case Spell::COLDRING:
-                return CRYOMANCY;
-            case Spell::LIGHTNINGBOLT:
-            case Spell::CHAINLIGHTNING:
-                return STORMCRAFT;
-            case Spell::ELEMENTALSTORM:
-            case Spell::METEORSHOWER:
-            case Spell::ARMAGEDDON:
-                return CATACLYSM;
-            default:
-                return upgradeCount;
-            }
-        }();
+        const size_t specialization = spellSpecializationId( spellId );
         if ( specialization != upgradeCount && attackProfile->ranks[specialization] > 0 ) {
             recordDoctrineUse( attacker, specialization );
         }
         if ( defenseProfile != nullptr ) {
-            const size_t ward = specialization != upgradeCount ? specialization + ( FIRE_WARD - PYROMANCY ) : upgradeCount;
+            const size_t ward = spellWardId( spellId );
             if ( defenseProfile->ranks[SPELL_WARD] > 0 || ( ward != upgradeCount && defenseProfile->ranks[ward] > 0 ) ) {
                 recordDoctrineUse( attacker, ARCANE_PIERCING );
             }
@@ -1585,25 +1578,7 @@ void fheroes2::RPG::recordSpellDoctrineUse( const PlayerColor attacker, const Pl
         if ( defenseProfile->ranks[SPELL_WARD] > 0 ) {
             recordDoctrineUse( defender, SPELL_WARD );
         }
-        const size_t ward = [spellId]() -> size_t {
-            switch ( spellId ) {
-            case Spell::FIREBALL:
-            case Spell::FIREBLAST:
-                return FIRE_WARD;
-            case Spell::COLDRAY:
-            case Spell::COLDRING:
-                return COLD_WARD;
-            case Spell::LIGHTNINGBOLT:
-            case Spell::CHAINLIGHTNING:
-                return STORM_WARD;
-            case Spell::ELEMENTALSTORM:
-            case Spell::METEORSHOWER:
-            case Spell::ARMAGEDDON:
-                return CATACLYSM_WARD;
-            default:
-                return upgradeCount;
-            }
-        }();
+        const size_t ward = spellWardId( spellId );
         if ( ward != upgradeCount && defenseProfile->ranks[ward] > 0 ) {
             recordDoctrineUse( defender, ward );
         }
