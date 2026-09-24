@@ -44,11 +44,13 @@
 
 namespace
 {
-    constexpr size_t upgradeCount = 40;
+    constexpr size_t upgradeCount = static_cast<size_t>( fheroes2::RPG::UPGRADE_COUNT );
     constexpr size_t upgradesPerTab = 5;
     constexpr uint64_t pointsPerLevel = 5;
     constexpr int profileVersion = 6;
     using namespace fheroes2::RPG;
+
+    uint64_t xpToNextLevel( uint64_t level );
 
     struct UpgradeInfo
     {
@@ -236,16 +238,6 @@ namespace
         }
     }
 
-    uint64_t legacyRankInvestment( const uint64_t rank )
-    {
-        // Profiles up to version 5 used cost(rank) = 1 + rank / 10.
-        const uint64_t completeGroups = rank / 10;
-        const uint64_t remainder = rank % 10;
-        const uint64_t groupSteps
-            = completeGroups == 0 ? 0 : saturatedMultiply( 5, saturatedMultiply( completeGroups, completeGroups - 1 ) );
-        return saturatedAdd( rank, saturatedAdd( groupSteps, saturatedMultiply( completeGroups, remainder ) ) );
-    }
-
     uint64_t scaledValue( const uint64_t value, const int percent )
     {
         const long double result = static_cast<long double>( value ) * percent / 100;
@@ -368,8 +360,20 @@ namespace
             investedPoints = saturatedAdd( investedPoints, rankInvestment( id, rank ) );
         }
 
+        if ( profile.ranks[BRUTAL_CRITICALS] > 0 && profile.ranks[CRITICAL_TRAINING] == 0 ) {
+            return false;
+        }
+
         const uint64_t earnedPoints = saturatedMultiply( profile.level - 1, pointsPerLevel );
         if ( investedPoints > earnedPoints || profile.points != earnedPoints - investedPoints ) {
+            return false;
+        }
+
+        // Every credited Renown point belongs to exactly one top-level source. Field Renown
+        // is further divided into hero, battle and adventure sources.
+        if ( profile.experience != saturatedAdd( profile.fieldExperience, profile.offlineExperience )
+             || profile.fieldExperience
+                    != saturatedAdd( saturatedAdd( profile.heroExperience, profile.battleExperience ), profile.adventureExperience ) ) {
             return false;
         }
 
@@ -639,10 +643,9 @@ namespace
             }
             for ( size_t i = 0; i < count; ++i ) {
                 uint64_t key = 0;
-                if ( !( input >> key ) ) {
+                if ( !( input >> key ) || !candidateVisited.insert( key ).second ) {
                     return false;
                 }
-                candidateVisited.insert( key );
             }
         }
         if ( version >= 5 ) {
@@ -660,17 +663,22 @@ namespace
         // Refund the old investment and reset the slots so legacy ranks cannot silently
         // turn into oversized Attack, Defense, critical or sustain bonuses.
         if ( version < profileVersion ) {
-            uint64_t refund = 0;
-            for ( const uint64_t rank : candidate.ranks ) {
-                refund = saturatedAdd( refund, legacyRankInvestment( rank ) );
-            }
-            candidate.points = saturatedAdd( candidate.points, refund );
+            // The migration is a complete respec. Reconstruct the closed guild-point ledger
+            // from level instead of trusting legacy rank/cost data that is about to be discarded.
+            candidate.points = saturatedMultiply( candidate.level - 1, pointsPerLevel );
             candidate.ranks.fill( 0 );
             candidate.useCounts.fill( 0 );
         }
 
         candidate.autoBuy = version < profileVersion ? false : autoBuyValue != 0;
         if ( version == profileVersion && !isCurrentProfileStateValid( candidate ) ) {
+            return false;
+        }
+
+        // Profile snapshots are single-record files. Extra tokens indicate a partial append,
+        // manual damage or a future format that this build must not silently reinterpret.
+        input >> std::ws;
+        if ( !input.eof() ) {
             return false;
         }
 
