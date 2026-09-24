@@ -1758,7 +1758,7 @@ void fheroes2::RPG::showMenu()
     bool redraw = true;
     LocalEvent & event = LocalEvent::Get();
 
-    const auto keepSelectedDoctrineVisible = [&scrollOffsets, &selectedOffsets]( const size_t tabIndex ) {
+    const auto keepSelectedDoctrineVisible = [&scrollOffsets, &selectedOffsets, visibleRows]( const size_t tabIndex ) {
         size_t & selectedOffset = selectedOffsets[tabIndex];
         size_t & scrollOffset = scrollOffsets[tabIndex];
 
