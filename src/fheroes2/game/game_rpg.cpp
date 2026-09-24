@@ -561,7 +561,9 @@ namespace
             // Steward deepen doctrines that are actually paying off for this profile without
             // allowing a heavily used niche perk to overwhelm raw mechanical value per point.
             const long double familiarity = std::log1p( static_cast<long double>( profile.useCounts[id] ) ) / 12.0L;
-            return 1.0L + std::min( 0.35L, familiarity );
+            const long double familiarityFactor = 1.0L + std::min( 0.35L, familiarity );
+            const long double breadthBonus = profile.ranks[id] == 0 ? 0.12L : 0.06L / ( 1.0L + std::log1p( static_cast<long double>( profile.ranks[id] ) ) );
+            return familiarityFactor * ( 1.0L + breadthBonus );
         }
         default:
             return 1.0L;
@@ -969,7 +971,11 @@ namespace
         message += "\nCurrent: " + shortEffectSummary( id, rank );
         const bool prerequisiteMet = id != BRUTAL_CRITICALS || playerProfile.ranks[CRITICAL_TRAINING] > 0;
         if ( canAdvance ) {
+            const long double nextEffect = effect( id, rank + 1 );
             message += "\nNext rank: " + shortEffectSummary( id, rank + 1 );
+            const bool flatEffect = id == ARMS_TRAINING || id == ARMOR_TRAINING || id == VETERAN_CORE || id == LEADERSHIP || id == FORTUNE;
+            message += "\nNext-rank gain: +" + ( flatEffect ? formatNumber( static_cast<uint64_t>( nextEffect - currentEffect ) )
+                                                           : formatEffect( nextEffect - currentEffect ) );
             const uint64_t price = cost( id, rank );
             message += "\nNext rank costs: " + formatNumber( price ) + " points";
             if ( !prerequisiteMet ) {
@@ -1069,7 +1075,14 @@ namespace
         }
         if ( totalTriggers > 0 ) {
             message += "\nTotal Battle Triggers: " + formatNumber( totalTriggers );
+
+            const auto mostUsed = std::max_element( playerProfile.useCounts.begin(), playerProfile.useCounts.end() );
+            if ( mostUsed != playerProfile.useCounts.end() && *mostUsed > 0 ) {
+                const size_t mostUsedId = static_cast<size_t>( std::distance( playerProfile.useCounts.begin(), mostUsed ) );
+                message += "\nSignature Doctrine: " + std::string( upgrades[mostUsedId].name ) + " (" + formatNumber( *mostUsed ) + " triggers)";
+            }
         }
+        message += "\nNext Level Reward: +" + formatNumber( pointsPerLevel ) + " guild points";
         message += "\nSteward Auto-Buyer: ";
         message += playerProfile.autoBuy ? "Active (ON)" : "Paused (OFF)";
         message += "\n\nRENOWN (RPG EXPERIENCE)";
@@ -1300,15 +1313,20 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
     if ( won && defending ) {
         base *= 1.10L;
     }
+    if ( won && challenge > 1.0L ) {
+        // Beating a stronger RPG profile deserves a modest heroic bonus on top of the normal
+        // challenge multiplier. The bonus reaches +25% at the existing 2x challenge cap.
+        base *= 1.0L + ( challenge - 1.0L ) * 0.25L;
+    }
     const long double earned = base * challenge;
     static_cast<void>( addExperience( color, static_cast<uint64_t>( std::min( earned, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) ),
                                       ExperienceKind::BATTLE ) );
 }
 
-void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int objectType, const int32_t tileIndex )
+uint64_t fheroes2::RPG::previewAdventureActionExperience( const PlayerColor color, const int objectType, const int32_t tileIndex )
 {
     if ( color != activePlayerColor || tileIndex < 0 ) {
-        return;
+        return 0;
     }
 
     uint64_t base = 70;
@@ -1316,10 +1334,16 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
     case MP2::OBJ_MONSTER:
     case MP2::OBJ_HERO:
     case MP2::OBJ_BOAT:
-        return;
+        return 0;
+
+    // Tiny lore/interactables are intentionally low-value so they cannot outshine real exploration.
+    case MP2::OBJ_SIGN:
+    case MP2::OBJ_BOTTLE:
+        base = 25;
+        break;
+
     case MP2::OBJ_RESOURCE:
     case MP2::OBJ_BARREL:
-    case MP2::OBJ_BOTTLE:
     case MP2::OBJ_CAMPFIRE:
     case MP2::OBJ_FLOTSAM:
     case MP2::OBJ_WINDMILL:
@@ -1328,16 +1352,19 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
     case MP2::OBJ_LEAN_TO:
         base = 80;
         break;
+
     case MP2::OBJ_TREASURE_CHEST:
     case MP2::OBJ_SEA_CHEST:
     case MP2::OBJ_WAGON:
         base = 180;
         break;
+
     case MP2::OBJ_ARTIFACT:
     case MP2::OBJ_SHIPWRECK_SURVIVOR:
     case MP2::OBJ_SKELETON:
         base = 200;
         break;
+
     case MP2::OBJ_MINE:
     case MP2::OBJ_ALCHEMIST_LAB:
     case MP2::OBJ_SAWMILL:
@@ -1345,15 +1372,19 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
     case MP2::OBJ_ABANDONED_MINE:
         base = 180;
         break;
+
     case MP2::OBJ_CASTLE:
         base = 140;
         break;
+
     case MP2::OBJ_SHRINE_FIRST_CIRCLE:
     case MP2::OBJ_SHRINE_SECOND_CIRCLE:
     case MP2::OBJ_SHRINE_THIRD_CIRCLE:
     case MP2::OBJ_TEMPLE:
-        base = 120;
+        base = 130;
         break;
+
+    // Character-growth sites are satisfying RPG destinations and deserve to stand above loose loot.
     case MP2::OBJ_FORT:
     case MP2::OBJ_MERCENARY_CAMP:
     case MP2::OBJ_WITCH_DOCTORS_HUT:
@@ -1362,8 +1393,9 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
     case MP2::OBJ_GAZEBO:
     case MP2::OBJ_WITCHS_HUT:
     case MP2::OBJ_TREE_OF_KNOWLEDGE:
-        base = 150;
+        base = 180;
         break;
+
     case MP2::OBJ_FOUNTAIN:
     case MP2::OBJ_FAERIE_RING:
     case MP2::OBJ_IDOL:
@@ -1373,21 +1405,34 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
     case MP2::OBJ_BUOY:
         base = 90;
         break;
+
     case MP2::OBJ_EVENT:
-    case MP2::OBJ_SIGN:
-    case MP2::OBJ_SPHINX:
-    case MP2::OBJ_ORACLE:
         base = 100;
         break;
+    case MP2::OBJ_ORACLE:
+        base = 170;
+        break;
+    case MP2::OBJ_SPHINX:
+        base = 220;
+        break;
+
     case MP2::OBJ_STONE_LITHS:
     case MP2::OBJ_WHIRLPOOL:
         base = 90;
         break;
+
+    // Dangerous adventure sites should feel like RPG accomplishments rather than ordinary clicks.
     case MP2::OBJ_SHIPWRECK:
     case MP2::OBJ_DERELICT_SHIP:
     case MP2::OBJ_SIRENS:
-        base = 130;
+    case MP2::OBJ_GRAVEYARD:
+    case MP2::OBJ_DAEMON_CAVE:
+        base = 210;
         break;
+    case MP2::OBJ_PYRAMID:
+        base = 260;
+        break;
+
     case MP2::OBJ_OBSERVATION_TOWER:
     case MP2::OBJ_MAGELLANS_MAPS:
     case MP2::OBJ_OBELISK:
@@ -1395,11 +1440,29 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
     case MP2::OBJ_EYE_OF_MAGI:
         base = 150;
         break;
+
     default:
         if ( !MP2::isInGameActionObject( static_cast<MP2::MapObjectType>( objectType ), false ) ) {
-            return;
+            return 0;
         }
         break;
+    }
+
+    const uint64_t key = ( static_cast<uint64_t>( world.GetMapSeed() ) << 32 ) | static_cast<uint32_t>( tileIndex );
+    if ( visitedActionTiles.count( key ) != 0 ) {
+        return 0;
+    }
+
+    const long double levelScale = 1.0L + std::log1p( static_cast<long double>( playerProfile.level - 1 ) ) / 5.0L;
+    return static_cast<uint64_t>( std::min<long double>( static_cast<long double>( std::numeric_limits<uint64_t>::max() ),
+                                                         static_cast<long double>( base ) * levelScale ) );
+}
+
+void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int objectType, const int32_t tileIndex )
+{
+    const uint64_t reward = previewAdventureActionExperience( color, objectType, tileIndex );
+    if ( reward == 0 ) {
+        return;
     }
 
     const uint64_t key = ( static_cast<uint64_t>( world.GetMapSeed() ) << 32 ) | static_cast<uint32_t>( tileIndex );
@@ -1407,8 +1470,7 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
         return;
     }
 
-    const long double levelScale = 1.0L + std::log1p( static_cast<long double>( playerProfile.level - 1 ) ) / 5.0L;
-    static_cast<void>( addExperience( color, static_cast<uint64_t>( static_cast<long double>( base ) * levelScale ), ExperienceKind::ADVENTURE ) );
+    static_cast<void>( addExperience( color, reward, ExperienceKind::ADVENTURE ) );
 }
 
 uint32_t fheroes2::RPG::creatureAttackBonus( const PlayerColor color )
