@@ -1613,170 +1613,19 @@ namespace
             StringReplace( message, "%{minutes}", std::to_string( minutes ) );
         }
 
+        const fheroes2::ExperienceDialogElement experienceUI( summary.xpEarned );
+        const std::vector<fheroes2::ResourceDialogElement> resourceElements = fheroes2::getResourceDialogElements( summary.rewards );
 
-
-
-        message += "\n";
-
-        message += _( "RPG XP earned: " );
-        message += fheroes2::RPG::formatExperience( summary.xpEarned );
-
-        const std::string supplies = formatOfflineRewards( summary.rewards );
-        if ( !supplies.empty() ) {
-            message += "\n";
-            // Offline progression intentionally does not modify the active map's treasury.
-            // These are the virtual production values used to calculate the RPG XP above, so
-            // labelling them as received supplies made the popup promise rewards it never gave.
-            message += _( "Virtual supplies used for XP: " );
-            message += supplies;
+        std::vector<const fheroes2::DialogElement *> rewardElements;
+        rewardElements.reserve( resourceElements.size() + ( summary.xpEarned > 0 ? 1 : 0 ) );
+        if ( summary.xpEarned > 0 ) {
+            rewardElements.emplace_back( &experienceUI );
+        }
+        for ( const fheroes2::ResourceDialogElement & element : resourceElements ) {
+            rewardElements.emplace_back( &element );
         }
 
-        message += "\n";
-        message += _( "Treasury unchanged." );
-
-        if ( summary.homecomingTier > 0 ) {
-            const std::string chestName = getHomecomingChestName( summary.homecomingTier );
-            if ( !chestName.empty() ) {
-                message += "\n";
-                message += _( "Homecoming Chest: " );
-                message += chestName;
-                if ( summary.eventCount > 0 ) {
-                    message += " (";
-                    for ( size_t i = 0; i < summary.eventCount; ++i ) {
-                        if ( i != 0 ) {
-                            message += ", ";
-                        }
-                        message += getOfflineHomecomingEventName( summary.events[i].eventId ) + " "
-                                   + formatOfflineReward( summary.events[i].resource, summary.events[i].bonus );
-                    }
-                    message += ")";
-                }
-            }
-        }
-
-        if ( summary.homecomingStreak > 0 ) {
-            message += "\n";
-            message += _( "Homecoming Streak: " );
-            message += std::to_string( summary.homecomingStreak );
-            message += _( " d" );
-            if ( summary.milestonePercent > 0 ) {
-                message += " (+" + std::to_string( summary.milestonePercent ) + "% bonus)";
-                const std::string milestoneReward = formatOfflineReward( summary.milestoneResource, summary.milestoneBonus );
-                if ( !milestoneReward.empty() ) {
-                    message += ": " + milestoneReward;
-                }
-            }
-        }
-
-        if ( summary.contractCompleted ) {
-            message += "\n";
-            if ( summary.contractsCompletedThisSession == 1 ) {
-                message += _( "Steward Contract Fulfilled: " );
-                message += getOfflineContractName( summary.contractId );
-            }
-            else {
-                message += _( "Steward Contracts Fulfilled: " );
-                message += std::to_string( summary.contractsCompletedThisSession );
-                message += _( " (starting with " );
-                message += getOfflineContractName( summary.contractId ) + ")";
-            }
-            const std::string contractReward = formatOfflineRewards( summary.contractRewards );
-            if ( !contractReward.empty() ) {
-                message += " (" + contractReward + ")";
-            }
-            if ( summary.nextContractId >= 0 && summary.nextContractTarget > 0 ) {
-                message += "\n";
-                message += _( "Next Contract: " );
-                message += getOfflineContractName( summary.nextContractId ) + " (" + std::to_string( summary.nextContractProgress ) + "/"
-                           + std::to_string( summary.nextContractTarget ) + ")";
-            }
-        }
-        else if ( summary.contractProgressAfter > summary.contractProgressBefore ) {
-            message += "\n";
-            message += _( "Contract Progress: " );
-            message += getOfflineContractName( summary.contractId );
-            message += " (" + std::to_string( summary.contractProgressAfter ) + "/" + std::to_string( summary.contractTarget ) + ")";
-        }
-
-        if ( summary.treasureMapCompleted ) {
-            message += "\n";
-            if ( summary.treasureMapsCompletedThisSession == 1 ) {
-                message += _( "Treasure Map Deciphered: " );
-                message += getOfflineTreasureMapName( summary.treasureMapId );
-            }
-            else {
-                message += _( "Treasure Maps Deciphered: " );
-                message += std::to_string( summary.treasureMapsCompletedThisSession );
-                message += _( " (starting with " );
-                message += getOfflineTreasureMapName( summary.treasureMapId ) + ")";
-            }
-            const std::string treasureReward = formatOfflineRewards( summary.treasureRewards );
-            if ( !treasureReward.empty() ) {
-                message += " (" + treasureReward + ")";
-            }
-            message += "; " + std::to_string( summary.treasureMapsCompleted ) + _( " total maps" );
-            message += _( "; fragments: " ) + std::to_string( summary.treasureFragmentsAfter ) + "/5";
-        }
-        else if ( summary.treasureFragmentsEarned > 0 ) {
-            message += "\n";
-            message += _( "Map Fragments Found: " );
-            message += "+" + std::to_string( summary.treasureFragmentsEarned ) + " (" + std::to_string( summary.treasureFragmentsAfter );
-            message += " / 5";
-            message += ")";
-        }
-
-        if ( summary.rareDiscovery ) {
-            message += "\n";
-            message += getOfflineRareDiscoveryName( summary.rareDiscoveryId ) + ": "
-                       + formatOfflineReward( summary.rareDiscoveryResource, summary.rareDiscoveryBonus );
-        }
-
-        if ( summary.supplyRushTriggered ) {
-            message += "\n";
-            const std::string rushRewards = formatOfflineRewards( summary.supplyRushRewards );
-            if ( summary.supplyRushesTriggered == 1 ) {
-                message += rushRewards.empty() ? _( "Supply Rush triggered; virtual stores were full." ) : _( "Supply Rush: " ) + rushRewards;
-            }
-            else {
-                message += _( "Supply Rushes: " ) + std::to_string( summary.supplyRushesTriggered );
-                message += rushRewards.empty() ? _( "; virtual stores were full." ) : " (" + rushRewards + ")";
-            }
-        }
-        if ( summary.supplyRushEarned > 0 ) {
-            message += "\n";
-            message += _( "Supply Rush Meter: " );
-            message += std::to_string( summary.supplyRushAfter ) + "/100 (+" + std::to_string( summary.supplyRushEarned ) + ")";
-        }
-
-        if ( summary.renownEarned > 0 ) {
-            message += "\n";
-            message += _( "Steward Renown: " );
-            message += "+" + std::to_string( summary.renownEarned ) + " (" + std::to_string( summary.renownTotal ) + ")";
-        }
-
-        if ( summary.rankAfter > summary.rankBefore ) {
-            message += "\n";
-            if ( summary.ranksEarned > 1 ) {
-                message += _( "Steward Promotions: " );
-                message += std::to_string( summary.ranksEarned ) + _( ", now " );
-            }
-            else {
-                message += _( "Steward Promoted: " );
-            }
-            message += getOfflineRankName( summary.rankAfter );
-            const std::string rankReward = formatOfflineRewards( summary.rankRewards );
-            if ( !rankReward.empty() ) {
-                message += " (" + rankReward + ")";
-            }
-        }
-
-        message += "\n";
-        message += _( "Realm Readiness: " );
-        message += std::to_string( summary.stateEfficiencyPercent ) + "% (" + std::to_string( summary.stateCastles ) + " castles, "
-                   + std::to_string( summary.stateTowns ) + " towns, " + std::to_string( summary.stateHeroes ) + " heroes, "
-                   + std::to_string( summary.stateMines ) + " mines)";
-
-        fheroes2::showStandardTextMessage( _( "Offline Progress" ), std::move( message ), Dialog::OK );
+        fheroes2::showStandardTextMessage( _( "Offline Rewards" ), std::move( message ), Dialog::OK, rewardElements );
     }
 
     void showOfflineProgressPopups( const OfflineProgressSummary & summary )
