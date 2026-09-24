@@ -974,9 +974,27 @@ namespace
         if ( canAdvance ) {
             const long double nextEffect = effect( id, rank + 1 );
             message += "\nNext rank: " + shortEffectSummary( id, rank + 1 );
-            const bool flatEffect = id == ARMS_TRAINING || id == ARMOR_TRAINING || id == VETERAN_CORE || id == LEADERSHIP || id == FORTUNE;
-            message += "\nNext-rank gain: +" + ( flatEffect ? formatNumber( static_cast<uint64_t>( nextEffect - currentEffect ) )
-                                                           : formatEffect( nextEffect - currentEffect ) );
+
+            const uint64_t flatGain = static_cast<uint64_t>( nextEffect - currentEffect );
+            if ( id == ARMS_TRAINING ) {
+                message += "\nNext-rank gain: +" + formatNumber( flatGain ) + " Attack";
+            }
+            else if ( id == ARMOR_TRAINING ) {
+                message += "\nNext-rank gain: +" + formatNumber( flatGain ) + " Defense";
+            }
+            else if ( id == VETERAN_CORE ) {
+                message += "\nNext-rank gain: +" + formatNumber( flatGain ) + " Attack & Defense";
+            }
+            else if ( id == LEADERSHIP ) {
+                message += "\nNext-rank gain: +" + formatNumber( flatGain ) + " Morale";
+            }
+            else if ( id == FORTUNE ) {
+                message += "\nNext-rank gain: +" + formatNumber( flatGain ) + " Luck";
+            }
+            else {
+                message += "\nNext-rank gain: +" + formatEffect( nextEffect - currentEffect );
+            }
+
             const uint64_t price = cost( id, rank );
             message += "\nNext rank costs: " + formatNumber( price ) + " points";
             if ( !prerequisiteMet ) {
