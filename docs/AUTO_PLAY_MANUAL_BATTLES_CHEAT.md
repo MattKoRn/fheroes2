@@ -34,7 +34,7 @@ Press **F9** during an adventure map to open the kingdom-wide RPG menu. Its eigh
 
 The Steward auto-buyer compares each next rank's marginal effect with its point cost and weights conditional specialties by how often the profile actually triggers them. RPG number labels generate suffixes as needed. The local kingdom profile is stored in `Documents\\Homm2RPG\\rpg_profile.dat` and survives map changes and save loading. Opposing players and neutral monsters receive separate random temporary profiles derived from the local profile at map start; these are discarded when the map ends.
 
-Offline production awards **RPG XP only**, based on the full elapsed interval. The former saved resource wallet is never restored onto a new map or loaded game, and offline progress does not add or subtract game resources. Each map/save uses its normal treasury. Old offline snapshots with creature-roster fields remain readable, but those fields are ignored and no longer written. Offline creature auto-recruitment and its popup have been removed. Returning from the background or loading a map shows the XP earned for the elapsed offline interval.
+Offline production awards **RPG XP only**, based on the full elapsed interval. The former saved resource wallet is never restored onto a new map or loaded game, and offline progress does not add or subtract game resources. Each map/save uses its normal treasury. Old offline snapshots with creature-roster fields remain readable, but those fields are ignored and no longer written. Offline creature auto-recruitment and its popup have been removed. Returning from the background or loading a map shows a compact popup with only the time away and the earned RPG XP / virtual offline reward values as native sprites.
 
 ## Enemy scaling
 
