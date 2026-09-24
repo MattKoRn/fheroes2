@@ -62,7 +62,7 @@ namespace
         { "Veteran Core", "Increase Attack and Defense" }, { "Blood Drinker", "Attacks steal life" }, { "Reaper", "Kills restore life" },
 
         { "Ferocity", "Increase all creature damage" }, { "Marksman", "Increase ranged damage" }, { "Brawler", "Increase melee damage" },
-        { "Executioner", "More damage to wounded stacks" }, { "Opening Blow", "More damage to untouched stacks" },
+        { "Executioner", "More damage to wounded stacks" }, { "Opening Blow", "More damage at full starting HP" },
 
         { "Giant Slayer", "More damage while outnumbered" }, { "Overwhelm", "More damage while outnumbering" },
         { "Frenzy", "More damage below half health" }, { "Discipline", "More damage at full health" },
@@ -81,7 +81,7 @@ namespace
         { "Critical Training", "Chance for a critical attack" }, { "Brutal Criticals", "Critical attacks deal more damage" },
 
         { "Evasion", "Chance to halve creature damage" }, { "Arcane Piercing", "Ignore RPG spell resistance" },
-        { "Close Quarters", "Reduce ranged melee penalty" }, { "Unyielding", "Reduce damage while untouched" },
+        { "Close Quarters", "Reduce ranged melee penalty" }, { "Unyielding", "Reduce damage at full starting HP" },
         { "Ruthless", "More damage to stacks below half health" }
     };
     constexpr std::array<const char *, upgradeCount> upgradeSigils{
@@ -105,7 +105,7 @@ namespace
         "Increases physical damage dealt by ranged attacks.",
         "Increases physical damage dealt by melee attacks.",
         "Increases physical damage against any stack that has already lost hit points or creatures.",
-        "Increases physical damage against a stack that has taken no damage and lost no creatures yet.",
+        "Increases physical damage against a stack while it is currently at its full starting battle hit points.",
 
         "Increases physical damage when the attacking stack has fewer creatures than its target.",
         "Increases physical damage when the attacking stack has more creatures than its target.",
@@ -140,7 +140,7 @@ namespace
         "Gives your creature stacks up to a 15% chance to reduce an incoming creature attack's final damage by 50%.",
         "Ignores up to 60% of the target's combined RPG spell resistance when your hero casts a damaging spell.",
         "Recovers part of the normal 50% melee penalty suffered by ranged creatures forced into hand-to-hand combat. At 100% recovery, the RPG penalty modifier removes that penalty.",
-        "Reduces physical damage while the defending stack is still at its full starting battle hit points.",
+        "Reduces physical damage while the defending stack is currently at its full starting battle hit points.",
         "Adds another damage bonus against enemy stacks below half of their starting battle hit points, rewarding aggressive finishing attacks."
     };
     constexpr std::array<const char *, 8> tabNames{ "ARMY", "OFFENSE", "TACTICS", "DEFENSE", "MAGIC", "WARDS", "COMMAND", "MASTERY" };
@@ -880,7 +880,7 @@ namespace
         case MARKSMAN: return "+" + formatEffect( value ) + " ranged damage";
         case BRAWLER: return "+" + formatEffect( value ) + " melee damage";
         case EXECUTIONER: return "+" + formatEffect( value ) + " vs wounded";
-        case OPENING_BLOW: return "+" + formatEffect( value ) + " vs untouched";
+        case OPENING_BLOW: return "+" + formatEffect( value ) + " at full HP";
         case GIANT_SLAYER: return "+" + formatEffect( value ) + " while outnumbered";
         case OVERWHELM: return "+" + formatEffect( value ) + " while outnumbering";
         case FRENZY: return "+" + formatEffect( value ) + " below half HP";
@@ -905,11 +905,11 @@ namespace
         case FORTUNE: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Luck";
         case REGENERATION: return formatEffect( value ) + " turn regeneration";
         case CRITICAL_TRAINING: return formatEffect( value ) + " crit chance";
-        case BRUTAL_CRITICALS: return "+50% + " + formatEffect( value ) + " crit damage";
+        case BRUTAL_CRITICALS: return "+" + formatEffect( 50.0L + value ) + " crit damage";
         case EVASION: return formatEffect( value ) + " evade chance";
         case ARCANE_PIERCING: return formatEffect( value ) + " spell resistance ignored";
         case CLOSE_QUARTERS: return formatEffect( value ) + " melee penalty recovered";
-        case UNYIELDING: return formatEffect( value ) + " reduction while untouched";
+        case UNYIELDING: return formatEffect( value ) + " reduction at full HP";
         case RUTHLESS: return "+" + formatEffect( value ) + " vs targets below half HP";
         default: return formatEffect( value );
         }
@@ -944,30 +944,33 @@ namespace
 
     void showUpgradeDetails( const size_t id )
     {
+        if ( id >= upgradeCount ) {
+            return;
+        }
+
         const uint64_t rank = playerProfile.ranks[id];
         const long double currentEffect = effect( id, rank );
         const bool canAdvance = rank < std::numeric_limits<uint64_t>::max() && effect( id, rank + 1 ) > currentEffect;
         std::string message = upgradeDetails[id];
         message += "\n\nCurrent rank: " + formatNumber( rank );
         message += "\nCurrent: " + shortEffectSummary( id, rank );
+        const bool prerequisiteMet = id != BRUTAL_CRITICALS || playerProfile.ranks[CRITICAL_TRAINING] > 0;
         if ( canAdvance ) {
             message += "\nNext rank: " + shortEffectSummary( id, rank + 1 );
             const uint64_t price = cost( id, rank );
             message += "\nNext rank costs: " + formatNumber( price ) + " points";
-            if ( playerProfile.points < price ) {
-                message += " (need " + formatNumber( price - playerProfile.points ) + " more)";
+            if ( !prerequisiteMet ) {
+                message += "\nPurchase status: LOCKED - requires Critical Training rank 1.";
             }
-        }
-        if ( id == BRUTAL_CRITICALS ) {
-            if ( playerProfile.ranks[CRITICAL_TRAINING] == 0 ) {
-                message += "\nRequires: Critical Training rank 1 (Locked)";
+            else if ( playerProfile.points < price ) {
+                message += "\nPurchase status: NEED " + formatNumber( price - playerProfile.points ) + " more guild points.";
             }
             else {
-                message += "\nRequires: Critical Training rank 1 (Met)";
+                message += "\nPurchase status: READY.";
             }
         }
-        if ( !canAdvance ) {
-            message += "\nMaximum effective rank reached.";
+        else {
+            message += "\nPurchase status: MAX - maximum effective rank reached.";
         }
         const uint64_t invested = totalSpentPointsOnUpgrade( playerProfile, id );
         if ( invested > 0 ) {
@@ -1003,7 +1006,22 @@ namespace
         message += "\n\nDOCTRINES:";
         for ( size_t offset = 0; offset < upgradesPerTab; ++offset ) {
             const size_t id = tabIndex * upgradesPerTab + offset;
-            message += "\n  " + std::string( upgrades[id].name ) + " (Rank " + formatNumber( playerProfile.ranks[id] ) + ")";
+            const uint64_t rank = playerProfile.ranks[id];
+            const bool canAdvance = rank < std::numeric_limits<uint64_t>::max() && effect( id, rank + 1 ) > effect( id, rank );
+            const bool prerequisiteMet = id != BRUTAL_CRITICALS || playerProfile.ranks[CRITICAL_TRAINING] > 0;
+
+            message += "\n  " + std::string( upgrades[id].name ) + " - Rank " + formatNumber( rank ) + ": " + shortEffectSummary( id, rank );
+            if ( !canAdvance ) {
+                message += " [MAX]";
+            }
+            else if ( !prerequisiteMet ) {
+                message += " [LOCKED]";
+            }
+            else {
+                const uint64_t price = cost( id, rank );
+                message += playerProfile.points >= price ? " [BUY " + formatNumber( price ) + "]"
+                                                         : " [NEED " + formatNumber( price - playerProfile.points ) + "]";
+            }
         }
         fheroes2::showStandardTextMessage( tabNames[tabIndex], std::move( message ), Dialog::ZERO );
     }
@@ -1014,11 +1032,16 @@ namespace
                                          ? xpToNextLevel( playerProfile.level ) - playerProfile.progress
                                          : 0;
         const uint64_t totalInvested = totalSpentPoints( playerProfile );
+        const uint64_t nextLevelCost = xpToNextLevel( playerProfile.level );
+        const long double levelProgressPercent
+            = nextLevelCost == 0 ? 0.0L : std::min( 100.0L, static_cast<long double>( playerProfile.progress ) * 100.0L / nextLevelCost );
 
         std::string message = "KINGDOM RPG SUMMARY\n";
         message += "\nKingdom Level: " + formatNumber( playerProfile.level );
         message += "\nAvailable Guild Points: " + formatNumber( playerProfile.points );
         message += "\nTotal Points Invested: " + formatNumber( totalInvested );
+        message += "\nCurrent Level Progress: " + formatNumber( playerProfile.progress ) + " / " + formatNumber( nextLevelCost )
+                   + " (" + formatEffect( levelProgressPercent ) + ")";
 
         size_t activeDoctrines = 0;
         for ( const uint64_t rank : playerProfile.ranks ) {
@@ -1848,9 +1871,12 @@ void fheroes2::RPG::showMenu()
                           canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
 
-            drawSingleLine( "Page " + std::to_string( scrollOffsets[tab] + 1 ) + "/3   Up/Down Select   B/Enter Buy   I Details   O Overview",
+            const size_t firstVisibleRow = scrollOffsets[tab] + 1;
+            const size_t lastVisibleRow = std::min( upgradesPerTab, scrollOffsets[tab] + visibleRows );
+            drawSingleLine( "Rows " + std::to_string( firstVisibleRow ) + "-" + std::to_string( lastVisibleRow ) + "/"
+                                + std::to_string( upgradesPerTab ) + "   Up/Down Select   B/Enter/Space Buy   I Details",
                             area.x + 12, area.y + 333, area.width - 24, fheroes2::FontType::smallWhite() );
-            drawSingleLine( "S/A Steward   R Respec   Esc Close", area.x + 12, area.y + 344, area.width - 24,
+            drawSingleLine( "1-8 Tabs   O Overview   S/A Steward   R Respec   Esc Close", area.x + 12, area.y + 344, area.width - 24,
                             fheroes2::FontType::smallWhite() );
             window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
