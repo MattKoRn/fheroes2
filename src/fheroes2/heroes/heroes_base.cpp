@@ -370,7 +370,7 @@ double HeroBase::GetMagicStrategicValue( const double armyStrength ) const
     double bestValue = 0;
     for ( const Spell & spell : spells ) {
         if ( spell.isCombat() ) {
-            const double rpgMult = spell.isDamage() ? fheroes2::RPG::spellMultiplier( GetColor(), PlayerColor::NONE, spell.GetID() ) : 1.0;
+            const double rpgMult = spell.isDamage() ? fheroes2::RPG::spellMultiplier( GetColor(), PlayerColor::UNUSED, spell.GetID() ) : 1.0;
             bestValue = std::max( bestValue, spell.getStrategicValue( armyStrength, currentSpellPoints, spellPower ) * rpgMult );
         }
     }
