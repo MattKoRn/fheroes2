@@ -113,6 +113,8 @@ AI::SpellSelection AI::BattlePlanner::selectBestSpell( Battle::Arena & arena, co
     // Hero should conserve spellpoints if already spent more than half or his army is stronger
     // Threshold is 0.04 when armies are equal (= 20% of single unit)
     double spellValueThreshold = _myArmyStrength * _myArmyStrength / _enemyArmyStrength * 0.04;
+    const double spellInvestment = fheroes2::RPG::spellcastingInvestmentPercent( _commander->GetColor() );
+    spellValueThreshold /= 1.0 + std::min( 0.35, spellInvestment / 100.0 );
     if ( _enemyShootersStrength / _enemyArmyStrength > 0.5 ) {
         spellValueThreshold *= 0.5;
     }
@@ -662,8 +664,11 @@ double AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::U
             }
         }
 
-        // Convert 0...5000 range into 0.0 to 0.9 ratio and clamp it
+        // Convert 0...5000 range into 0.0 to 0.9 ratio and clamp it.
         ratio = std::clamp( _enemySpellStrength / antimagicLowLimit * 0.036, 0.0, ratioLimit );
+
+        const double spellWard = fheroes2::RPG::doctrineEffect( target.GetColor(), fheroes2::RPG::SPELL_WARD );
+        ratio *= 1.0 - std::min( 0.40, spellWard / 125.0 );
 
         // Hero is stronger than its army, possible hit and run tactic
         if ( _enemySpellStrength > _enemyArmyStrength ) {
@@ -696,6 +701,14 @@ double AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::U
         if ( target.isArchers() ) {
             ratio *= 1.25;
         }
+
+        const double arrowWard = fheroes2::RPG::doctrineEffect( target.GetColor(), fheroes2::RPG::ARROW_WARD );
+        ratio *= 1.0 - std::min( 0.35, arrowWard / 140.0 );
+    }
+
+    if ( spellID == Spell::STONESKIN || spellID == Spell::STEELSKIN ) {
+        const double ironSkin = fheroes2::RPG::doctrineEffect( target.GetColor(), fheroes2::RPG::IRON_SKIN );
+        ratio *= 1.0 - std::min( 0.30, ironSkin / 150.0 );
     }
 
     const double value = target.GetStrength() * ratio * getEffectiveDurationMultiplier() * getRpgBattleUnitValueFactor( target );
@@ -1090,7 +1103,13 @@ AI::SpellcastOutcome AI::BattlePlanner::spellTeleportValue( Battle::Arena & aren
         return {};
     }
 
-    return { currentPos.GetHead()->GetIndex(), currentUnit.GetStrength() * bloodLustRatio, bestTarget.cell };
+    const double meleeDoctrine
+        = fheroes2::RPG::doctrineEffect( currentUnit.GetColor(), fheroes2::RPG::FEROCITY )
+          + fheroes2::RPG::doctrineEffect( currentUnit.GetColor(), fheroes2::RPG::BRAWLER );
+    const double meleeBuildFactor = 1.0 + std::min( 0.30, meleeDoctrine / 100.0 );
+    const double unlockedAttackValue = std::max( currentUnit.GetStrength() * bloodLustRatio, bestDamage * 0.30 ) * meleeBuildFactor;
+
+    return { currentPos.GetHead()->GetIndex(), unlockedAttackValue, bestTarget.cell };
 }
 
 AI::SpellcastOutcome AI::BattlePlanner::spellEarthquakeValue( const Battle::Arena & arena, const Spell & spell, const Battle::Units & friendly ) const
