@@ -384,7 +384,7 @@ namespace
         std::sort( enemies.begin(), enemies.end(), []( const Battle::Unit * unit1, const Battle::Unit * unit2 ) { return !unit1->isArchers() && unit2->isArchers(); } );
 
         const double allEnemiesThreat = std::accumulate( enemies.begin(), enemies.end(), 0.0, [&attacker]( const double total, const Battle::Unit * unit ) {
-            return total + unit->evaluateThreatForUnit( attacker );
+            return total + unit->evaluateThreatForUnit( attacker ) * getRpgTacticalThreatFactor( *unit );
         } );
 
         PositionValues result;
@@ -1798,7 +1798,7 @@ double AI::BattlePlanner::getMeleeBestOutcome( Battle::Arena & arena, const Batt
     MeleeAttackOutcome bestOutcome;
 
     const double allEnemiesThreat = std::accumulate( enemies.begin(), enemies.end(), 0.0, [&currentUnit]( const double total, const Battle::Unit * unit ) {
-        return total + unit->evaluateThreatForUnit( currentUnit );
+        return total + unit->evaluateThreatForUnit( currentUnit ) * getRpgTacticalThreatFactor( *unit );
     } );
 
     for ( const Battle::Unit * enemy : enemies ) {
@@ -1975,7 +1975,7 @@ AI::BattleTargetPair AI::BattlePlanner::meleeUnitDefense( Battle::Arena & arena,
     const Battle::Units enemies( arena.getEnemyForce( _myColor ).getUnits(), Battle::Units::REMOVE_INVALID_UNITS_AND_SPECIFIED_UNIT, &currentUnit );
 
     const double allEnemiesThreat = std::accumulate( enemies.begin(), enemies.end(), 0.0, [&currentUnit]( const double total, const Battle::Unit * unit ) {
-        return total + unit->evaluateThreatForUnit( currentUnit );
+        return total + unit->evaluateThreatForUnit( currentUnit ) * getRpgTacticalThreatFactor( *unit );
     } );
 
     // 1. Cover our archers and attack enemy units blocking them, if there are any. Units whose affiliation has been changed should not cover the archers, because
