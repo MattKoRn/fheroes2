@@ -92,6 +92,8 @@ namespace fheroes2::RPG
                                     bool inMeleePenalty = false );
     [[nodiscard]] uint64_t availablePoints();
     [[nodiscard]] uint64_t kingdomLevel();
+    [[nodiscard]] uint64_t renownToNextLevel( PlayerColor color );
+    [[nodiscard]] double spellcastingInvestmentPercent( PlayerColor color );
     [[nodiscard]] bool isStewardActive();
     [[nodiscard]] uint64_t doctrineRank( PlayerColor color, size_t upgradeId );
     // Returns the actual current mechanical value of a doctrine (flat stat/point or percentage,
