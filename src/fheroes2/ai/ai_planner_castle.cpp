@@ -35,6 +35,7 @@
 #include "dialog.h"
 #include "difficulty.h"
 #include "game.h"
+#include "game_rpg.h"
 #include "heroes.h"
 #include "kingdom.h"
 #include "logging.h"
@@ -186,13 +187,34 @@ namespace
             return true;
         }
 
+        const double rpgMagicInvestment = fheroes2::RPG::spellcastingInvestmentPercent( castle.GetColor() );
+        int desiredSpellLevel = spellLevel;
+        if ( rpgMagicInvestment >= 20.0 ) {
+            desiredSpellLevel = std::max( desiredSpellLevel, 5 );
+        }
+        else if ( rpgMagicInvestment >= 12.0 ) {
+            desiredSpellLevel = std::max( desiredSpellLevel, 4 );
+        }
+        else if ( rpgMagicInvestment >= 6.0 ) {
+            desiredSpellLevel = std::max( desiredSpellLevel, 3 );
+        }
+
+        static const std::vector<BuildOrder> magicGuildUpgrades
+            = { { BUILD_MAGEGUILD2, 2 }, { BUILD_MAGEGUILD3, 2 }, { BUILD_MAGEGUILD4, 1 }, { BUILD_MAGEGUILD5, 1 } };
+
+        // A strongly specialized magic kingdom should visibly build around that identity instead
+        // of waiting until every ordinary town-development option has been exhausted.
+        if ( safetyFactor > 0 && rpgMagicInvestment >= 12.0 && castle.GetLevelMageGuild() < desiredSpellLevel ) {
+            if ( Build( castle, magicGuildUpgrades ) ) {
+                return true;
+            }
+        }
+
         if ( Build( castle, GetBuildOrder( castle.GetRace() ) ) ) {
             return true;
         }
 
-        if ( castle.GetLevelMageGuild() < spellLevel && safetyFactor > 0 ) {
-            static const std::vector<BuildOrder> magicGuildUpgrades
-                = { { BUILD_MAGEGUILD2, 2 }, { BUILD_MAGEGUILD3, 2 }, { BUILD_MAGEGUILD4, 1 }, { BUILD_MAGEGUILD5, 1 } };
+        if ( castle.GetLevelMageGuild() < desiredSpellLevel && safetyFactor > 0 ) {
             if ( Build( castle, magicGuildUpgrades ) ) {
                 return true;
             }
