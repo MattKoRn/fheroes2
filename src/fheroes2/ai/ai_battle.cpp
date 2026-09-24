@@ -693,7 +693,7 @@ namespace
             }
 
             const double baseDmg = static_cast<double>( fheroes2::getSpellDamage( spell, commander.GetPower(), &commander ) );
-            const double rpgMult = fheroes2::RPG::spellMultiplier( commander.GetColor(), PlayerColor::NONE, spell.GetID() );
+            const double rpgMult = fheroes2::RPG::spellMultiplier( commander.GetColor(), PlayerColor::UNUSED, spell.GetID() );
             bestValue = std::max( bestValue, baseDmg * rpgMult );
         }
 
