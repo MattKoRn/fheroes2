@@ -1850,9 +1850,11 @@ void fheroes2::RPG::showMenu()
                 const std::string next = rankCanAdvance ? shortEffectSummary( i, rank + 1 ) : "MAX EFFECT";
                 drawSingleLine( current + " -> " + next, textX, rowArea.y + 36, rowArea.width - 130,
                                 canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
+                const uint64_t price = rankCanAdvance ? cost( i, playerProfile.ranks[i] ) : 0;
                 const std::string buyLabel = !rankCanAdvance ? "MAX"
                                              : !prerequisiteMet ? "LOCKED"
-                                                                : "BUY " + formatNumber( cost( i, playerProfile.ranks[i] ) );
+                                             : playerProfile.points < price ? "NEED " + formatNumber( price - playerProfile.points )
+                                                                            : "BUY " + formatNumber( price );
                 drawText( buyLabel, buyAreas[row].x + 3, buyAreas[row].y + 5, buyAreas[row].width - 6,
                           canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
             }
