@@ -729,6 +729,13 @@ namespace
 
     void saveProfile( const bool discardInvalidPrimary = false )
     {
+        // Never replace a recoverable on-disk profile with an impossible runtime state. If a
+        // future gameplay bug breaks one of the closed RPG ledgers, keep the last good snapshot.
+        if ( !isCurrentProfileStateValid( playerProfile ) ) {
+            ERROR_LOG( "Refusing to save invalid RPG profile state." )
+            return;
+        }
+
         const std::string path = profilePath();
         const std::string tempPath = path + ".tmp";
         const std::string backupPath = path + ".bak";
@@ -1466,6 +1473,21 @@ double fheroes2::RPG::criticalDamageBonusPercent( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
     return profile == nullptr ? 50.0 : 50.0 + static_cast<double>( effect( BRUTAL_CRITICALS, profile->ranks[BRUTAL_CRITICALS] ) );
+}
+
+double fheroes2::RPG::expectedCriticalDamageMultiplier( const PlayerColor color )
+{
+    const double chance = std::clamp( criticalChance( color ), 0.0, 100.0 ) / 100.0;
+    const double bonus = std::max( 0.0, criticalDamageBonusPercent( color ) ) / 100.0;
+    return 1.0 + chance * bonus;
+}
+
+double fheroes2::RPG::sustainValuePercent( const PlayerColor color )
+{
+    // Kill-heal depends on actually finishing creatures, so count half of its headline value in
+    // deterministic AI/strategic estimates. This matches the existing strategic weighting while
+    // keeping all consumers on one shared definition.
+    return lifeStealPercent( color ) + killHealPercent( color ) * 0.5 + regenerationPercent( color );
 }
 
 double fheroes2::RPG::evasionChance( const PlayerColor color )
