@@ -380,7 +380,7 @@ namespace
 
         case MP2::OBJ_BUOY:
         case MP2::OBJ_TEMPLE:
-            return !hero.isObjectTypeVisited( objectType ) && hero.GetMorale() < Morale::BLOOD && !army.AllTroopsAreUndead();
+            return !hero.isObjectTypeVisited( objectType ) && getEffectiveRpgMorale( hero ) < Morale::BLOOD && !army.AllTroopsAreUndead();
 
         case MP2::OBJ_MAGELLANS_MAPS:
             return !kingdom.isVisited( objectType ) && kingdom.AllowPayment( PaymentConditions::getMagellansMapsPurchasePrice() );
@@ -522,8 +522,12 @@ namespace
                 return false;
             }
 
-            if ( ( skillType == Skill::Secondary::LEADERSHIP ) && army.AllTroopsAreUndead() ) {
-                // For undead army it's pointless to have Leadership skill.
+            if ( skillType == Skill::Secondary::LEADERSHIP
+                 && ( army.AllTroopsAreUndead() || getEffectiveRpgMorale( hero ) >= Morale::BLOOD ) ) {
+                // Leadership cannot improve an undead army or morale already capped by the RPG profile.
+                return false;
+            }
+            if ( skillType == Skill::Secondary::LUCK && getEffectiveRpgLuck( hero ) >= Luck::IRISH ) {
                 return false;
             }
 
@@ -558,7 +562,7 @@ namespace
         case MP2::OBJ_FOUNTAIN:
         case MP2::OBJ_IDOL:
         case MP2::OBJ_MERMAID:
-            return !hero.isObjectTypeVisited( objectType ) && hero.GetLuck() < Luck::IRISH;
+            return !hero.isObjectTypeVisited( objectType ) && getEffectiveRpgLuck( hero ) < Luck::IRISH;
 
         // Objects increasing Movement points and Morale.
         case MP2::OBJ_OASIS:
@@ -573,7 +577,7 @@ namespace
             }
 
             const double movementPenalty = 2.0 * distance;
-            return movementPenalty < GameStatic::getMovementPointBonus( objectType ) || hero.GetMorale() < Morale::BLOOD;
+            return movementPenalty < GameStatic::getMovementPointBonus( objectType ) || getEffectiveRpgMorale( hero ) < Morale::BLOOD;
         }
 
         case MP2::OBJ_MAGIC_WELL: {
@@ -1275,8 +1279,9 @@ namespace
             const int effectiveLuck = getEffectiveRpgLuck( hero );
             const int remainingLuck = std::max( 0, Luck::IRISH - effectiveLuck );
             const double baseLuckValue = 100.0 + 400.0 * remainingLuck / Luck::IRISH;
+            const double luckHeadroom = static_cast<double>( remainingLuck ) / Luck::IRISH;
             const double criticalSynergy
-                = std::min( 900.0, ( fheroes2::RPG::expectedCriticalDamageMultiplier( hero.GetColor() ) - 1.0 ) * 3000.0 );
+                = std::min( 900.0, ( fheroes2::RPG::expectedCriticalDamageMultiplier( hero.GetColor() ) - 1.0 ) * 3000.0 ) * luckHeadroom;
             return baseLuckValue + criticalSynergy;
         }
         case Skill::Secondary::BALLISTICS: {
