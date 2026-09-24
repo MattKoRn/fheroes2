@@ -109,6 +109,38 @@ namespace
         Maps::Tile _copyTile;
     };
 
+    int getEffectiveRpgMorale( const Heroes & hero )
+    {
+        return Morale::Normalize( hero.GetMorale() + fheroes2::RPG::moraleBonus( hero.GetColor() ) );
+    }
+
+    int getEffectiveRpgLuck( const Heroes & hero )
+    {
+        return std::clamp( hero.GetLuck() + fheroes2::RPG::luckBonus( hero.GetColor() ), -3, 3 );
+    }
+
+    double getRpgSpellcastingPriorityFactor( const PlayerColor color )
+    {
+        const double elementalSpecialization
+            = std::max( { fheroes2::RPG::doctrineEffect( color, fheroes2::RPG::PYROMANCY ),
+                          fheroes2::RPG::doctrineEffect( color, fheroes2::RPG::CRYOMANCY ),
+                          fheroes2::RPG::doctrineEffect( color, fheroes2::RPG::STORMCRAFT ),
+                          fheroes2::RPG::doctrineEffect( color, fheroes2::RPG::CATACLYSM ) } );
+        const double offense = fheroes2::RPG::doctrineEffect( color, fheroes2::RPG::SORCERY ) + elementalSpecialization
+                               + fheroes2::RPG::doctrineEffect( color, fheroes2::RPG::ARCANE_PIERCING ) * 0.25;
+
+        return 1.0 + std::min( 0.50, offense / 100.0 );
+    }
+
+    double getRpgAwareSpellStrategicValue( const Heroes & hero, const Spell & spell )
+    {
+        double value = spell.getStrategicValue( hero.GetArmy().GetStrength(), hero.GetMaxSpellPoints(), hero.GetPower() );
+        if ( spell.isDamage() ) {
+            value *= fheroes2::RPG::spellMultiplier( hero.GetColor(), PlayerColor::NONE, spell.GetID() );
+        }
+        return value;
+    }
+
     int32_t daysToNextWeek()
     {
         const int32_t currentDay = ( static_cast<int32_t>( world.CountDay() ) % numOfDaysPerWeek );
@@ -1227,7 +1259,10 @@ namespace
             if ( hero.GetArmy().AllTroopsAreUndead() ) {
                 return 100.0;
             }
-            return 1000.0 + static_cast<double>( fheroes2::RPG::moraleBonus( hero.GetColor() ) ) * 150.0;
+
+            const int effectiveMorale = getEffectiveRpgMorale( hero );
+            const int remainingMorale = std::max( 0, Morale::BLOOD - effectiveMorale );
+            return 100.0 + 900.0 * remainingMorale / Morale::BLOOD;
         }
         case Skill::Secondary::NECROMANCY:
             return hero.GetArmy().AllTroopsAreUndead() ? 1000.0 : 100.0;
@@ -1236,9 +1271,13 @@ namespace
             if ( role == Heroes::Role::COURIER || role == Heroes::Role::SCOUT ) {
                 return 100.0;
             }
-            const double criticalValue = fheroes2::RPG::criticalChance( hero.GetColor() ) * 45.0;
-            const double fortuneValue = static_cast<double>( fheroes2::RPG::luckBonus( hero.GetColor() ) ) * 125.0;
-            return 500.0 + criticalValue + fortuneValue;
+
+            const int effectiveLuck = getEffectiveRpgLuck( hero );
+            const int remainingLuck = std::max( 0, Luck::IRISH - effectiveLuck );
+            const double baseLuckValue = 100.0 + 400.0 * remainingLuck / Luck::IRISH;
+            const double criticalSynergy
+                = std::min( 900.0, ( fheroes2::RPG::expectedCriticalDamageMultiplier( hero.GetColor() ) - 1.0 ) * 3000.0 );
+            return baseLuckValue + criticalSynergy;
         }
         case Skill::Secondary::BALLISTICS: {
             const Heroes::Role role = hero.getAIRole();
@@ -1729,7 +1768,7 @@ double AI::Planner::getGeneralObjectValue( const Heroes & hero, const int32_t in
     case MP2::OBJ_SHRINE_SECOND_CIRCLE:
     case MP2::OBJ_SHRINE_THIRD_CIRCLE: {
         const Spell & spell = getSpellFromTile( tile );
-        return spell.getStrategicValue( hero.GetArmy().GetStrength(), hero.GetMaxSpellPoints(), hero.GetPower() );
+        return getRpgAwareSpellStrategicValue( hero, spell );
     }
     case MP2::OBJ_ARENA:
     case MP2::OBJ_FORT:
@@ -1824,7 +1863,7 @@ double AI::Planner::getGeneralObjectValue( const Heroes & hero, const int32_t in
             return -dangerousTaskPenalty;
         }
 
-        return hero.isPotentSpellcaster() ? 1500 : 0;
+        return hero.isPotentSpellcaster() ? 1500 * getRpgSpellcastingPriorityFactor( hero.GetColor() ) : 0;
     }
     case MP2::OBJ_MAGIC_WELL: {
         if ( !hero.HaveSpellBook() || hero.GetSpellPoints() >= hero.GetMaxSpellPoints() ) {
@@ -1832,7 +1871,7 @@ double AI::Planner::getGeneralObjectValue( const Heroes & hero, const int32_t in
             return -dangerousTaskPenalty;
         }
 
-        return hero.isPotentSpellcaster() ? 1500 : 0;
+        return hero.isPotentSpellcaster() ? 1500 * getRpgSpellcastingPriorityFactor( hero.GetColor() ) : 0;
     }
     case MP2::OBJ_BLACK_CAT:
     case MP2::OBJ_BUOY:
@@ -1842,7 +1881,7 @@ double AI::Planner::getGeneralObjectValue( const Heroes & hero, const int32_t in
             return 0;
         }
 
-        const int morale = hero.GetMorale();
+        const int morale = getEffectiveRpgMorale( hero );
         if ( morale >= Morale::BLOOD ) {
             return -dangerousTaskPenalty; // No reason to visit with maximum morale
         }
@@ -1939,7 +1978,7 @@ double AI::Planner::getGeneralObjectValue( const Heroes & hero, const int32_t in
     case MP2::OBJ_FOUNTAIN:
     case MP2::OBJ_IDOL:
     case MP2::OBJ_MERMAID: {
-        const int luck = hero.GetLuck();
+        const int luck = getEffectiveRpgLuck( hero );
         if ( luck >= Luck::IRISH ) {
             return -dangerousTaskPenalty; // No reason to visit with maximum morale
         }
@@ -2262,7 +2301,7 @@ double AI::Planner::getFighterObjectValue( const Heroes & hero, const int32_t in
     case MP2::OBJ_SHRINE_SECOND_CIRCLE:
     case MP2::OBJ_SHRINE_THIRD_CIRCLE: {
         const Spell & spell = getSpellFromTile( tile );
-        return spell.getStrategicValue( hero.GetArmy().GetStrength(), hero.GetMaxSpellPoints(), hero.GetPower() ) * 1.1;
+        return getRpgAwareSpellStrategicValue( hero, spell ) * 1.1;
     }
     case MP2::OBJ_ARENA:
     case MP2::OBJ_FORT:
@@ -2282,7 +2321,7 @@ double AI::Planner::getFighterObjectValue( const Heroes & hero, const int32_t in
             return -dangerousTaskPenalty;
         }
 
-        return hero.isPotentSpellcaster() ? 2000 : 0;
+        return hero.isPotentSpellcaster() ? 2000 * getRpgSpellcastingPriorityFactor( hero.GetColor() ) : 0;
     }
     case MP2::OBJ_MAGIC_WELL: {
         if ( !hero.HaveSpellBook() || hero.GetSpellPoints() >= hero.GetMaxSpellPoints() ) {
@@ -2290,7 +2329,7 @@ double AI::Planner::getFighterObjectValue( const Heroes & hero, const int32_t in
             return -dangerousTaskPenalty;
         }
 
-        return hero.isPotentSpellcaster() ? 2000 : 0;
+        return hero.isPotentSpellcaster() ? 2000 * getRpgSpellcastingPriorityFactor( hero.GetColor() ) : 0;
     }
     case MP2::OBJ_BUOY:
     case MP2::OBJ_TEMPLE: {
@@ -2299,7 +2338,7 @@ double AI::Planner::getFighterObjectValue( const Heroes & hero, const int32_t in
             return 0;
         }
 
-        const int morale = hero.GetMorale();
+        const int morale = getEffectiveRpgMorale( hero );
         if ( morale >= Morale::BLOOD ) {
             return -dangerousTaskPenalty; // No reason to visit with maximum morale
         }
@@ -2443,7 +2482,7 @@ double AI::Planner::getCourierObjectValue( const Heroes & hero, const int32_t in
             return -dangerousTaskPenalty;
         }
 
-        return hero.isPotentSpellcaster() ? fiveTiles : 0;
+        return hero.isPotentSpellcaster() ? fiveTiles * getRpgSpellcastingPriorityFactor( hero.GetColor() ) : 0;
     }
     case MP2::OBJ_MAGIC_WELL: {
         if ( !hero.HaveSpellBook() || hero.GetSpellPoints() >= hero.GetMaxSpellPoints() ) {
@@ -2451,7 +2490,7 @@ double AI::Planner::getCourierObjectValue( const Heroes & hero, const int32_t in
             return -dangerousTaskPenalty;
         }
 
-        return hero.isPotentSpellcaster() ? fiveTiles : 0;
+        return hero.isPotentSpellcaster() ? fiveTiles * getRpgSpellcastingPriorityFactor( hero.GetColor() ) : 0;
     }
     default:
         break;
