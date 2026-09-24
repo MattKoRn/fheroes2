@@ -121,15 +121,7 @@ namespace
 
     double getRpgSpellcastingPriorityFactor( const PlayerColor color )
     {
-        const double elementalSpecialization
-            = std::max( { fheroes2::RPG::doctrineEffect( color, fheroes2::RPG::PYROMANCY ),
-                          fheroes2::RPG::doctrineEffect( color, fheroes2::RPG::CRYOMANCY ),
-                          fheroes2::RPG::doctrineEffect( color, fheroes2::RPG::STORMCRAFT ),
-                          fheroes2::RPG::doctrineEffect( color, fheroes2::RPG::CATACLYSM ) } );
-        const double offense = fheroes2::RPG::doctrineEffect( color, fheroes2::RPG::SORCERY ) + elementalSpecialization
-                               + fheroes2::RPG::doctrineEffect( color, fheroes2::RPG::ARCANE_PIERCING ) * 0.25;
-
-        return 1.0 + std::min( 0.50, offense / 100.0 );
+        return 1.0 + std::min( 0.50, fheroes2::RPG::spellcastingInvestmentPercent( color ) / 100.0 );
     }
 
     double getRpgAwareSpellStrategicValue( const Heroes & hero, const Spell & spell )
@@ -1251,13 +1243,7 @@ namespace
             // Don't check castles/spell availability since high Wisdom drives building priority.
             // Value the real diminishing-return spell bonuses instead of raw ranks: otherwise a
             // late-game RPG profile can make Wisdom dominate every secondary-skill choice.
-            const double strongestElement
-                = std::max( { fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::PYROMANCY ),
-                              fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::CRYOMANCY ),
-                              fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::STORMCRAFT ),
-                              fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::CATACLYSM ) } );
-            const double spellDoctrineEffect = fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::SORCERY ) + strongestElement
-                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::ARCANE_PIERCING ) * 0.25;
+            const double spellDoctrineEffect = fheroes2::RPG::spellcastingInvestmentPercent( hero.GetColor() );
             const double baseWisdom = level == Skill::Level::BASIC ? 2500.0 : 1000.0;
             return baseWisdom + std::min( 1500.0, spellDoctrineEffect * 50.0 );
         }
@@ -1329,17 +1315,16 @@ namespace
         }
         case Skill::Secondary::MYSTICISM: {
             const double baseMysticism = hero.HaveSpellBook() ? 500.0 : 100.0;
-            const double strongestElement
-                = std::max( { fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::PYROMANCY ),
-                              fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::CRYOMANCY ),
-                              fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::STORMCRAFT ),
-                              fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::CATACLYSM ) } );
-            const double spellDoctrineEffect = fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::SORCERY ) + strongestElement * 0.5
-                                               + fheroes2::RPG::doctrineEffect( hero.GetColor(), fheroes2::RPG::ARCANE_PIERCING ) * 0.5;
-            return baseMysticism + ( hero.HaveSpellBook() ? std::min( 700.0, spellDoctrineEffect * 30.0 ) : 0.0 );
+            const double spellDoctrineEffect = fheroes2::RPG::spellcastingInvestmentPercent( hero.GetColor() );
+            return baseMysticism + ( hero.HaveSpellBook() ? std::min( 700.0, spellDoctrineEffect * 24.0 ) : 0.0 );
         }
-        case Skill::Secondary::EAGLE_EYE:
-            return hero.HaveSpellBook() ? 250.0 : 0.0;
+        case Skill::Secondary::EAGLE_EYE: {
+            if ( !hero.HaveSpellBook() ) {
+                return 0.0;
+            }
+            const double spellInvestment = fheroes2::RPG::spellcastingInvestmentPercent( hero.GetColor() );
+            return 250.0 + std::min( 600.0, spellInvestment * 24.0 );
+        }
         case Skill::Secondary::DIPLOMACY:
             // discourage AI picking it up, but if it's already there prioritise leveling to save gold
             return level == Skill::Level::BASIC ? 100.0 : 1250.0;
@@ -2592,34 +2577,49 @@ double AI::Planner::getObjectValue( const Heroes & hero, const int32_t index, co
         return 0.0;
     }
 
-    if ( value <= 0.0 ) {
+    if ( value < 0.0 ) {
         return value;
     }
 
     const uint64_t adventureRenown = fheroes2::RPG::previewAdventureActionExperience( hero.GetColor(), static_cast<int>( objectType ), index );
-    if ( adventureRenown > 0 ) {
-        // Exploration-focused roles care more about persistent discoveries; fighters stay mission
-        // focused, and couriers only take RPG detours when the normal courier logic already likes them.
-        double roleWeight = 1.0;
-        switch ( hero.getAIRole() ) {
-        case Heroes::Role::SCOUT:
-            roleWeight = 2.0;
-            break;
-        case Heroes::Role::HUNTER:
-            roleWeight = 1.4;
-            break;
-        case Heroes::Role::CHAMPION:
-        case Heroes::Role::FIGHTER:
-            roleWeight = 0.8;
-            break;
-        case Heroes::Role::COURIER:
-            roleWeight = 0.35;
-            break;
-        default:
-            break;
-        }
+    if ( adventureRenown == 0 ) {
+        return value;
+    }
 
-        value += std::min( 1200.0, static_cast<double>( adventureRenown ) * roleWeight );
+    // Exploration-focused roles care more about persistent discoveries; fighters stay mission
+    // focused, and couriers only take small progression detours.
+    double roleWeight = 1.0;
+    switch ( hero.getAIRole() ) {
+    case Heroes::Role::SCOUT:
+        roleWeight = 2.0;
+        break;
+    case Heroes::Role::HUNTER:
+        roleWeight = 1.4;
+        break;
+    case Heroes::Role::CHAMPION:
+    case Heroes::Role::FIGHTER:
+        roleWeight = 0.8;
+        break;
+    case Heroes::Role::COURIER:
+        roleWeight = 0.35;
+        break;
+    default:
+        break;
+    }
+
+    const double explorationValue = std::min( 1200.0, static_cast<double>( adventureRenown ) * roleWeight );
+    value += explorationValue;
+
+    const uint64_t remainingRenown = fheroes2::RPG::renownToNextLevel( hero.GetColor() );
+    if ( remainingRenown > 0 ) {
+        if ( adventureRenown >= remainingRenown ) {
+            // Completing the level immediately is exciting and also unlocks another five guild points.
+            value += std::min( 900.0, explorationValue * 0.75 + 250.0 );
+        }
+        else if ( adventureRenown * 2 >= remainingRenown ) {
+            // Give a softer push to discoveries that fill at least half of the remaining bar.
+            value += std::min( 350.0, explorationValue * 0.25 );
+        }
     }
 
     return value;
