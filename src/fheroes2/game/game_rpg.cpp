@@ -689,7 +689,13 @@ namespace
                 }
             }
         }
-        if ( version == 2 ) {
+        if ( version < 2 ) {
+            // Version 1 predates source ledgers. Its Renown came from normal in-game progression,
+            // so classify it as field/hero Renown before rewriting the profile as version 6.
+            candidate.fieldExperience = candidate.experience;
+            candidate.heroExperience = candidate.experience;
+        }
+        else if ( version == 2 ) {
             candidate.heroExperience = candidate.fieldExperience;
         }
 
