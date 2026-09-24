@@ -62,19 +62,19 @@ namespace
         return std::max<uint32_t>( 1, result );
     }
 
-    double getRpgBattleUnitValueFactor( const Battle::Unit & unit )
+    double getRpgColorBattleValueFactor( const PlayerColor color )
     {
-        if ( unit.Modes( Battle::CAP_TOWER ) ) {
-            return 1.0;
-        }
-
-        const PlayerColor color = unit.GetColor();
         const double criticalFactor = std::sqrt( std::max( 1.0, fheroes2::RPG::expectedCriticalDamageMultiplier( color ) ) );
         const double evasionDamageTakenFactor = std::max( 0.50, 1.0 - fheroes2::RPG::evasionChance( color ) / 200.0 );
         const double durabilityFactor = 1.0 / std::sqrt( evasionDamageTakenFactor );
         const double sustainFactor = 1.0 + std::min( 0.15, fheroes2::RPG::sustainValuePercent( color ) / 200.0 );
 
         return criticalFactor * durabilityFactor * sustainFactor;
+    }
+
+    double getRpgBattleUnitValueFactor( const Battle::Unit & unit )
+    {
+        return unit.Modes( Battle::CAP_TOWER ) ? 1.0 : getRpgColorBattleValueFactor( unit.GetColor() );
     }
 
     int32_t getSpellPower( const HeroBase * hero )
@@ -698,7 +698,7 @@ double AI::BattlePlanner::spellEffectValue( const Spell & spell, const Battle::U
         }
     }
 
-    const double value = target.GetStrength() * ratio * getEffectiveDurationMultiplier();
+    const double value = target.GetStrength() * ratio * getEffectiveDurationMultiplier() * getRpgBattleUnitValueFactor( target );
     return std::isfinite( value ) && value > 0.0 ? value : 0.0;
 }
 
@@ -854,7 +854,10 @@ AI::SpellcastOutcome AI::BattlePlanner::spellSummonValue( const Spell & spell, c
 
     SpellcastOutcome bestOutcome;
 
-    bestOutcome.value = summon.GetStrengthWithBonus( _commander->GetAttack(), _commander->GetDefense() );
+    const int rpgAttack = static_cast<int>( fheroes2::RPG::creatureAttackBonus( heroColor ) );
+    const int rpgDefense = static_cast<int>( fheroes2::RPG::creatureDefenseBonus( heroColor ) );
+    bestOutcome.value
+        = summon.GetStrengthWithBonus( _commander->GetAttack() + rpgAttack, _commander->GetDefense() + rpgDefense ) * getRpgColorBattleValueFactor( heroColor );
     if ( !std::isfinite( bestOutcome.value ) || bestOutcome.value <= 0.0 ) {
         return {};
     }
