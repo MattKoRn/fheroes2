@@ -1304,8 +1304,7 @@ double Army::GetStrength() const
     // Strategic strength should reflect the same expected RPG combat value that the battle AI
     // sees. Conditional doctrines use a fixed mix of common battle states so estimates stay
     // deterministic without pretending that every doctrine is active on every attack.
-    const double criticalFactor = 1.0 + fheroes2::RPG::criticalChance( armyColor ) / 100.0
-                                                  * fheroes2::RPG::criticalDamageBonusPercent( armyColor ) / 100.0;
+    const double criticalFactor = fheroes2::RPG::expectedCriticalDamageMultiplier( armyColor );
     const double evasionDamageTakenFactor = 1.0 - fheroes2::RPG::evasionChance( armyColor ) / 200.0;
     const auto expectedDamageTakenFactor = [armyColor]( const bool ranged ) {
         const auto scenario = [armyColor, ranged]( const bool defenderOutnumbered, const bool defenderFullHealth,
@@ -1323,8 +1322,7 @@ double Army::GetStrength() const
         = std::max( 0.30, ( meleeDamageTakenFactor + rangedDamageTakenFactor ) * 0.5 * evasionDamageTakenFactor );
     const double durabilityFactor = 1.0 / averageDamageTakenFactor;
 
-    const double sustainPercent = fheroes2::RPG::lifeStealPercent( armyColor ) + fheroes2::RPG::killHealPercent( armyColor ) * 0.5
-                                  + fheroes2::RPG::regenerationPercent( armyColor );
+    const double sustainPercent = fheroes2::RPG::sustainValuePercent( armyColor );
     const double sustainFactor = 1.0 + std::min( 0.20, sustainPercent / 200.0 );
 
     const int bonusAttack = ( commander ? commander->GetAttack() : 0 ) + rpgAttackBonus;
@@ -1374,7 +1372,9 @@ double Army::GetStrength() const
             strength *= 1 + ( ( armyMorale < 0 ) ? armyMorale / 12.0 : armyMorale / 24.0 );
         }
 
-        strength *= 1 + armyLuck / 24.0;
+        // Good luck doubles damage on proc; bad luck halves it. Both roll on 1/24,
+        // so negative Luck only removes half as much expected damage as positive Luck adds.
+        strength *= armyLuck >= 0 ? 1.0 + armyLuck / 24.0 : 1.0 + armyLuck / 48.0;
 
         result += strength;
     }
