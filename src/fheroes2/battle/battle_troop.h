@@ -111,6 +111,7 @@ namespace Battle
         virtual uint32_t GetMissingHitPoints() const;
         uint32_t GetAffectedDuration( const uint32_t mode ) const override;
         uint32_t GetSpeed() const override;
+        [[nodiscard]] int GetMoraleWithoutRPG() const;
         int GetMorale() const override;
 
         Unit * GetMirror() const
