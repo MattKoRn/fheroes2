@@ -1,0 +1,40 @@
+name: RPG Smoke
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/fheroes2/game/game_rpg.cpp'
+      - 'src/fheroes2/game/game_rpg.h'
+      - 'src/fheroes2/ai/**'
+      - '.github/workflows/rpg_smoke.yml'
+  pull_request:
+    paths:
+      - 'src/fheroes2/game/game_rpg.cpp'
+      - 'src/fheroes2/game/game_rpg.h'
+      - 'src/fheroes2/ai/**'
+      - '.github/workflows/rpg_smoke.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: rpg-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux-rpg-smoke:
+    name: Linux RPG compile smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install SDL2 build dependencies
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install libsdl2-dev libsdl2-mixer-dev libsdl2-image-dev gettext
+      - name: Compile with strict warnings
+        run: make -j 2
+        env:
+          FHEROES2_STRICT_COMPILATION: ON
