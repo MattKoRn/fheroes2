@@ -561,6 +561,222 @@ namespace
         }
     }
 
+    enum class AscensionChannel
+    {
+        ATTACK,
+        DEFENSE,
+        PHYSICAL_DAMAGE,
+        PHYSICAL_REDUCTION,
+        SPELL_DAMAGE,
+        SPELL_REDUCTION,
+        CRITICAL_CHANCE,
+        CRITICAL_DAMAGE,
+        EVASION,
+        LIFE_STEAL,
+        REGENERATION,
+        ARMOR_PIERCING,
+        ARCANE_PIERCING
+    };
+
+    constexpr std::array<uint64_t, 4> ascensionMilestones{ 10, 25, 50, 100 };
+
+    constexpr std::array<AscensionChannel, upgradeCount> ascensionChannels{
+        AscensionChannel::PHYSICAL_DAMAGE, AscensionChannel::PHYSICAL_REDUCTION, AscensionChannel::CRITICAL_DAMAGE,
+        AscensionChannel::CRITICAL_CHANCE, AscensionChannel::REGENERATION,
+
+        AscensionChannel::ATTACK, AscensionChannel::ARMOR_PIERCING, AscensionChannel::PHYSICAL_REDUCTION,
+        AscensionChannel::CRITICAL_DAMAGE, AscensionChannel::ARMOR_PIERCING,
+
+        AscensionChannel::ATTACK, AscensionChannel::CRITICAL_CHANCE, AscensionChannel::LIFE_STEAL,
+        AscensionChannel::DEFENSE, AscensionChannel::PHYSICAL_DAMAGE,
+
+        AscensionChannel::DEFENSE, AscensionChannel::EVASION, AscensionChannel::ATTACK,
+        AscensionChannel::REGENERATION, AscensionChannel::PHYSICAL_DAMAGE,
+
+        AscensionChannel::ARCANE_PIERCING, AscensionChannel::SPELL_REDUCTION, AscensionChannel::DEFENSE,
+        AscensionChannel::CRITICAL_CHANCE, AscensionChannel::ARCANE_PIERCING,
+
+        AscensionChannel::SPELL_DAMAGE, AscensionChannel::SPELL_DAMAGE, AscensionChannel::DEFENSE,
+        AscensionChannel::EVASION, AscensionChannel::SPELL_DAMAGE,
+
+        AscensionChannel::ATTACK, AscensionChannel::CRITICAL_DAMAGE, AscensionChannel::PHYSICAL_REDUCTION,
+        AscensionChannel::CRITICAL_DAMAGE, AscensionChannel::CRITICAL_CHANCE,
+
+        AscensionChannel::PHYSICAL_REDUCTION, AscensionChannel::SPELL_DAMAGE, AscensionChannel::PHYSICAL_DAMAGE,
+        AscensionChannel::ATTACK, AscensionChannel::LIFE_STEAL
+    };
+
+    constexpr std::array<const char *, upgradeCount> ascensionNames{
+        "Battle Rhythm", "Fortified Formation", "Veteran Instinct", "Blood Rush", "Harvest Cycle",
+        "War Temper", "Piercing Volley", "Guarded Brawl", "Finality", "First Breach",
+        "David's Aim", "Momentum", "Blood Heat", "Battle Order", "Exposed Weakness",
+        "Iron Formation", "Deflection", "Counterstance", "Second Wind", "Hold and Strike",
+        "Arcane Pressure", "Flame Tempering", "Frozen Guard", "Static Charge", "Worldbreaker",
+        "Reflected Insight", "Fire Attunement", "Frost Shell", "Stormstep", "Chaos Insight",
+        "Commander's Edge", "Lucky Break", "Renewed Guard", "Killing Form", "Blood Sense",
+        "Flowing Guard", "Arcane Feedback", "Point-Blank Mastery", "Resolute Counter", "Predatory Finish"
+    };
+
+    uint8_t ascensionTierForRank( const uint64_t rank )
+    {
+        uint8_t tier = 0;
+        for ( const uint64_t milestone : ascensionMilestones ) {
+            if ( rank < milestone ) {
+                break;
+            }
+            ++tier;
+        }
+        return tier;
+    }
+
+    uint64_t nextAscensionRank( const uint64_t rank )
+    {
+        for ( const uint64_t milestone : ascensionMilestones ) {
+            if ( rank < milestone ) {
+                return milestone;
+            }
+        }
+        return 0;
+    }
+
+    const char * ascensionTierLabel( const uint8_t tier )
+    {
+        switch ( tier ) {
+        case 1: return "Ascension I";
+        case 2: return "Ascension II";
+        case 3: return "Ascension III";
+        case 4: return "Ascension IV";
+        default: return "Unascended";
+        }
+    }
+
+    const char * ascensionChannelDescription( const AscensionChannel channel )
+    {
+        switch ( channel ) {
+        case AscensionChannel::ATTACK: return "+1 creature Attack per Ascension stage";
+        case AscensionChannel::DEFENSE: return "+1 creature Defense per Ascension stage";
+        case AscensionChannel::PHYSICAL_DAMAGE: return "+1.25% all physical damage per Ascension stage";
+        case AscensionChannel::PHYSICAL_REDUCTION: return "+0.75% all physical reduction per Ascension stage";
+        case AscensionChannel::SPELL_DAMAGE: return "+1.25% all damaging spell power per Ascension stage";
+        case AscensionChannel::SPELL_REDUCTION: return "+0.75% all spell reduction per Ascension stage";
+        case AscensionChannel::CRITICAL_CHANCE: return "+0.5% critical chance per Ascension stage";
+        case AscensionChannel::CRITICAL_DAMAGE: return "+2.5% critical bonus damage per Ascension stage";
+        case AscensionChannel::EVASION: return "+0.5% Evasion chance per Ascension stage";
+        case AscensionChannel::LIFE_STEAL: return "+1% life steal per Ascension stage";
+        case AscensionChannel::REGENERATION: return "+0.75% turn regeneration per Ascension stage";
+        case AscensionChannel::ARMOR_PIERCING: return "+1.5% physical resistance bypass per Ascension stage";
+        case AscensionChannel::ARCANE_PIERCING: return "+1.5% spell resistance bypass per Ascension stage";
+        default: return "No secondary effect";
+        }
+    }
+
+    long double ascensionPerTier( const AscensionChannel channel )
+    {
+        switch ( channel ) {
+        case AscensionChannel::ATTACK:
+        case AscensionChannel::DEFENSE:
+            return 1.0L;
+        case AscensionChannel::PHYSICAL_DAMAGE:
+        case AscensionChannel::SPELL_DAMAGE:
+            return 1.25L;
+        case AscensionChannel::PHYSICAL_REDUCTION:
+        case AscensionChannel::SPELL_REDUCTION:
+        case AscensionChannel::REGENERATION:
+            return 0.75L;
+        case AscensionChannel::CRITICAL_CHANCE:
+        case AscensionChannel::EVASION:
+            return 0.50L;
+        case AscensionChannel::CRITICAL_DAMAGE:
+            return 2.50L;
+        case AscensionChannel::LIFE_STEAL:
+            return 1.0L;
+        case AscensionChannel::ARMOR_PIERCING:
+        case AscensionChannel::ARCANE_PIERCING:
+            return 1.50L;
+        default:
+            return 0.0L;
+        }
+    }
+
+    long double ascensionChannelBonus( const Profile & profile, const AscensionChannel channel )
+    {
+        long double total = 0.0L;
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            if ( ascensionChannels[id] == channel ) {
+                total += static_cast<long double>( ascensionTierForRank( profile.ranks[id] ) ) * ascensionPerTier( channel );
+            }
+        }
+        return total;
+    }
+
+    bool doctrineCanAdvance( const size_t id, const uint64_t rank )
+    {
+        if ( id >= upgradeCount || rank == std::numeric_limits<uint64_t>::max() ) {
+            return false;
+        }
+
+        if ( effect( id, rank + 1 ) > effect( id, rank ) ) {
+            return true;
+        }
+
+        // A hard-capped primary mechanic may still progress toward a real Ascension milestone.
+        return nextAscensionRank( rank ) != 0;
+    }
+
+    bool storedDoctrineRankIsReachable( const size_t id, const uint64_t rank )
+    {
+        if ( rank == 0 ) {
+            return true;
+        }
+        if ( effect( id, rank ) > effect( id, rank - 1 ) ) {
+            return true;
+        }
+
+        // Ranks at or below the final Ascension milestone can be mechanically meaningful even
+        // after the doctrine's primary effect has reached a hard engine cap.
+        return rank <= ascensionMilestones.back();
+    }
+
+    long double ascensionMilestoneUtility( const size_t id, const uint64_t currentRank )
+    {
+        if ( id >= upgradeCount || currentRank == std::numeric_limits<uint64_t>::max() ) {
+            return 0.0L;
+        }
+
+        const uint8_t currentTier = ascensionTierForRank( currentRank );
+        const uint8_t nextTier = ascensionTierForRank( currentRank + 1 );
+        if ( nextTier > currentTier ) {
+            const AscensionChannel channel = ascensionChannels[id];
+            const long double raw = ascensionPerTier( channel );
+            switch ( channel ) {
+            case AscensionChannel::ATTACK:
+            case AscensionChannel::DEFENSE:
+                return raw * 7.5L;
+            case AscensionChannel::CRITICAL_DAMAGE:
+                return raw * 0.60L;
+            case AscensionChannel::CRITICAL_CHANCE:
+            case AscensionChannel::EVASION:
+                return raw * 0.85L;
+            case AscensionChannel::LIFE_STEAL:
+            case AscensionChannel::REGENERATION:
+                return raw * 0.80L;
+            default:
+                return raw;
+            }
+        }
+
+        // Hard-capped primaries still need a small planning value for the ranks between milestones,
+        // otherwise the Steward could never deliberately reach their next evolution.
+        if ( effect( id, currentRank + 1 ) <= effect( id, currentRank ) ) {
+            const uint64_t milestone = nextAscensionRank( currentRank );
+            if ( milestone > currentRank ) {
+                return 0.35L / static_cast<long double>( milestone - currentRank );
+            }
+        }
+
+        return 0.0L;
+    }
+
     long double doctrinePairResonance( const Profile & profile, const size_t first, const size_t second, const long double scale,
                                         const long double cap )
     {
@@ -653,7 +869,7 @@ namespace
             // A stored rank must have produced a real mechanical increase when it was bought.
             // This rejects parseable corruption that pushes hard safety-capped mechanics beyond
             // their meaningful limit, which could otherwise mint saturated refunds during a respec.
-            if ( rank > 0 && effect( id, rank ) <= effect( id, rank - 1 ) ) {
+            if ( !storedDoctrineRankIsReachable( id, rank ) ) {
                 return false;
             }
 
@@ -726,8 +942,7 @@ namespace
 
     bool buy( Profile & profile, const size_t id )
     {
-        if ( id >= upgradeCount || profile.ranks[id] == std::numeric_limits<uint64_t>::max()
-             || effect( id, profile.ranks[id] + 1 ) <= effect( id, profile.ranks[id] )
+        if ( !doctrineCanAdvance( id, profile.ranks[id] )
              || ( id == BRUTAL_CRITICALS && profile.ranks[CRITICAL_TRAINING] == 0 ) ) {
             return false;
         }
@@ -989,12 +1204,12 @@ namespace
     long double autoBuyMarginalReturn( const Profile & profile, const size_t id )
     {
         const uint64_t rank = profile.ranks[id];
-        if ( rank == std::numeric_limits<uint64_t>::max() || effect( id, rank + 1 ) <= effect( id, rank )
-             || ( id == BRUTAL_CRITICALS && profile.ranks[CRITICAL_TRAINING] == 0 ) ) {
+        if ( !doctrineCanAdvance( id, rank ) || ( id == BRUTAL_CRITICALS && profile.ranks[CRITICAL_TRAINING] == 0 ) ) {
             return 0.0L;
         }
 
-        return autoBuyUtility( profile, id ) * autoBuyActivityFactor( profile, id ) * autoBuySynergyFactor( profile, id )
+        const long double utility = autoBuyUtility( profile, id ) + ascensionMilestoneUtility( id, rank );
+        return utility * autoBuyActivityFactor( profile, id ) * autoBuySynergyFactor( profile, id )
                * autoBuyPlaystyleFactor( profile, id ) / static_cast<long double>( cost( id, rank ) );
     }
 
@@ -1719,17 +1934,37 @@ namespace
 
         const uint64_t rank = playerProfile.ranks[id];
         const long double currentEffect = effect( id, rank );
-        const bool canAdvance = rank < std::numeric_limits<uint64_t>::max() && effect( id, rank + 1 ) > currentEffect;
+        const bool canAdvance = doctrineCanAdvance( id, rank );
+        const uint8_t ascensionTier = ascensionTierForRank( rank );
         std::string message = upgradeDetails[id];
         message += "\n\nCurrent rank: " + formatNumber( rank );
         message += "\nCurrent: " + shortEffectSummary( id, rank );
+        message += "\nAscension: " + std::string( ascensionTierLabel( ascensionTier ) );
+        if ( ascensionTier > 0 ) {
+            message += " - " + std::string( ascensionNames[id] );
+        }
+        message += "\nEvolution: " + std::string( ascensionChannelDescription( ascensionChannels[id] ) );
+        const uint64_t nextMilestone = nextAscensionRank( rank );
+        if ( nextMilestone > 0 ) {
+            message += "\nNext Ascension: Rank " + formatNumber( nextMilestone );
+        }
+        else {
+            message += "\nAscension IV mastered.";
+        }
         const bool prerequisiteMet = id != BRUTAL_CRITICALS || playerProfile.ranks[CRITICAL_TRAINING] > 0;
         if ( canAdvance ) {
             const long double nextEffect = effect( id, rank + 1 );
             message += "\nNext rank: " + shortEffectSummary( id, rank + 1 );
+            const uint8_t nextAscensionTier = ascensionTierForRank( rank + 1 );
+            if ( nextAscensionTier > ascensionTier ) {
+                message += "\nUNLOCKS: " + std::string( ascensionTierLabel( nextAscensionTier ) ) + " - " + ascensionNames[id];
+            }
 
-            const uint64_t flatGain = static_cast<uint64_t>( nextEffect - currentEffect );
-            if ( id == ARMS_TRAINING ) {
+            const uint64_t flatGain = nextEffect > currentEffect ? static_cast<uint64_t>( nextEffect - currentEffect ) : 0;
+            if ( nextEffect <= currentEffect ) {
+                message += "\nPrimary effect: capped; this rank advances Ascension progress.";
+            }
+            else if ( id == ARMS_TRAINING ) {
                 message += "\nNext-rank gain: +" + formatNumber( flatGain ) + " Attack";
             }
             else if ( id == ARMOR_TRAINING ) {
@@ -1750,7 +1985,7 @@ namespace
 
             const uint64_t price = cost( id, rank );
             message += "\nNext rank costs: " + formatNumber( price ) + " points";
-            if ( price > 0 ) {
+            if ( price > 0 && nextEffect > currentEffect ) {
                 const long double gainPerPoint = ( nextEffect - currentEffect ) / static_cast<long double>( price );
                 if ( id == ARMS_TRAINING ) {
                     message += "\nGain per point: " + formatDecimal( gainPerPoint ) + " Attack";
@@ -1822,7 +2057,7 @@ namespace
         for ( size_t offset = 0; offset < upgradesPerTab; ++offset ) {
             const size_t id = tabIndex * upgradesPerTab + offset;
             const uint64_t rank = playerProfile.ranks[id];
-            const bool canAdvance = rank < std::numeric_limits<uint64_t>::max() && effect( id, rank + 1 ) > effect( id, rank );
+            const bool canAdvance = doctrineCanAdvance( id, rank );
             const bool prerequisiteMet = id != BRUTAL_CRITICALS || playerProfile.ranks[CRITICAL_TRAINING] > 0;
 
             message += "\n  " + std::string( upgrades[id].name ) + " - Rank " + formatNumber( rank ) + ": " + shortEffectSummary( id, rank );
@@ -1914,6 +2149,18 @@ namespace
                        + " (" + formatNumber( *activityFocus ) + " triggers)";
         }
         message += "\nTotal Doctrine Triggers: " + formatNumber( totalTriggers );
+
+        size_t ascendedDoctrines = 0;
+        uint64_t totalAscensionStages = 0;
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            const uint8_t tier = ascensionTierForRank( playerProfile.ranks[id] );
+            if ( tier > 0 ) {
+                ++ascendedDoctrines;
+                totalAscensionStages = saturatedAdd( totalAscensionStages, tier );
+            }
+        }
+        message += "\nAscended Doctrines: " + formatNumber( ascendedDoctrines ) + " / " + formatNumber( upgradeCount );
+        message += "\nTotal Ascension Stages: " + formatNumber( totalAscensionStages );
 
         const StewardGoal stewardGoal = findStewardGoal( playerProfile );
         if ( stewardGoal.id < upgradeCount ) {
@@ -2704,7 +2951,9 @@ uint64_t fheroes2::RPG::creatureAttackDoctrineModifier( const PlayerColor color 
         return 0;
     }
 
-    return saturatedAdd( profile->ranks[ARMS_TRAINING], profile->ranks[VETERAN_CORE] );
+    const uint64_t base = saturatedAdd( profile->ranks[ARMS_TRAINING], profile->ranks[VETERAN_CORE] );
+    const uint64_t ascension = static_cast<uint64_t>( ascensionChannelBonus( *profile, AscensionChannel::ATTACK ) );
+    return saturatedAdd( base, ascension );
 }
 
 uint64_t fheroes2::RPG::creatureDefenseDoctrineModifier( const PlayerColor color )
@@ -2714,7 +2963,9 @@ uint64_t fheroes2::RPG::creatureDefenseDoctrineModifier( const PlayerColor color
         return 0;
     }
 
-    return saturatedAdd( profile->ranks[ARMOR_TRAINING], profile->ranks[VETERAN_CORE] );
+    const uint64_t base = saturatedAdd( profile->ranks[ARMOR_TRAINING], profile->ranks[VETERAN_CORE] );
+    const uint64_t ascension = static_cast<uint64_t>( ascensionChannelBonus( *profile, AscensionChannel::DEFENSE ) );
+    return saturatedAdd( base, ascension );
 }
 
 uint32_t fheroes2::RPG::creatureAttackBonus( const PlayerColor color )
@@ -2744,7 +2995,10 @@ int fheroes2::RPG::luckBonus( const PlayerColor color )
 double fheroes2::RPG::lifeStealPercent( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
-    return profile == nullptr ? 0.0 : static_cast<double>( effect( BLOOD_DRINKER, profile->ranks[BLOOD_DRINKER] ) );
+    return profile == nullptr
+               ? 0.0
+               : static_cast<double>( effect( BLOOD_DRINKER, profile->ranks[BLOOD_DRINKER] )
+                                      + ascensionChannelBonus( *profile, AscensionChannel::LIFE_STEAL ) );
 }
 
 double fheroes2::RPG::killHealPercent( const PlayerColor color )
@@ -2756,19 +3010,29 @@ double fheroes2::RPG::killHealPercent( const PlayerColor color )
 double fheroes2::RPG::regenerationPercent( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
-    return profile == nullptr ? 0.0 : static_cast<double>( effect( REGENERATION, profile->ranks[REGENERATION] ) );
+    return profile == nullptr
+               ? 0.0
+               : static_cast<double>( effect( REGENERATION, profile->ranks[REGENERATION] )
+                                      + ascensionChannelBonus( *profile, AscensionChannel::REGENERATION ) );
 }
 
 double fheroes2::RPG::criticalChance( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
-    return profile == nullptr ? 0.0 : static_cast<double>( effect( CRITICAL_TRAINING, profile->ranks[CRITICAL_TRAINING] ) );
+    return profile == nullptr
+               ? 0.0
+               : static_cast<double>( std::min<long double>(
+                     100.0L, effect( CRITICAL_TRAINING, profile->ranks[CRITICAL_TRAINING] )
+                                 + ascensionChannelBonus( *profile, AscensionChannel::CRITICAL_CHANCE ) ) );
 }
 
 double fheroes2::RPG::criticalDamageBonusPercent( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
-    return profile == nullptr ? 50.0 : 50.0 + static_cast<double>( effect( BRUTAL_CRITICALS, profile->ranks[BRUTAL_CRITICALS] ) );
+    return profile == nullptr
+               ? 50.0
+               : 50.0 + static_cast<double>( effect( BRUTAL_CRITICALS, profile->ranks[BRUTAL_CRITICALS] )
+                                             + ascensionChannelBonus( *profile, AscensionChannel::CRITICAL_DAMAGE ) );
 }
 
 double fheroes2::RPG::expectedCriticalDamageMultiplier( const PlayerColor color )
@@ -2789,7 +3053,11 @@ double fheroes2::RPG::sustainValuePercent( const PlayerColor color )
 double fheroes2::RPG::evasionChance( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
-    return profile == nullptr ? 0.0 : static_cast<double>( effect( EVASION, profile->ranks[EVASION] ) );
+    return profile == nullptr
+               ? 0.0
+               : static_cast<double>( std::min<long double>(
+                     100.0L, effect( EVASION, profile->ranks[EVASION] )
+                                 + ascensionChannelBonus( *profile, AscensionChannel::EVASION ) ) );
 }
 
 double fheroes2::RPG::rangedMeleePenaltyRecoveryPercent( const PlayerColor color )
@@ -2807,6 +3075,7 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
 
     long double attackBonus = 0;
     if ( attackProfile != nullptr ) {
+        attackBonus += ascensionChannelBonus( *attackProfile, AscensionChannel::PHYSICAL_DAMAGE );
         attackBonus += effect( FEROCITY, attackProfile->ranks[FEROCITY] );
         attackBonus += effect( ranged ? MARKSMAN : BRAWLER, attackProfile->ranks[ranged ? MARKSMAN : BRAWLER] );
 
@@ -2843,6 +3112,7 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
 
     long double defenseReduction = 0;
     if ( defenseProfile != nullptr ) {
+        defenseReduction += ascensionChannelBonus( *defenseProfile, AscensionChannel::PHYSICAL_REDUCTION );
         defenseReduction += effect( IRON_SKIN, defenseProfile->ranks[IRON_SKIN] );
         defenseReduction += effect( ranged ? ARROW_WARD : MELEE_GUARD, defenseProfile->ranks[ranged ? ARROW_WARD : MELEE_GUARD] );
 
@@ -2864,7 +3134,9 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
     // can become invulnerable through rank stacking.
     defenseReduction = std::min<long double>( defenseReduction, 70.0L );
     if ( attackProfile != nullptr && defenseReduction > 0 ) {
-        const long double piercing = effect( ARMOR_PIERCING, attackProfile->ranks[ARMOR_PIERCING] );
+        const long double piercing = std::min<long double>(
+            100.0L, effect( ARMOR_PIERCING, attackProfile->ranks[ARMOR_PIERCING] )
+                       + ascensionChannelBonus( *attackProfile, AscensionChannel::ARMOR_PIERCING ) );
         defenseReduction *= 1.0L - piercing / 100.0L;
     }
 
@@ -2877,8 +3149,16 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
     const Profile * defenseProfile = getProfile( defender );
     const size_t specialization = spellSpecializationId( spellId );
 
-    long double spellBonus = attackProfile == nullptr ? 0 : effect( SORCERY, attackProfile->ranks[SORCERY] );
-    long double defenseReduction = defenseProfile == nullptr ? 0 : effect( SPELL_WARD, defenseProfile->ranks[SPELL_WARD] );
+    long double spellBonus
+        = attackProfile == nullptr
+              ? 0
+              : effect( SORCERY, attackProfile->ranks[SORCERY] )
+                    + ascensionChannelBonus( *attackProfile, AscensionChannel::SPELL_DAMAGE );
+    long double defenseReduction
+        = defenseProfile == nullptr
+              ? 0
+              : effect( SPELL_WARD, defenseProfile->ranks[SPELL_WARD] )
+                    + ascensionChannelBonus( *defenseProfile, AscensionChannel::SPELL_REDUCTION );
 
     if ( specialization != upgradeCount ) {
         if ( attackProfile != nullptr ) {
@@ -2896,7 +3176,9 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
     // safety ceiling before Arcane Piercing.
     defenseReduction = std::min<long double>( defenseReduction, 70.0L );
     if ( attackProfile != nullptr && defenseReduction > 0 ) {
-        const long double piercing = effect( ARCANE_PIERCING, attackProfile->ranks[ARCANE_PIERCING] );
+        const long double piercing = std::min<long double>(
+            100.0L, effect( ARCANE_PIERCING, attackProfile->ranks[ARCANE_PIERCING] )
+                       + ascensionChannelBonus( *attackProfile, AscensionChannel::ARCANE_PIERCING ) );
         defenseReduction *= 1.0L - piercing / 100.0L;
     }
 
