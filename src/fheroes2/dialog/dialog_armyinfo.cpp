@@ -206,21 +206,26 @@ namespace
         }
 
         const ArmyTroop * armyTroop = getRpgArmyTroop( troop );
-        const uint64_t doctrineModifier
-            = armyTroop != nullptr && troop.isAffectedByMorale()
-                  ? static_cast<uint64_t>( std::max( 0, fheroes2::RPG::moraleBonus( armyTroop->GetColor() ) ) )
-                  : 0;
+        uint64_t doctrineModifier = 0;
+        if ( armyTroop != nullptr && troop.isAffectedByMorale() ) {
+            const int finalMorale = Morale::Normalize( normalMorale + fheroes2::RPG::moraleBonus( armyTroop->GetColor() ) );
+            doctrineModifier = static_cast<uint64_t>( std::max( 0, finalMorale - normalMorale ) );
+        }
 
         return appendFlatRpgModifier( Morale::String( normalMorale ), doctrineModifier );
     }
 
     std::string formatLuckWithRpgModifier( const Troop & troop )
     {
+        const int normalLuck = troop.GetLuck();
         const ArmyTroop * armyTroop = getRpgArmyTroop( troop );
-        const uint64_t doctrineModifier
-            = armyTroop == nullptr ? 0 : static_cast<uint64_t>( std::max( 0, fheroes2::RPG::luckBonus( armyTroop->GetColor() ) ) );
+        uint64_t doctrineModifier = 0;
+        if ( armyTroop != nullptr ) {
+            const int finalLuck = std::clamp( normalLuck + fheroes2::RPG::luckBonus( armyTroop->GetColor() ), -3, 3 );
+            doctrineModifier = static_cast<uint64_t>( std::max( 0, finalLuck - normalLuck ) );
+        }
 
-        return appendFlatRpgModifier( Luck::String( troop.GetLuck() ), doctrineModifier );
+        return appendFlatRpgModifier( Luck::String( normalLuck ), doctrineModifier );
     }
 
     void DrawMonsterStats( const fheroes2::Point & dst, const Troop & troop, fheroes2::Display & display )
