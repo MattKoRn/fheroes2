@@ -16,6 +16,7 @@
 #include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "audio_manager.h"
 #include "color.h"
@@ -104,9 +105,9 @@ namespace
         "EV", "MP", "CQ", "UY", "RT"
     };
     constexpr std::array<const char *, upgradeCount> upgradeDetails{
-        "Adds +1 Attack per rank to every creature stack controlled by this RPG profile with no doctrine cap.",
-        "Adds +1 Defense per rank to every creature stack controlled by this RPG profile with no doctrine cap.",
-        "Adds +1 Attack and +1 Defense per rank to every creature stack with no doctrine cap. Its ranks cost more because both stats increase together.",
+        "Adds open-ended creature Attack with diminishing returns. Rank 1 grants a full +1 Attack; later ranks still improve the underlying curve but each rank contributes less than the previous one.",
+        "Adds open-ended creature Defense with diminishing returns. Rank 1 grants a full +1 Defense; later ranks still improve the underlying curve but each rank contributes less than the previous one.",
+        "Adds open-ended Attack and Defense with diminishing returns. Rank 1 grants a full +1 to both stats; later ranks add progressively less. Its ranks cost more because both stats grow together.",
         "Whenever one of your creature stacks deals attack damage, it heals for a logarithmically scaling percentage of the actual damage dealt with no doctrine cap. Healing is still limited by the stack's missing hit points and cannot resurrect killed creatures.",
         "Whenever one of your attacks kills creatures, the attacking stack heals for a logarithmically scaling percentage of the slain creatures' hit points with no doctrine cap. Healing is still limited by missing hit points and cannot resurrect creatures already lost from that stack.",
 
@@ -185,7 +186,60 @@ namespace
         TRICKSTER
     };
 
+    enum class EliteMutation
+    {
+        VAMPIRIC,
+        BERSERKER,
+        ARMORED,
+        ARCANE_SHIELDED,
+        REGENERATING,
+        DEADLY,
+        ELUSIVE,
+        PIERCING,
+        UNSTABLE_MAGIC,
+        WARFORGED
+    };
+
     constexpr std::array<const char *, 5> rivalArchetypeNames{ "Warlord", "Predator", "Arcanist", "Sentinel", "Trickster" };
+    constexpr std::array<EliteMutation, 10> eliteMutationPool{
+        EliteMutation::VAMPIRIC, EliteMutation::BERSERKER, EliteMutation::ARMORED, EliteMutation::ARCANE_SHIELDED,
+        EliteMutation::REGENERATING, EliteMutation::DEADLY, EliteMutation::ELUSIVE, EliteMutation::PIERCING,
+        EliteMutation::UNSTABLE_MAGIC, EliteMutation::WARFORGED
+    };
+
+    const char * eliteMutationName( const EliteMutation mutation )
+    {
+        switch ( mutation ) {
+        case EliteMutation::VAMPIRIC: return "Vampiric";
+        case EliteMutation::BERSERKER: return "Berserker";
+        case EliteMutation::ARMORED: return "Armored";
+        case EliteMutation::ARCANE_SHIELDED: return "Arcane-Shielded";
+        case EliteMutation::REGENERATING: return "Regenerating";
+        case EliteMutation::DEADLY: return "Deadly";
+        case EliteMutation::ELUSIVE: return "Elusive";
+        case EliteMutation::PIERCING: return "Piercing";
+        case EliteMutation::UNSTABLE_MAGIC: return "Unstable Magic";
+        case EliteMutation::WARFORGED: return "Warforged";
+        default: return "Unknown";
+        }
+    }
+
+    const char * eliteMutationDescription( const EliteMutation mutation )
+    {
+        switch ( mutation ) {
+        case EliteMutation::VAMPIRIC: return "+8% life steal";
+        case EliteMutation::BERSERKER: return "+10% physical damage";
+        case EliteMutation::ARMORED: return "+8% physical reduction";
+        case EliteMutation::ARCANE_SHIELDED: return "+8% spell reduction";
+        case EliteMutation::REGENERATING: return "+5% turn regeneration";
+        case EliteMutation::DEADLY: return "+4% critical chance and +10% critical bonus damage";
+        case EliteMutation::ELUSIVE: return "+6% Evasion chance";
+        case EliteMutation::PIERCING: return "+10% Armor and Arcane Piercing";
+        case EliteMutation::UNSTABLE_MAGIC: return "+12% damaging-spell power";
+        case EliteMutation::WARFORGED: return "+3 Attack and +3 Defense";
+        default: return "No effect";
+        }
+    }
 
     uint64_t consumeAffordableLevelsWithCarry( Profile & profile );
 
@@ -193,6 +247,7 @@ namespace
     std::map<PlayerColor, Profile> enemyProfiles;
     std::set<PlayerColor> eliteEnemyColors;
     std::map<PlayerColor, RivalArchetype> eliteRivalArchetypes;
+    std::map<PlayerColor, std::vector<EliteMutation>> eliteRivalMutations;
     std::set<uint64_t> visitedActionTiles;
     PlayerColor activePlayerColor = PlayerColor::NONE;
 
@@ -260,6 +315,28 @@ namespace
     size_t eliteRivalFocusHallLimit( const uint64_t level )
     {
         return 4 + static_cast<size_t>( std::min<uint64_t>( 2, prestigeRankForLevel( level ) / 2 ) );
+    }
+
+    size_t eliteRivalMutationCount( const uint64_t level )
+    {
+        // Elite kingdoms always have one mutation. Deep Prestige adds a second and third mutation
+        // without letting the modifier stack grow without bound.
+        return 1 + static_cast<size_t>( std::min<uint64_t>( 2, prestigeRankForLevel( level ) / 3 ) );
+    }
+
+    bool hasEliteMutation( const PlayerColor color, const EliteMutation mutation )
+    {
+        const auto rival = eliteRivalMutations.find( color );
+        if ( rival == eliteRivalMutations.end() ) {
+            return false;
+        }
+        return std::find( rival->second.begin(), rival->second.end(), mutation ) != rival->second.end();
+    }
+
+    size_t activeEliteMutationCount( const PlayerColor color )
+    {
+        const auto rival = eliteRivalMutations.find( color );
+        return rival == eliteRivalMutations.end() ? 0 : rival->second.size();
     }
 
     uint64_t rivalArchetypeHallBias( const RivalArchetype archetype, const size_t tab )
@@ -2280,6 +2357,7 @@ namespace
         std::string message = "ELITE RIVAL INTEL\n";
         message += "\nEncounter Chance / Hostile Kingdom: " + std::to_string( eliteRivalChanceForLevel( playerProfile.level ) ) + "%";
         message += "\nMaximum Coordinated Halls: " + formatNumber( eliteRivalFocusHallLimit( playerProfile.level ) );
+        message += "\nMutations per Elite: " + formatNumber( eliteRivalMutationCount( playerProfile.level ) );
         message += "\nElite Rivals This Map: " + formatNumber( eliteEnemyColors.size() );
 
         std::array<uint64_t, tabNames.size()> activityByTab{};
@@ -2313,8 +2391,26 @@ namespace
         message += "\nArcanist: MAGIC / WARDS pressure";
         message += "\nSentinel: DEFENSE / WARDS pressure";
         message += "\nTrickster: TACTICS / MASTERY pressure";
+
+        if ( !eliteRivalMutations.empty() ) {
+            message += "\n\nACTIVE ELITE MUTATIONS";
+            for ( const auto & [color, mutations] : eliteRivalMutations ) {
+                message += "\n" + Color::String( color ) + ": ";
+                for ( size_t index = 0; index < mutations.size(); ++index ) {
+                    if ( index > 0 ) {
+                        message += ", ";
+                    }
+                    message += eliteMutationName( mutations[index] );
+                }
+            }
+            message += "\n\nMUTATION EFFECTS";
+            for ( const EliteMutation mutation : eliteMutationPool ) {
+                message += "\n" + std::string( eliteMutationName( mutation ) ) + ": " + eliteMutationDescription( mutation );
+            }
+        }
+
         message += "\n\nElite focus also reads your recorded doctrine-trigger history, so frequently used halls are more likely to be recognized.";
-        message += "\nRivals still use only doctrines you have purchased and every generated rank remains inside the existing 115% envelope.";
+        message += "\nRivals still use only doctrines you have purchased and every generated rank remains inside the existing 115% envelope. Mutations are separate encounter affixes and never create doctrine ranks.";
 
         fheroes2::showStandardTextMessage( "Elite Rival Intel", std::move( message ), Dialog::ZERO );
     }
@@ -2351,6 +2447,7 @@ namespace
         message += "\nSteward Planning Horizon: " + formatNumber( stewardPlanningHorizon( playerProfile.level ) ) + " ranks";
         message += "\nElite Rival Chance / Hostile Kingdom: " + std::to_string( eliteRivalChanceForLevel( playerProfile.level ) ) + "%";
         message += "\nElite Rival Focus Limit: " + formatNumber( eliteRivalFocusHallLimit( playerProfile.level ) ) + " halls";
+        message += "\nElite Mutation Count: " + formatNumber( eliteRivalMutationCount( playerProfile.level ) ) + " per Elite";
         uint64_t totalTriggers = 0;
         for ( const uint64_t uses : playerProfile.useCounts ) {
             totalTriggers = saturatedAdd( totalTriggers, uses );
@@ -2502,6 +2599,7 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     enemyProfiles.clear();
     eliteEnemyColors.clear();
     eliteRivalArchetypes.clear();
+    eliteRivalMutations.clear();
     visitedActionTiles.clear();
     playerProfile = {};
     if ( playerColor == PlayerColor::NONE ) {
@@ -2747,6 +2845,13 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
             const RivalArchetype archetype = static_cast<RivalArchetype>( archetypeRoll( rng ) + 1 );
             eliteEnemyColors.insert( player->GetColor() );
             eliteRivalArchetypes[player->GetColor()] = archetype;
+
+            std::array<EliteMutation, eliteMutationPool.size()> mutationPool = eliteMutationPool;
+            std::shuffle( mutationPool.begin(), mutationPool.end(), rng );
+            const size_t mutationCount = std::min( eliteRivalMutationCount( playerProfile.level ), mutationPool.size() );
+            auto & mutations = eliteRivalMutations[player->GetColor()];
+            mutations.assign( mutationPool.begin(), mutationPool.begin() + mutationCount );
+
             enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 100, 115, true, true, true, archetype ) );
         }
         else {
@@ -2765,6 +2870,7 @@ void fheroes2::RPG::endMap()
     enemyProfiles.clear();
     eliteEnemyColors.clear();
     eliteRivalArchetypes.clear();
+    eliteRivalMutations.clear();
     visitedActionTiles.clear();
 }
 
@@ -2838,6 +2944,8 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
         const long double prestigeEliteBonus
             = std::min<long double>( 0.15L, static_cast<long double>( prestigeRankForLevel( playerProfile.level ) ) * 0.01L );
         base *= 1.35L + prestigeEliteBonus;
+        // Each active mutation increases the reward for defeating the more dangerous Elite.
+        base *= 1.0L + static_cast<long double>( activeEliteMutationCount( opponent ) ) * 0.05L;
     }
     const long double earned = base * challenge;
     static_cast<void>( addExperience( color, static_cast<uint64_t>( std::min( earned, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) ),
@@ -3004,7 +3112,8 @@ uint64_t fheroes2::RPG::creatureAttackDoctrineModifier( const PlayerColor color 
     const uint64_t base
         = saturatedAdd( diminishingFlatStatBonus( profile->ranks[ARMS_TRAINING] ), diminishingFlatStatBonus( profile->ranks[VETERAN_CORE] ) );
     const uint64_t ascension = static_cast<uint64_t>( ascensionChannelBonus( *profile, AscensionChannel::ATTACK ) );
-    return saturatedAdd( base, ascension );
+    const uint64_t mutation = hasEliteMutation( color, EliteMutation::WARFORGED ) ? 3 : 0;
+    return saturatedAdd( saturatedAdd( base, ascension ), mutation );
 }
 
 uint64_t fheroes2::RPG::creatureDefenseDoctrineModifier( const PlayerColor color )
@@ -3017,7 +3126,8 @@ uint64_t fheroes2::RPG::creatureDefenseDoctrineModifier( const PlayerColor color
     const uint64_t base
         = saturatedAdd( diminishingFlatStatBonus( profile->ranks[ARMOR_TRAINING] ), diminishingFlatStatBonus( profile->ranks[VETERAN_CORE] ) );
     const uint64_t ascension = static_cast<uint64_t>( ascensionChannelBonus( *profile, AscensionChannel::DEFENSE ) );
-    return saturatedAdd( base, ascension );
+    const uint64_t mutation = hasEliteMutation( color, EliteMutation::WARFORGED ) ? 3 : 0;
+    return saturatedAdd( saturatedAdd( base, ascension ), mutation );
 }
 
 uint32_t fheroes2::RPG::creatureAttackBonus( const PlayerColor color )
@@ -3050,7 +3160,8 @@ double fheroes2::RPG::lifeStealPercent( const PlayerColor color )
     return profile == nullptr
                ? 0.0
                : static_cast<double>( effect( BLOOD_DRINKER, profile->ranks[BLOOD_DRINKER] )
-                                      + ascensionChannelBonus( *profile, AscensionChannel::LIFE_STEAL ) );
+                                      + ascensionChannelBonus( *profile, AscensionChannel::LIFE_STEAL )
+                                      + ( hasEliteMutation( color, EliteMutation::VAMPIRIC ) ? 8.0L : 0.0L ) );
 }
 
 double fheroes2::RPG::killHealPercent( const PlayerColor color )
@@ -3065,7 +3176,8 @@ double fheroes2::RPG::regenerationPercent( const PlayerColor color )
     return profile == nullptr
                ? 0.0
                : static_cast<double>( effect( REGENERATION, profile->ranks[REGENERATION] )
-                                      + ascensionChannelBonus( *profile, AscensionChannel::REGENERATION ) );
+                                      + ascensionChannelBonus( *profile, AscensionChannel::REGENERATION )
+                                      + ( hasEliteMutation( color, EliteMutation::REGENERATING ) ? 5.0L : 0.0L ) );
 }
 
 double fheroes2::RPG::criticalChance( const PlayerColor color )
@@ -3075,7 +3187,8 @@ double fheroes2::RPG::criticalChance( const PlayerColor color )
                ? 0.0
                : static_cast<double>( std::min<long double>(
                      100.0L, effect( CRITICAL_TRAINING, profile->ranks[CRITICAL_TRAINING] )
-                                 + ascensionChannelBonus( *profile, AscensionChannel::CRITICAL_CHANCE ) ) );
+                                 + ascensionChannelBonus( *profile, AscensionChannel::CRITICAL_CHANCE )
+                                 + ( hasEliteMutation( color, EliteMutation::DEADLY ) ? 4.0L : 0.0L ) ) );
 }
 
 double fheroes2::RPG::criticalDamageBonusPercent( const PlayerColor color )
@@ -3084,7 +3197,8 @@ double fheroes2::RPG::criticalDamageBonusPercent( const PlayerColor color )
     return profile == nullptr
                ? 50.0
                : 50.0 + static_cast<double>( effect( BRUTAL_CRITICALS, profile->ranks[BRUTAL_CRITICALS] )
-                                             + ascensionChannelBonus( *profile, AscensionChannel::CRITICAL_DAMAGE ) );
+                                             + ascensionChannelBonus( *profile, AscensionChannel::CRITICAL_DAMAGE )
+                                             + ( hasEliteMutation( color, EliteMutation::DEADLY ) ? 10.0L : 0.0L ) );
 }
 
 double fheroes2::RPG::expectedCriticalDamageMultiplier( const PlayerColor color )
@@ -3109,7 +3223,8 @@ double fheroes2::RPG::evasionChance( const PlayerColor color )
                ? 0.0
                : static_cast<double>( std::min<long double>(
                      100.0L, effect( EVASION, profile->ranks[EVASION] )
-                                 + ascensionChannelBonus( *profile, AscensionChannel::EVASION ) ) );
+                                 + ascensionChannelBonus( *profile, AscensionChannel::EVASION )
+                                 + ( hasEliteMutation( color, EliteMutation::ELUSIVE ) ? 6.0L : 0.0L ) ) );
 }
 
 double fheroes2::RPG::rangedMeleePenaltyRecoveryPercent( const PlayerColor color )
@@ -3128,6 +3243,9 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
     long double attackBonus = 0;
     if ( attackProfile != nullptr ) {
         attackBonus += ascensionChannelBonus( *attackProfile, AscensionChannel::PHYSICAL_DAMAGE );
+        if ( hasEliteMutation( attacker, EliteMutation::BERSERKER ) ) {
+            attackBonus += 10.0L;
+        }
         attackBonus += effect( FEROCITY, attackProfile->ranks[FEROCITY] );
         attackBonus += effect( ranged ? MARKSMAN : BRAWLER, attackProfile->ranks[ranged ? MARKSMAN : BRAWLER] );
 
@@ -3165,6 +3283,9 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
     long double defenseReduction = 0;
     if ( defenseProfile != nullptr ) {
         defenseReduction += ascensionChannelBonus( *defenseProfile, AscensionChannel::PHYSICAL_REDUCTION );
+        if ( hasEliteMutation( defender, EliteMutation::ARMORED ) ) {
+            defenseReduction += 8.0L;
+        }
         defenseReduction += effect( IRON_SKIN, defenseProfile->ranks[IRON_SKIN] );
         defenseReduction += effect( ranged ? ARROW_WARD : MELEE_GUARD, defenseProfile->ranks[ranged ? ARROW_WARD : MELEE_GUARD] );
 
@@ -3188,7 +3309,8 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
     if ( attackProfile != nullptr && defenseReduction > 0 ) {
         const long double piercing = std::min<long double>(
             100.0L, effect( ARMOR_PIERCING, attackProfile->ranks[ARMOR_PIERCING] )
-                       + ascensionChannelBonus( *attackProfile, AscensionChannel::ARMOR_PIERCING ) );
+                       + ascensionChannelBonus( *attackProfile, AscensionChannel::ARMOR_PIERCING )
+                       + ( hasEliteMutation( attacker, EliteMutation::PIERCING ) ? 10.0L : 0.0L ) );
         defenseReduction *= 1.0L - piercing / 100.0L;
     }
 
@@ -3205,12 +3327,14 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
         = attackProfile == nullptr
               ? 0
               : effect( SORCERY, attackProfile->ranks[SORCERY] )
-                    + ascensionChannelBonus( *attackProfile, AscensionChannel::SPELL_DAMAGE );
+                    + ascensionChannelBonus( *attackProfile, AscensionChannel::SPELL_DAMAGE )
+                    + ( hasEliteMutation( attacker, EliteMutation::UNSTABLE_MAGIC ) ? 12.0L : 0.0L );
     long double defenseReduction
         = defenseProfile == nullptr
               ? 0
               : effect( SPELL_WARD, defenseProfile->ranks[SPELL_WARD] )
-                    + ascensionChannelBonus( *defenseProfile, AscensionChannel::SPELL_REDUCTION );
+                    + ascensionChannelBonus( *defenseProfile, AscensionChannel::SPELL_REDUCTION )
+                    + ( hasEliteMutation( defender, EliteMutation::ARCANE_SHIELDED ) ? 8.0L : 0.0L );
 
     if ( specialization != upgradeCount ) {
         if ( attackProfile != nullptr ) {
@@ -3230,7 +3354,8 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
     if ( attackProfile != nullptr && defenseReduction > 0 ) {
         const long double piercing = std::min<long double>(
             100.0L, effect( ARCANE_PIERCING, attackProfile->ranks[ARCANE_PIERCING] )
-                       + ascensionChannelBonus( *attackProfile, AscensionChannel::ARCANE_PIERCING ) );
+                       + ascensionChannelBonus( *attackProfile, AscensionChannel::ARCANE_PIERCING )
+                       + ( hasEliteMutation( attacker, EliteMutation::PIERCING ) ? 10.0L : 0.0L ) );
         defenseReduction *= 1.0L - piercing / 100.0L;
     }
 
