@@ -866,9 +866,9 @@ namespace
         for ( size_t id = 0; id < upgradeCount; ++id ) {
             const uint64_t rank = profile.ranks[id];
 
-            // A stored rank must have produced a real mechanical increase when it was bought.
-            // This rejects parseable corruption that pushes hard safety-capped mechanics beyond
-            // their meaningful limit, which could otherwise mint saturated refunds during a respec.
+            // A stored rank must either increase the primary mechanic or remain within the
+            // four-stage Ascension progression window. This rejects corrupted ranks beyond the
+            // last meaningful milestone on a hard-capped doctrine.
             if ( !storedDoctrineRankIsReachable( id, rank ) ) {
                 return false;
             }
@@ -942,7 +942,7 @@ namespace
 
     bool buy( Profile & profile, const size_t id )
     {
-        if ( !doctrineCanAdvance( id, profile.ranks[id] )
+        if ( id >= upgradeCount || !doctrineCanAdvance( id, profile.ranks[id] )
              || ( id == BRUTAL_CRITICALS && profile.ranks[CRITICAL_TRAINING] == 0 ) ) {
             return false;
         }
@@ -2017,7 +2017,7 @@ namespace
             }
         }
         else {
-            message += "\nPurchase status: MAX - maximum effective rank reached.";
+            message += "\nPurchase status: MAX - no primary growth or Ascension milestone remains.";
         }
         const uint64_t invested = totalSpentPointsOnUpgrade( playerProfile, id );
         if ( invested > 0 ) {
@@ -2061,6 +2061,10 @@ namespace
             const bool prerequisiteMet = id != BRUTAL_CRITICALS || playerProfile.ranks[CRITICAL_TRAINING] > 0;
 
             message += "\n  " + std::string( upgrades[id].name ) + " - Rank " + formatNumber( rank ) + ": " + shortEffectSummary( id, rank );
+            const uint8_t ascensionTier = ascensionTierForRank( rank );
+            if ( ascensionTier > 0 ) {
+                message += " [" + std::string( ascensionTierLabel( ascensionTier ) ) + ": " + ascensionNames[id] + "]";
+            }
             if ( !canAdvance ) {
                 message += " [MAX]";
             }
