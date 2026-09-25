@@ -1547,8 +1547,10 @@ namespace
         long double stewardPickValue = 0.0L;
         for ( size_t id = 0; id < upgradeCount; ++id ) {
             const long double marginal = autoBuyMarginalReturn( playerProfile, id );
-            if ( marginal > stewardPickValue ) {
-                stewardPickValue = marginal;
+            const bool pursuingGoal = id == stewardGoal.id && playerProfile.ranks[id] < stewardGoal.targetRank;
+            const long double candidate = marginal * ( pursuingGoal ? 1.18L : 1.0L );
+            if ( candidate > stewardPickValue ) {
+                stewardPickValue = candidate;
                 stewardPick = id;
             }
         }
