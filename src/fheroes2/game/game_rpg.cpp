@@ -702,7 +702,7 @@ namespace
         return System::concatPath( fheroes2::RPG::dataDirectory(), "rpg_profile.dat" );
     }
 
-    bool readProfile( const std::string & path, Profile & profile, std::set<uint64_t> & visitedTiles )
+    bool readProfile( const std::string & path, Profile & profile, std::set<uint64_t> & visitedTiles, bool * needsMigration = nullptr )
     {
         std::ifstream input( path );
         int version = 0;
@@ -812,10 +812,13 @@ namespace
 
         profile = std::move( candidate );
         visitedTiles = std::move( candidateVisited );
+        if ( needsMigration != nullptr ) {
+            *needsMigration = version < profileVersion;
+        }
         return true;
     }
 
-    void saveProfile( const bool discardInvalidPrimary = false )
+    void saveProfile( const bool preserveRecoveryBackup = false )
     {
         // Never replace a recoverable on-disk profile with an impossible runtime state. If a
         // future gameplay bug breaks one of the closed RPG ledgers, keep the last good snapshot.
@@ -858,11 +861,11 @@ namespace
         const bool hadOriginal = System::IsFile( path );
         bool movedOriginalToBackup = false;
         if ( hadOriginal ) {
-            if ( discardInvalidPrimary ) {
-                // Recovery loaded a valid fallback while the primary file itself is corrupt.
-                // Never rotate that corrupt primary over the known-good persistent backup.
+            if ( preserveRecoveryBackup ) {
+                // Recovery loaded a valid fallback. Never rotate an invalid or older primary
+                // over the known-good persistent backup.
                 if ( !System::Unlink( path ) ) {
-                    ERROR_LOG( "Unable to remove invalid RPG profile." )
+                    ERROR_LOG( "Unable to remove superseded RPG profile." )
                     return;
                 }
             }
@@ -1366,10 +1369,11 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
         return firstTime > secondTime;
     } );
     std::string loadedProfilePath;
+    bool loadedProfileNeedsMigration = false;
     for ( const std::string & candidate : profileCandidates ) {
         Profile candidateProfile;
         std::set<uint64_t> candidateVisited;
-        if ( readProfile( candidate, candidateProfile, candidateVisited ) ) {
+        if ( readProfile( candidate, candidateProfile, candidateVisited, &loadedProfileNeedsMigration ) ) {
             playerProfile = std::move( candidateProfile );
             visitedActionTiles = std::move( candidateVisited );
             loadedProfilePath = candidate;
@@ -1377,19 +1381,22 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
         }
     }
 
-    // If recovery had to fall back from a corrupt primary, do not let the recovery save
-    // rotate that corrupt file over a known-good backup. Validation uses temporary outputs
-    // so probing the primary cannot disturb the recovered profile or its visited-site set.
-    bool discardInvalidPrimary = false;
+    // A selected backup must survive recovery even if the primary is an older valid file.
+    // An invalid primary must also never replace the backup. When needed, validation uses
+    // temporary outputs so probing the primary cannot disturb the recovered profile or visited-site set.
+    bool preserveRecoveryBackup = loadedProfilePath == path + ".bak";
     if ( !loadedProfilePath.empty() && loadedProfilePath != path && System::IsFile( path ) ) {
         Profile primaryProfile;
         std::set<uint64_t> primaryVisited;
-        discardInvalidPrimary = !readProfile( path, primaryProfile, primaryVisited );
+        preserveRecoveryBackup = preserveRecoveryBackup || !readProfile( path, primaryProfile, primaryVisited );
     }
 
-    // Persist migrations and recovered snapshots immediately. In particular, this prevents
-    // a version-5 profile from being refunded repeatedly if the game exits before the first XP award.
-    saveProfile( discardInvalidPrimary );
+    // Persist new profiles, migrations and recovered snapshots immediately. An unchanged
+    // current primary already has a durable copy; rewriting it on every map entry would
+    // needlessly replace the older recovery backup with an identical snapshot.
+    if ( loadedProfilePath != path || loadedProfileNeedsMigration ) {
+        saveProfile( preserveRecoveryBackup );
+    }
 
     // Temporary enemy RPG builds are deterministic for the same map/profile level and
     // scale only upgrades the player has actually purchased. This avoids fresh profiles

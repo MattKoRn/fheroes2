@@ -1254,7 +1254,7 @@ namespace
                 return 100.0;
             }
 
-            const int rpgMorale = std::clamp( fheroes2::RPG::moraleBonus( hero.GetColor() ), 0, Morale::BLOOD );
+            const int rpgMorale = std::clamp<int>( fheroes2::RPG::moraleBonus( hero.GetColor() ), 0, Morale::BLOOD );
             const int remainingMorale = Morale::BLOOD - rpgMorale;
             return 100.0 + 900.0 * remainingMorale / Morale::BLOOD;
         }
@@ -1266,7 +1266,7 @@ namespace
                 return 100.0;
             }
 
-            const int rpgLuck = std::clamp( fheroes2::RPG::luckBonus( hero.GetColor() ), 0, Luck::IRISH );
+            const int rpgLuck = std::clamp<int>( fheroes2::RPG::luckBonus( hero.GetColor() ), 0, Luck::IRISH );
             const int remainingLuck = Luck::IRISH - rpgLuck;
             const double baseLuckValue = 100.0 + 400.0 * remainingLuck / Luck::IRISH;
             const double luckHeadroom = static_cast<double>( remainingLuck ) / Luck::IRISH;

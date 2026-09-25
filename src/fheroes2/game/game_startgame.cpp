@@ -37,6 +37,7 @@
 #include <limits>
 #include <memory>
 #include <ostream>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -248,6 +249,31 @@ namespace
         return static_cast<int32_t>( std::clamp<int64_t>( value, 0, std::numeric_limits<int32_t>::max() ) );
     }
 
+    constexpr uint64_t clampOfflineExperience( const long double value )
+    {
+        if ( value <= 0 ) {
+            return 0;
+        }
+        if ( value >= static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) {
+            return std::numeric_limits<uint64_t>::max();
+        }
+        return static_cast<uint64_t>( value );
+    }
+
+    static_assert( clampOfflineExperience( 1.9L ) == 1 );
+    static_assert( clampOfflineExperience( static_cast<long double>( std::numeric_limits<uint64_t>::max() ) )
+                   == std::numeric_limits<uint64_t>::max() );
+
+    constexpr uint64_t ceilOfflineHours( const uint64_t seconds )
+    {
+        return seconds / ( 60 * 60 ) + ( seconds % ( 60 * 60 ) != 0 ? 1 : 0 );
+    }
+
+    static_assert( ceilOfflineHours( 3600 ) == 1 );
+    static_assert( ceilOfflineHours( 3601 ) == 2 );
+    static_assert( ceilOfflineHours( static_cast<uint64_t>( std::numeric_limits<int64_t>::max() ) )
+                   == static_cast<uint64_t>( std::numeric_limits<int64_t>::max() ) / 3600 + 1 );
+
     bool loadOfflineProgressData( OfflineProgressData & data, bool * preserveRecoveryBackup = nullptr )
     {
         const auto loadFromPath = []( const std::string & candidatePath, OfflineProgressData & candidate ) {
@@ -256,6 +282,13 @@ namespace
                 return false;
             }
 
+        // Older snapshots were permissive and are normalized below. A current snapshot must
+        // be exactly one complete record: accepting duplicate, unknown or out-of-range fields
+        // could silently turn a damaged recovery candidate into extra offline rewards.
+        std::set<std::string> seenKeys;
+        bool hasDuplicateKey = false;
+        bool hasUnexpectedKey = false;
+        bool hasInvalidFunds = false;
         int version = 0;
         bool hasTimestamp = false;
         bool hasResources = false;
@@ -284,13 +317,16 @@ namespace
         bool hasCreatureReserve = false;
         bool hasCreatureRecruitCarry = false;
 
-        const auto readFunds = [&input]( Funds & funds ) {
+        const auto readFunds = [&input, &hasInvalidFunds]( Funds & funds ) {
             for ( const FundsMember member : offlineFundMembers ) {
                 int64_t value = 0;
                 if ( !( input >> value ) ) {
                     return false;
                 }
 
+                if ( value < 0 || value > std::numeric_limits<int32_t>::max() ) {
+                    hasInvalidFunds = true;
+                }
                 funds.*member = clampResourceValue( value );
             }
 
@@ -299,6 +335,9 @@ namespace
 
         std::string key;
         while ( input >> key ) {
+            if ( !seenKeys.insert( key ).second ) {
+                hasDuplicateKey = true;
+            }
             if ( key == "version" ) {
                 input >> version;
             }
@@ -319,7 +358,6 @@ namespace
                         return false;
                     }
 
-                    value = std::clamp<int64_t>( value, 0, offlineSecondsPerDay - 1 );
                 }
             }
             else if ( key == "homecoming_streak" ) {
@@ -392,30 +430,32 @@ namespace
             }
             else if ( key == "state_efficiency_percent" ) {
                 input >> candidate.stateEfficiencyPercent;
-                candidate.stateEfficiencyPercent = std::clamp<uint32_t>( candidate.stateEfficiencyPercent, 100, 150 );
                 hasStateEfficiency = true;
             }
             else if ( key == "supply_rush_meter" ) {
                 input >> candidate.supplyRushMeter;
-                candidate.supplyRushMeter = std::min<uint32_t>( candidate.supplyRushMeter, 99 );
                 hasSupplyRushMeter = true;
             }
             else if ( key == "creature_roster" ) {
+                hasUnexpectedKey = true;
                 hasCreatureRoster = true;
                 std::string ignoredLine;
                 std::getline( input, ignoredLine );
             }
             else if ( key == "creature_reserve" ) {
+                hasUnexpectedKey = true;
                 hasCreatureReserve = true;
                 std::string ignoredLine;
                 std::getline( input, ignoredLine );
             }
             else if ( key == "creature_recruit_carry" ) {
+                hasUnexpectedKey = true;
                 hasCreatureRecruitCarry = true;
                 std::string ignoredLine;
                 std::getline( input, ignoredLine );
             }
             else {
+                hasUnexpectedKey = true;
                 std::string ignoredLine;
                 std::getline( input, ignoredLine );
             }
@@ -423,6 +463,9 @@ namespace
             if ( !input ) {
                 return false;
             }
+        }
+        if ( !input.eof() ) {
+            return false;
         }
 
         const bool hasVersionSpecificFields
@@ -465,8 +508,33 @@ namespace
             return false;
         }
 
+        if ( version == 13 ) {
+            const bool hasInvalidCarry = std::any_of( candidate.carry.begin(), candidate.carry.end(),
+                                                      []( const int64_t value ) { return value < 0 || value >= offlineSecondsPerDay; } );
+            const bool hasInvalidKingdomState = candidate.stateCastles > 255 || candidate.stateTowns > 255 || candidate.stateHeroes > 255
+                                                || candidate.stateMines > 255 || candidate.stateArtifacts > 255
+                                                || candidate.stateEfficiencyPercent < 100 || candidate.stateEfficiencyPercent > 150;
+            const bool hasInvalidStreak = candidate.homecomingStreak == 0
+                                              ? candidate.lastHomecomingStreakUnix != 0 || candidate.lastHomecomingStreakDay != 0
+                                              : candidate.lastHomecomingStreakUnix <= 0 || candidate.lastHomecomingStreakUnix > candidate.lastSeenUnix
+                                                    || candidate.lastHomecomingStreakDay <= 0;
+            const bool hasInvalidContract = candidate.contractId == -1
+                                                ? candidate.contractProgress != 0 || candidate.contractTarget != 0
+                                                : candidate.contractId < 0 || candidate.contractId >= 5 || candidate.contractTarget == 0
+                                                      || candidate.contractTarget > 48;
+            if ( hasDuplicateKey || hasUnexpectedKey || hasInvalidFunds || hasInvalidCarry || hasInvalidKingdomState || hasInvalidStreak
+                 || hasInvalidContract || candidate.pendingResumeSeconds < 0 || candidate.treasureFragments > 4 || candidate.supplyRushMeter > 99 ) {
+                return false;
+            }
+        }
+
         // Normalize persistent counters before any arithmetic uses them. These limits are
         // structural invariants of the current format, not progression caps.
+        for ( int64_t & value : candidate.carry ) {
+            value = std::clamp<int64_t>( value, 0, offlineSecondsPerDay - 1 );
+        }
+        candidate.stateEfficiencyPercent = std::clamp<uint32_t>( candidate.stateEfficiencyPercent, 100, 150 );
+        candidate.supplyRushMeter = std::min<uint32_t>( candidate.supplyRushMeter, 99 );
         candidate.treasureFragments = std::min<uint32_t>( candidate.treasureFragments, 4 );
         candidate.pendingResumeSeconds = std::max<int64_t>( 0, candidate.pendingResumeSeconds );
         if ( version < 11 ) {
@@ -864,7 +932,7 @@ namespace
                 return;
             }
 
-            if ( returnDay == previousStreakDay + 1 ) {
+            if ( returnDay - previousStreakDay == 1 ) {
                 if ( data.homecomingStreak < std::numeric_limits<uint32_t>::max() ) {
                     ++data.homecomingStreak;
                 }
@@ -1049,7 +1117,8 @@ namespace
             return 0;
         }
 
-        const uint64_t elapsedHours = std::max<uint64_t>( 1, ( static_cast<uint64_t>( summary.elapsedSeconds ) + 60 * 60 - 1 ) / ( 60 * 60 ) );
+        const uint64_t seconds = static_cast<uint64_t>( summary.elapsedSeconds );
+        const uint64_t elapsedHours = std::max<uint64_t>( 1, ceilOfflineHours( seconds ) );
         const uint64_t resourceTypes = summary.productionRewards.GetValidItemsCount();
 
         switch ( contractId ) {
@@ -1203,8 +1272,11 @@ namespace
             }
 
             if ( eligibleCount > 0 ) {
-                const uint64_t seed = getOfflineEventSeed( previousLastSeenUnix,
-                                                            summary.elapsedSeconds + static_cast<int64_t>( data.treasureMapsCompleted + 1 ) * 7919 );
+                const int64_t mapOffset = static_cast<int64_t>( static_cast<uint64_t>( data.treasureMapsCompleted ) + 1 ) * 7919;
+                const int64_t eventSeconds = summary.elapsedSeconds > std::numeric_limits<int64_t>::max() - mapOffset
+                                                 ? std::numeric_limits<int64_t>::max()
+                                                 : summary.elapsedSeconds + mapOffset;
+                const uint64_t seed = getOfflineEventSeed( previousLastSeenUnix, eventSeconds );
                 const size_t selectedIndex = eligibleIndices[( seed >> 24 ) % eligibleCount];
                 const FundsMember member = offlineFundMembers[selectedIndex];
                 const int rewardPercent = getTreasureMapRewardPercent( mapId );
@@ -1459,7 +1531,7 @@ namespace
         const long double baselineDailyEquivalent = std::max<long double>( 2500.0L, dailyGoldEquivalent );
         const long double xpValue = baselineDailyEquivalent * summary.stateEfficiencyPercent / 100
                                     * static_cast<long double>( summary.elapsedSeconds ) / offlineSecondsPerDay + bonusEquivalent;
-        summary.xpEarned = static_cast<uint64_t>( std::min( xpValue, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) );
+        summary.xpEarned = clampOfflineExperience( xpValue );
         summary.xpEarned = fheroes2::RPG::addExperience( kingdom.GetColor(), summary.xpEarned, fheroes2::RPG::ExperienceKind::OFFLINE );
         data.resources = kingdom.GetFunds();
 
