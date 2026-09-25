@@ -760,6 +760,11 @@ namespace
                 marginalReturns[id] = autoBuyMarginalReturn( profile, id );
             };
 
+            if ( bestId == BLOOD_DRINKER || bestId == REAPER || bestId == REGENERATION ) {
+                refresh( BLOOD_DRINKER );
+                refresh( REAPER );
+                refresh( REGENERATION );
+            }
             if ( bestId == CRITICAL_TRAINING || bestId == BRUTAL_CRITICALS ) {
                 refresh( CRITICAL_TRAINING );
                 refresh( BRUTAL_CRITICALS );
@@ -767,6 +772,19 @@ namespace
             if ( bestId == MARKSMAN || bestId == CLOSE_QUARTERS ) {
                 refresh( MARKSMAN );
                 refresh( CLOSE_QUARTERS );
+            }
+            if ( bestId == EXECUTIONER || bestId == RUTHLESS ) {
+                refresh( EXECUTIONER );
+                refresh( RUTHLESS );
+            }
+            if ( bestId == FRENZY || bestId == LAST_STAND ) {
+                refresh( FRENZY );
+                refresh( LAST_STAND );
+            }
+            if ( bestId == OPENING_BLOW || bestId == DISCIPLINE || bestId == UNYIELDING ) {
+                refresh( OPENING_BLOW );
+                refresh( DISCIPLINE );
+                refresh( UNYIELDING );
             }
             if ( bestId == SORCERY || bestId == PYROMANCY || bestId == CRYOMANCY || bestId == STORMCRAFT || bestId == CATACLYSM
                  || bestId == ARCANE_PIERCING ) {
@@ -781,6 +799,13 @@ namespace
                 refresh( IRON_SKIN );
                 refresh( ARROW_WARD );
                 refresh( MELEE_GUARD );
+            }
+            if ( bestId == SPELL_WARD || bestId == FIRE_WARD || bestId == COLD_WARD || bestId == STORM_WARD || bestId == CATACLYSM_WARD ) {
+                refresh( SPELL_WARD );
+                refresh( FIRE_WARD );
+                refresh( COLD_WARD );
+                refresh( STORM_WARD );
+                refresh( CATACLYSM_WARD );
             }
         }
     }
