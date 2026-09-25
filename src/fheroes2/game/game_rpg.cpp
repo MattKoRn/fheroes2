@@ -504,6 +504,29 @@ namespace
         return 4.0L * std::log1p( static_cast<long double>( rank ) );
     }
 
+    long double diminishingFlatStatEffect( const uint64_t rank )
+    {
+        if ( rank == 0 ) {
+            return 0.0L;
+        }
+
+        // Flat combat stats used to be the only fully linear doctrines. Keep rank 1 worth one
+        // full point, then gradually reduce each later rank's marginal value without ever imposing
+        // a hard cap. The curve is intentionally gentler than the percentage-doctrine log curves.
+        constexpr long double softness = 25.0L;
+        return std::log1p( static_cast<long double>( rank ) / softness ) / std::log1p( 1.0L / softness );
+    }
+
+    uint64_t diminishingFlatStatBonus( const uint64_t rank )
+    {
+        const long double value = diminishingFlatStatEffect( rank );
+        if ( value <= 0.0L ) {
+            return 0;
+        }
+        return static_cast<uint64_t>( std::min<long double>(
+            static_cast<long double>( std::numeric_limits<uint64_t>::max() ), std::ceil( value - 1.0e-12L ) ) );
+    }
+
     long double effect( const size_t id, const uint64_t rank )
     {
         if ( rank == 0 ) {
@@ -514,9 +537,8 @@ namespace
         case ARMS_TRAINING:
         case ARMOR_TRAINING:
         case VETERAN_CORE:
-            // Flat combat stats are intentionally open-ended. The underlying engine accessors
-            // still clamp to their native integer storage limits.
-            return static_cast<long double>( rank );
+            // Flat stats remain open-ended, but later ranks contribute progressively less.
+            return diminishingFlatStatEffect( rank );
         case LEADERSHIP:
         case FORTUNE:
             // Heroes II only has three positive Morale/Luck steps. Additional ranks would have no
@@ -653,19 +675,19 @@ namespace
     const char * ascensionChannelDescription( const AscensionChannel channel )
     {
         switch ( channel ) {
-        case AscensionChannel::ATTACK: return "+1 creature Attack per Ascension stage";
-        case AscensionChannel::DEFENSE: return "+1 creature Defense per Ascension stage";
-        case AscensionChannel::PHYSICAL_DAMAGE: return "+1.25% all physical damage per Ascension stage";
-        case AscensionChannel::PHYSICAL_REDUCTION: return "+0.75% all physical reduction per Ascension stage";
-        case AscensionChannel::SPELL_DAMAGE: return "+1.25% all damaging spell power per Ascension stage";
-        case AscensionChannel::SPELL_REDUCTION: return "+0.75% all spell reduction per Ascension stage";
-        case AscensionChannel::CRITICAL_CHANCE: return "+0.5% critical chance per Ascension stage";
-        case AscensionChannel::CRITICAL_DAMAGE: return "+2.5% critical bonus damage per Ascension stage";
-        case AscensionChannel::EVASION: return "+0.5% Evasion chance per Ascension stage";
-        case AscensionChannel::LIFE_STEAL: return "+1% life steal per Ascension stage";
-        case AscensionChannel::REGENERATION: return "+0.75% turn regeneration per Ascension stage";
-        case AscensionChannel::ARMOR_PIERCING: return "+1.5% physical resistance bypass per Ascension stage";
-        case AscensionChannel::ARCANE_PIERCING: return "+1.5% spell resistance bypass per Ascension stage";
+        case AscensionChannel::ATTACK: return "+1 creature Attack at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::DEFENSE: return "+1 creature Defense at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::PHYSICAL_DAMAGE: return "+1.25% physical damage at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::PHYSICAL_REDUCTION: return "+0.75% physical reduction at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::SPELL_DAMAGE: return "+1.25% spell power at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::SPELL_REDUCTION: return "+0.75% spell reduction at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::CRITICAL_CHANCE: return "+0.5% critical chance at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::CRITICAL_DAMAGE: return "+2.5% critical damage at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::EVASION: return "+0.5% Evasion at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::LIFE_STEAL: return "+1% life steal at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::REGENERATION: return "+0.75% Regeneration at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::ARMOR_PIERCING: return "+1.5% Armor Piercing at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::ARCANE_PIERCING: return "+1.5% Arcane Piercing at Ascension I; later stages diminish to 75% / 55% / 40%";
         default: return "No secondary effect";
         }
     }
@@ -698,12 +720,32 @@ namespace
         }
     }
 
+    long double ascensionStageWeight( const uint8_t stage )
+    {
+        switch ( stage ) {
+        case 1: return 1.00L;
+        case 2: return 0.75L;
+        case 3: return 0.55L;
+        case 4: return 0.40L;
+        default: return 0.0L;
+        }
+    }
+
+    long double ascensionTierScale( const uint8_t tier )
+    {
+        long double scale = 0.0L;
+        for ( uint8_t stage = 1; stage <= tier; ++stage ) {
+            scale += ascensionStageWeight( stage );
+        }
+        return scale;
+    }
+
     long double ascensionChannelBonus( const Profile & profile, const AscensionChannel channel )
     {
         long double total = 0.0L;
         for ( size_t id = 0; id < upgradeCount; ++id ) {
             if ( ascensionChannels[id] == channel ) {
-                total += static_cast<long double>( ascensionTierForRank( profile.ranks[id] ) ) * ascensionPerTier( channel );
+                total += ascensionTierScale( ascensionTierForRank( profile.ranks[id] ) ) * ascensionPerTier( channel );
             }
         }
         return total;
@@ -747,7 +789,7 @@ namespace
         const uint8_t nextTier = ascensionTierForRank( currentRank + 1 );
         if ( nextTier > currentTier ) {
             const AscensionChannel channel = ascensionChannels[id];
-            const long double raw = ascensionPerTier( channel );
+            const long double raw = ascensionPerTier( channel ) * ascensionStageWeight( nextTier );
             switch ( channel ) {
             case AscensionChannel::ATTACK:
             case AscensionChannel::DEFENSE:
@@ -1855,9 +1897,9 @@ namespace
     {
         const long double value = effect( id, rank );
         switch ( id ) {
-        case ARMS_TRAINING: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Attack";
-        case ARMOR_TRAINING: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Defense";
-        case VETERAN_CORE: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Attack & Defense";
+        case ARMS_TRAINING: return "+" + formatNumber( diminishingFlatStatBonus( rank ) ) + " Attack";
+        case ARMOR_TRAINING: return "+" + formatNumber( diminishingFlatStatBonus( rank ) ) + " Defense";
+        case VETERAN_CORE: return "+" + formatNumber( diminishingFlatStatBonus( rank ) ) + " Attack & Defense";
         case BLOOD_DRINKER: return formatEffect( value ) + " life steal";
         case REAPER: return formatEffect( value ) + " slain-HP healing";
         case FEROCITY: return "+" + formatEffect( value ) + " creature damage";
@@ -1961,17 +2003,20 @@ namespace
             }
 
             const uint64_t flatGain = nextEffect > currentEffect ? static_cast<uint64_t>( nextEffect - currentEffect ) : 0;
+            const uint64_t currentFlatStat = diminishingFlatStatBonus( rank );
+            const uint64_t nextFlatStat = diminishingFlatStatBonus( rank + 1 );
+            const uint64_t actualFlatGain = nextFlatStat >= currentFlatStat ? nextFlatStat - currentFlatStat : 0;
             if ( nextEffect <= currentEffect ) {
                 message += "\nPrimary effect: capped; this rank advances Ascension progress.";
             }
             else if ( id == ARMS_TRAINING ) {
-                message += "\nNext-rank gain: +" + formatNumber( flatGain ) + " Attack";
+                message += "\nNext-rank gain: +" + formatNumber( actualFlatGain ) + " Attack";
             }
             else if ( id == ARMOR_TRAINING ) {
-                message += "\nNext-rank gain: +" + formatNumber( flatGain ) + " Defense";
+                message += "\nNext-rank gain: +" + formatNumber( actualFlatGain ) + " Defense";
             }
             else if ( id == VETERAN_CORE ) {
-                message += "\nNext-rank gain: +" + formatNumber( flatGain ) + " Attack & Defense";
+                message += "\nNext-rank gain: +" + formatNumber( actualFlatGain ) + " Attack & Defense";
             }
             else if ( id == LEADERSHIP ) {
                 message += "\nNext-rank gain: +" + formatNumber( flatGain ) + " Morale";
@@ -1988,13 +2033,13 @@ namespace
             if ( price > 0 && nextEffect > currentEffect ) {
                 const long double gainPerPoint = ( nextEffect - currentEffect ) / static_cast<long double>( price );
                 if ( id == ARMS_TRAINING ) {
-                    message += "\nGain per point: " + formatDecimal( gainPerPoint ) + " Attack";
+                    message += "\nDiminishing stat gain: +" + formatNumber( actualFlatGain ) + " actual Attack this rank";
                 }
                 else if ( id == ARMOR_TRAINING ) {
-                    message += "\nGain per point: " + formatDecimal( gainPerPoint ) + " Defense";
+                    message += "\nDiminishing stat gain: +" + formatNumber( actualFlatGain ) + " actual Defense this rank";
                 }
                 else if ( id == VETERAN_CORE ) {
-                    message += "\nGain per point: " + formatDecimal( gainPerPoint ) + " Attack & Defense";
+                    message += "\nDiminishing stat gain: +" + formatNumber( actualFlatGain ) + " actual Attack & Defense this rank";
                 }
                 else if ( id == LEADERSHIP ) {
                     message += "\nGain per point: " + formatDecimal( gainPerPoint ) + " Morale";
@@ -2029,6 +2074,7 @@ namespace
         if ( const char * resonance = doctrineResonanceHint( id ); resonance != nullptr ) {
             message += "\nResonance: " + std::string( resonance );
         }
+        message += "\nScaling: Diminishing returns - each later primary rank adds less than the previous one.";
         message += "\nAvailable points: " + formatNumber( playerProfile.points );
         fheroes2::showStandardTextMessage( upgrades[id].name, std::move( message ), Dialog::ZERO );
     }
@@ -2955,7 +3001,8 @@ uint64_t fheroes2::RPG::creatureAttackDoctrineModifier( const PlayerColor color 
         return 0;
     }
 
-    const uint64_t base = saturatedAdd( profile->ranks[ARMS_TRAINING], profile->ranks[VETERAN_CORE] );
+    const uint64_t base
+        = saturatedAdd( diminishingFlatStatBonus( profile->ranks[ARMS_TRAINING] ), diminishingFlatStatBonus( profile->ranks[VETERAN_CORE] ) );
     const uint64_t ascension = static_cast<uint64_t>( ascensionChannelBonus( *profile, AscensionChannel::ATTACK ) );
     return saturatedAdd( base, ascension );
 }
@@ -2967,7 +3014,8 @@ uint64_t fheroes2::RPG::creatureDefenseDoctrineModifier( const PlayerColor color
         return 0;
     }
 
-    const uint64_t base = saturatedAdd( profile->ranks[ARMOR_TRAINING], profile->ranks[VETERAN_CORE] );
+    const uint64_t base
+        = saturatedAdd( diminishingFlatStatBonus( profile->ranks[ARMOR_TRAINING] ), diminishingFlatStatBonus( profile->ranks[VETERAN_CORE] ) );
     const uint64_t ascension = static_cast<uint64_t>( ascensionChannelBonus( *profile, AscensionChannel::DEFENSE ) );
     return saturatedAdd( base, ascension );
 }
