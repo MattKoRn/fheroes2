@@ -213,6 +213,42 @@ namespace
         return saturatedMultiply( first, second );
     }
 
+    uint64_t prestigeRankForLevel( const uint64_t level )
+    {
+        return level / 10;
+    }
+
+    uint64_t nextPrestigeLevel( const uint64_t level )
+    {
+        return saturatedMultiply( saturatedAdd( prestigeRankForLevel( level ), 1 ), 10 );
+    }
+
+    long double prestigeBattleRenownMultiplier( const uint64_t level )
+    {
+        const long double bonus = std::min<long double>( 0.25L, static_cast<long double>( prestigeRankForLevel( level ) ) * 0.02L );
+        return 1.0L + bonus;
+    }
+
+    int eliteRivalChanceForLevel( const uint64_t level )
+    {
+        if ( level < 5 ) {
+            return 0;
+        }
+
+        const uint64_t prestigeBonus = std::min<uint64_t>( 10, prestigeRankForLevel( level ) );
+        return static_cast<int>( std::min<uint64_t>( 40, 10 + level / 4 + prestigeBonus ) );
+    }
+
+    size_t stewardPlanningHorizon( const uint64_t level )
+    {
+        return 3 + static_cast<size_t>( std::min<uint64_t>( 3, prestigeRankForLevel( level ) ) );
+    }
+
+    size_t eliteRivalFocusHallLimit( const uint64_t level )
+    {
+        return 4 + static_cast<size_t>( std::min<uint64_t>( 2, prestigeRankForLevel( level ) / 2 ) );
+    }
+
     uint64_t baseCost( const size_t id )
     {
         switch ( id ) {
@@ -766,7 +802,7 @@ namespace
 
     StewardGoal findStewardGoal( const Profile & profile )
     {
-        constexpr size_t goalHorizon = 3;
+        const size_t goalHorizon = stewardPlanningHorizon( profile.level );
         StewardGoal bestGoal;
 
         for ( size_t id = 0; id < upgradeCount; ++id ) {
@@ -1534,6 +1570,14 @@ namespace
             }
         }
         message += "\nActive Doctrines Unlocked: " + std::to_string( activeDoctrines ) + " / " + std::to_string( upgradeCount );
+        const uint64_t prestigeRank = prestigeRankForLevel( playerProfile.level );
+        message += "\n\nGUILD PRESTIGE";
+        message += "\nPrestige Rank: " + formatNumber( prestigeRank );
+        message += "\nNext Prestige Milestone: Guild Level " + formatNumber( nextPrestigeLevel( playerProfile.level ) );
+        message += "\nBattle Renown Bonus: +" + formatEffect( ( prestigeBattleRenownMultiplier( playerProfile.level ) - 1.0L ) * 100.0L );
+        message += "\nSteward Planning Horizon: " + formatNumber( stewardPlanningHorizon( playerProfile.level ) ) + " ranks";
+        message += "\nElite Rival Chance / Hostile Kingdom: " + std::to_string( eliteRivalChanceForLevel( playerProfile.level ) ) + "%";
+        message += "\nElite Rival Focus Limit: " + formatNumber( eliteRivalFocusHallLimit( playerProfile.level ) ) + " halls";
         uint64_t totalTriggers = 0;
         for ( const uint64_t uses : playerProfile.useCounts ) {
             totalTriggers = saturatedAdd( totalTriggers, uses );
@@ -1739,12 +1783,14 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
 
               std::array<size_t, tabNames.size()> investedTabs{};
               std::array<uint64_t, tabNames.size()> tabInvestments{};
+              std::array<uint64_t, tabNames.size()> tabActivity{};
               size_t investedTabCount = 0;
               for ( size_t tab = 0; tab < tabNames.size(); ++tab ) {
                   const size_t firstUpgrade = tab * upgradesPerTab;
                   for ( size_t offset = 0; offset < upgradesPerTab; ++offset ) {
                       const size_t id = firstUpgrade + offset;
                       tabInvestments[tab] = saturatedAdd( tabInvestments[tab], rankInvestment( id, playerProfile.ranks[id] ) );
+                      tabActivity[tab] = saturatedAdd( tabActivity[tab], playerProfile.useCounts[id] );
                   }
 
                   if ( tabInvestments[tab] > 0 ) {
@@ -1757,16 +1803,21 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
               if ( investedTabCount > 0 ) {
                   if ( sophisticatedKingdom ) {
                       // Ordinary rivals coordinate one to three invested halls according to their
-                      // strength roll. Elite rivals always use the maximum planning tier and can
-                      // coordinate a fourth hall if the player's build is broad enough.
-                      sophisticationTier = eliteKingdom ? 4 : levelPercent >= 105 ? 3 : levelPercent >= 95 ? 2 : 1;
+                      // strength roll. Elite rivals begin at four focused halls and earn up to two
+                      // additional coordinated halls through the player's Guild Prestige.
+                      sophisticationTier = eliteKingdom ? static_cast<int>( eliteRivalFocusHallLimit( playerProfile.level ) )
+                                                       : levelPercent >= 105 ? 3 : levelPercent >= 95 ? 2 : 1;
                       focusTabCount = std::min( static_cast<size_t>( sophisticationTier ), investedTabCount );
 
                       std::array<uint64_t, tabNames.size()> priorities{};
                       std::uniform_int_distribution<uint64_t> tieBreak( 0, 15 );
                       for ( size_t i = 0; i < investedTabCount; ++i ) {
                           const size_t tab = investedTabs[i];
-                          priorities[tab] = saturatedAdd( saturatedMultiply( tabInvestments[tab], 16 ), tieBreak( rng ) );
+                          const uint64_t activityWeight = static_cast<uint64_t>(
+                              std::min<long double>( 255.0L, std::log1p( static_cast<long double>( tabActivity[tab] ) ) * 24.0L ) );
+                          const uint64_t adaptiveWeight = eliteKingdom ? activityWeight : activityWeight / 2;
+                          priorities[tab] = saturatedAdd(
+                              saturatedAdd( saturatedMultiply( tabInvestments[tab], 16 ), adaptiveWeight ), tieBreak( rng ) );
                       }
                       std::sort( investedTabs.begin(), investedTabs.begin() + investedTabCount,
                                  [&priorities]( const size_t first, const size_t second ) { return priorities[first] > priorities[second]; } );
@@ -1882,9 +1933,9 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
           };
 
     // Elite rivals are deterministic for this map because they use the same seeded generator.
-    // They only begin appearing after a few RPG levels, and their chance rises slowly before
-    // capping so most rival kingdoms remain ordinary.
-    const int eliteChance = playerProfile.level < 5 ? 0 : static_cast<int>( std::min<uint64_t>( 30, 10 + playerProfile.level / 4 ) );
+    // They only begin appearing after a few RPG levels. Guild Prestige raises the late-game
+    // encounter rate gradually, while the hard cap keeps ordinary rival kingdoms common.
+    const int eliteChance = eliteRivalChanceForLevel( playerProfile.level );
     std::uniform_int_distribution<int> eliteRoll( 0, 99 );
 
     for ( const Player * player : Settings::Get().GetPlayers().getVector() ) {
@@ -1972,10 +2023,18 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
         // challenge multiplier. The bonus reaches +25% at the existing 2x challenge cap.
         base *= 1.0L + ( challenge - 1.0L ) * 0.25L;
     }
+
+    // Guild Prestige is an endgame progression layer derived entirely from kingdom level.
+    // It does not alter combat stats or the saved point ledger: every ten levels simply makes
+    // future battles modestly more rewarding, up to a +25% Renown bonus.
+    base *= prestigeBattleRenownMultiplier( playerProfile.level );
+
     if ( won && opponent != PlayerColor::NONE && eliteEnemyColors.count( opponent ) > 0 ) {
-        // Elite rivals are harder because of build coherence rather than hidden doctrines. Pay a
-        // visible progression premium for overcoming that extra tactical density.
-        base *= 1.35L;
+        // Elite rivals become tactically denser as Prestige grows, so their victory premium grows
+        // from +35% toward +50% without granting them unpurchased doctrines or exceeding rank caps.
+        const long double prestigeEliteBonus
+            = std::min<long double>( 0.15L, static_cast<long double>( prestigeRankForLevel( playerProfile.level ) ) * 0.01L );
+        base *= 1.35L + prestigeEliteBonus;
     }
     const long double earned = base * challenge;
     static_cast<void>( addExperience( color, static_cast<uint64_t>( std::min( earned, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) ),
