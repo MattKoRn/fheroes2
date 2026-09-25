@@ -708,6 +708,42 @@ namespace
         }
     }
 
+    long double autoBuyPlaystyleFactor( const Profile & profile, const size_t id )
+    {
+        const size_t targetTab = id / upgradesPerTab;
+        uint64_t targetTabUses = 0;
+        uint64_t targetTabInvestment = 0;
+        uint64_t maximumTabUses = 0;
+
+        for ( size_t tab = 0; tab < tabNames.size(); ++tab ) {
+            uint64_t tabUses = 0;
+            const size_t firstUpgrade = tab * upgradesPerTab;
+            for ( size_t offset = 0; offset < upgradesPerTab; ++offset ) {
+                const size_t upgradeId = firstUpgrade + offset;
+                tabUses = saturatedAdd( tabUses, profile.useCounts[upgradeId] );
+                if ( tab == targetTab ) {
+                    targetTabInvestment = saturatedAdd( targetTabInvestment, rankInvestment( upgradeId, profile.ranks[upgradeId] ) );
+                }
+            }
+
+            maximumTabUses = std::max( maximumTabUses, tabUses );
+            if ( tab == targetTab ) {
+                targetTabUses = tabUses;
+            }
+        }
+
+        // The Steward learns a broad combat style rather than only chasing one frequently-triggered
+        // doctrine. Battle telemetry supplies the stronger signal, while existing investment gives a
+        // smaller commitment bonus so a manually-started build continues to develop coherently.
+        const long double activityBonus
+            = std::min( 0.14L, std::log1p( static_cast<long double>( targetTabUses ) ) / 32.0L );
+        const long double commitmentBonus
+            = std::min( 0.08L, std::log1p( static_cast<long double>( targetTabInvestment ) ) / 38.0L );
+        const long double signatureBonus = targetTabUses > 0 && targetTabUses == maximumTabUses ? 0.08L : 0.0L;
+
+        return 1.0L + activityBonus + commitmentBonus + signatureBonus;
+    }
+
     long double autoBuyMarginalReturn( const Profile & profile, const size_t id )
     {
         const uint64_t rank = profile.ranks[id];
@@ -717,14 +753,14 @@ namespace
         }
 
         return autoBuyUtility( profile, id ) * autoBuyActivityFactor( profile, id ) * autoBuySynergyFactor( profile, id )
-               / static_cast<long double>( cost( id, rank ) );
+               * autoBuyPlaystyleFactor( profile, id ) / static_cast<long double>( cost( id, rank ) );
     }
 
     void autoBuy( Profile & profile )
     {
-        // The marginal value of almost every doctrine only changes when that doctrine itself
-        // gains a rank. Cache these values so a large stored point balance does not recalculate
-        // logarithmic effects for all 40 doctrines on every single purchase.
+        // Cache doctrine scores so a large stored point balance does not recalculate every hall on
+        // every purchase. Synergy partners and the purchased doctrine's whole hall are refreshed
+        // below because those are the only rank-dependent scores that can change immediately.
         std::array<long double, upgradeCount> marginalReturns{};
         for ( size_t id = 0; id < upgradeCount; ++id ) {
             marginalReturns[id] = autoBuyMarginalReturn( profile, id );
@@ -759,6 +795,12 @@ namespace
             const auto refresh = [&profile, &marginalReturns]( const size_t id ) {
                 marginalReturns[id] = autoBuyMarginalReturn( profile, id );
             };
+
+            // Hall-level playstyle commitment changes whenever any rank in that hall changes.
+            const size_t purchasedTabStart = ( bestId / upgradesPerTab ) * upgradesPerTab;
+            for ( size_t offset = 0; offset < upgradesPerTab; ++offset ) {
+                refresh( purchasedTabStart + offset );
+            }
 
             if ( bestId == BLOOD_DRINKER || bestId == REAPER || bestId == REGENERATION ) {
                 refresh( BLOOD_DRINKER );
@@ -1553,73 +1595,159 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     seed ^= static_cast<uint64_t>( playerColor ) * 0xC2B2AE3D27D4EB4FULL;
     std::mt19937_64 rng( seed );
 
-    const auto makeTemporaryProfile = [&rng]( const int minimumPower, const int maximumPower, const bool roundUpSmallRanks ) {
-        std::uniform_int_distribution<int> variation( minimumPower, maximumPower );
-        Profile temporary;
-        temporary.level = std::max<uint64_t>( 1, scaledValue( playerProfile.level, variation( rng ) ) );
+    const auto makeTemporaryProfile
+        = [&rng]( const int minimumPower, const int maximumPower, const bool roundUpSmallRanks, const bool sophisticatedKingdom ) {
+              std::uniform_int_distribution<int> variation( minimumPower, maximumPower );
+              const int levelPercent = variation( rng );
 
-        // Pick one or two doctrine halls that the player has actually invested in and bias this
-        // temporary opponent toward them. This preserves the player's progression envelope while
-        // making enemy builds feel like coherent archetypes instead of forty unrelated dice rolls.
-        std::array<size_t, tabNames.size()> investedTabs{};
-        size_t investedTabCount = 0;
-        for ( size_t tab = 0; tab < tabNames.size(); ++tab ) {
-            const size_t firstUpgrade = tab * upgradesPerTab;
-            bool hasInvestment = false;
-            for ( size_t offset = 0; offset < upgradesPerTab; ++offset ) {
-                if ( playerProfile.ranks[firstUpgrade + offset] > 0 ) {
-                    hasInvestment = true;
-                    break;
-                }
-            }
-            if ( hasInvestment ) {
-                investedTabs[investedTabCount++] = tab;
-            }
-        }
+              Profile temporary;
+              temporary.level = std::max<uint64_t>( 1, scaledValue( playerProfile.level, levelPercent ) );
 
-        size_t primaryTab = tabNames.size();
-        size_t secondaryTab = tabNames.size();
-        if ( investedTabCount > 0 ) {
-            std::uniform_int_distribution<size_t> tabPick( 0, investedTabCount - 1 );
-            primaryTab = investedTabs[tabPick( rng )];
+              std::array<size_t, tabNames.size()> investedTabs{};
+              std::array<uint64_t, tabNames.size()> tabInvestments{};
+              size_t investedTabCount = 0;
+              for ( size_t tab = 0; tab < tabNames.size(); ++tab ) {
+                  const size_t firstUpgrade = tab * upgradesPerTab;
+                  for ( size_t offset = 0; offset < upgradesPerTab; ++offset ) {
+                      const size_t id = firstUpgrade + offset;
+                      tabInvestments[tab] = saturatedAdd( tabInvestments[tab], rankInvestment( id, playerProfile.ranks[id] ) );
+                  }
 
-            if ( investedTabCount > 1 ) {
-                do {
-                    secondaryTab = investedTabs[tabPick( rng )];
-                } while ( secondaryTab == primaryTab );
-            }
-        }
+                  if ( tabInvestments[tab] > 0 ) {
+                      investedTabs[investedTabCount++] = tab;
+                  }
+              }
 
-        for ( size_t id = 0; id < upgradeCount; ++id ) {
-            if ( playerProfile.ranks[id] == 0 ) {
-                continue;
-            }
+              size_t focusTabCount = 0;
+              int sophisticationTier = 0;
+              if ( investedTabCount > 0 ) {
+                  if ( sophisticatedKingdom ) {
+                      // A weaker kingdom roll uses one coherent hall, a roughly equal opponent
+                      // coordinates two, and a stronger roll can coordinate three. This changes
+                      // build quality without expanding the existing rank-power envelope.
+                      sophisticationTier = levelPercent >= 105 ? 3 : levelPercent >= 95 ? 2 : 1;
+                      focusTabCount = std::min( static_cast<size_t>( sophisticationTier ), investedTabCount );
 
-            int percent = variation( rng );
-            const size_t tab = id / upgradesPerTab;
-            if ( tab == primaryTab ) {
-                percent += 8;
-            }
-            else if ( tab == secondaryTab ) {
-                percent += 4;
-            }
-            else {
-                percent -= 2;
-            }
-            percent = std::clamp( percent, minimumPower, maximumPower );
+                      // Prefer the player's genuinely-developed halls. A tiny deterministic random
+                      // tie-break keeps equal-investment opponents from becoming identical clones.
+                      std::array<uint64_t, tabNames.size()> priorities{};
+                      std::uniform_int_distribution<uint64_t> tieBreak( 0, 15 );
+                      for ( size_t i = 0; i < investedTabCount; ++i ) {
+                          const size_t tab = investedTabs[i];
+                          priorities[tab] = saturatedAdd( saturatedMultiply( tabInvestments[tab], 16 ), tieBreak( rng ) );
+                      }
+                      std::sort( investedTabs.begin(), investedTabs.begin() + investedTabCount,
+                                 [&priorities]( const size_t first, const size_t second ) { return priorities[first] > priorities[second]; } );
+                  }
+                  else {
+                      // Neutral monsters stay deliberately simpler than kingdoms: one random hall
+                      // gives them an identity without making ordinary map stacks tactically dense.
+                      sophisticationTier = 1;
+                      focusTabCount = 1;
+                      std::uniform_int_distribution<size_t> tabPick( 0, investedTabCount - 1 );
+                      std::swap( investedTabs[0], investedTabs[tabPick( rng )] );
+                  }
+              }
 
-            const long double scaledRank = static_cast<long double>( playerProfile.ranks[id] ) * percent / 100.0L;
-            const long double roundedRank = roundUpSmallRanks ? std::floor( scaledRank + 0.5L ) : std::floor( scaledRank );
-            temporary.ranks[id] = static_cast<uint64_t>( std::min<long double>(
-                static_cast<long double>( std::numeric_limits<uint64_t>::max() ), std::max<long double>( 0.0L, roundedRank ) ) );
-        }
+              const auto isFocusedTab = [&investedTabs, focusTabCount]( const size_t tab ) {
+                  for ( size_t focus = 0; focus < focusTabCount; ++focus ) {
+                      if ( investedTabs[focus] == tab ) {
+                          return focus;
+                      }
+                  }
+                  return focusTabCount;
+              };
 
-        if ( temporary.ranks[CRITICAL_TRAINING] == 0 ) {
-            temporary.ranks[BRUTAL_CRITICALS] = 0;
-        }
+              const auto hasPurchased = []( const size_t id ) { return playerProfile.ranks[id] > 0; };
+              const auto packageBonus = [sophisticationTier, &hasPurchased]( const size_t id ) {
+                  if ( sophisticationTier < 2 ) {
+                      return 0;
+                  }
 
-        return temporary;
-    };
+                  const int bonus = sophisticationTier >= 3 ? 6 : 3;
+                  switch ( id ) {
+                  case BLOOD_DRINKER:
+                  case REAPER:
+                  case REGENERATION:
+                      return ( static_cast<int>( hasPurchased( BLOOD_DRINKER ) ) + static_cast<int>( hasPurchased( REAPER ) )
+                               + static_cast<int>( hasPurchased( REGENERATION ) ) )
+                                 >= 2
+                             ? bonus
+                             : 0;
+                  case MARKSMAN:
+                  case CLOSE_QUARTERS:
+                      return hasPurchased( MARKSMAN ) && hasPurchased( CLOSE_QUARTERS ) ? bonus : 0;
+                  case EXECUTIONER:
+                  case RUTHLESS:
+                      return hasPurchased( EXECUTIONER ) && hasPurchased( RUTHLESS ) ? bonus : 0;
+                  case FRENZY:
+                  case LAST_STAND:
+                      return hasPurchased( FRENZY ) && hasPurchased( LAST_STAND ) ? bonus : 0;
+                  case OPENING_BLOW:
+                  case DISCIPLINE:
+                  case UNYIELDING:
+                      return ( static_cast<int>( hasPurchased( OPENING_BLOW ) ) + static_cast<int>( hasPurchased( DISCIPLINE ) )
+                               + static_cast<int>( hasPurchased( UNYIELDING ) ) )
+                                 >= 2
+                             ? bonus
+                             : 0;
+                  case SORCERY:
+                  case PYROMANCY:
+                  case CRYOMANCY:
+                  case STORMCRAFT:
+                  case CATACLYSM:
+                  case ARCANE_PIERCING:
+                      return hasPurchased( SORCERY )
+                                 && ( hasPurchased( PYROMANCY ) || hasPurchased( CRYOMANCY ) || hasPurchased( STORMCRAFT )
+                                      || hasPurchased( CATACLYSM ) )
+                             ? bonus
+                             : 0;
+                  case SPELL_WARD:
+                  case FIRE_WARD:
+                  case COLD_WARD:
+                  case STORM_WARD:
+                  case CATACLYSM_WARD:
+                      return hasPurchased( SPELL_WARD )
+                                 && ( hasPurchased( FIRE_WARD ) || hasPurchased( COLD_WARD ) || hasPurchased( STORM_WARD )
+                                      || hasPurchased( CATACLYSM_WARD ) )
+                             ? bonus
+                             : 0;
+                  case CRITICAL_TRAINING:
+                  case BRUTAL_CRITICALS:
+                      return hasPurchased( CRITICAL_TRAINING ) && hasPurchased( BRUTAL_CRITICALS ) ? bonus : 0;
+                  default:
+                      return 0;
+                  }
+              };
+
+              for ( size_t id = 0; id < upgradeCount; ++id ) {
+                  if ( playerProfile.ranks[id] == 0 ) {
+                      continue;
+                  }
+
+                  int percent = variation( rng );
+                  const size_t focus = isFocusedTab( id / upgradesPerTab );
+                  if ( focus < focusTabCount ) {
+                      percent += focus == 0 ? 8 : focus == 1 ? 5 : 3;
+                  }
+                  else {
+                      percent -= 2;
+                  }
+                  percent += packageBonus( id );
+                  percent = std::clamp( percent, minimumPower, maximumPower );
+
+                  const long double scaledRank = static_cast<long double>( playerProfile.ranks[id] ) * percent / 100.0L;
+                  const long double roundedRank = roundUpSmallRanks ? std::floor( scaledRank + 0.5L ) : std::floor( scaledRank );
+                  temporary.ranks[id] = static_cast<uint64_t>( std::min<long double>(
+                      static_cast<long double>( std::numeric_limits<uint64_t>::max() ), std::max<long double>( 0.0L, roundedRank ) ) );
+              }
+
+              if ( temporary.ranks[CRITICAL_TRAINING] == 0 ) {
+                  temporary.ranks[BRUTAL_CRITICALS] = 0;
+              }
+
+              return temporary;
+          };
 
     for ( const Player * player : Settings::Get().GetPlayers().getVector() ) {
         if ( player == nullptr || !player->isPlay() || player->GetColor() == playerColor
@@ -1627,9 +1755,9 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
             continue;
         }
 
-        enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 85, 115, true ) );
+        enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 85, 115, true, true ) );
     }
-    enemyProfiles.emplace( PlayerColor::NONE, makeTemporaryProfile( 60, 90, false ) );
+    enemyProfiles.emplace( PlayerColor::NONE, makeTemporaryProfile( 60, 90, false, false ) );
 }
 
 void fheroes2::RPG::endMap()
