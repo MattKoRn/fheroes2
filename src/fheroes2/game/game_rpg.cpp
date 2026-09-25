@@ -849,6 +849,11 @@ namespace
         case LAST_STAND:
             return 1.0L + std::min<long double>( 0.15L, effect( FRENZY, profile.ranks[FRENZY] ) / 150.0L );
 
+        case GIANT_SLAYER:
+            return 1.0L + std::min<long double>( 0.15L, effect( BULWARK, profile.ranks[BULWARK] ) / 150.0L );
+        case BULWARK:
+            return 1.0L + std::min<long double>( 0.15L, effect( GIANT_SLAYER, profile.ranks[GIANT_SLAYER] ) / 150.0L );
+
         case OPENING_BLOW:
         case DISCIPLINE:
             return 1.0L + std::min<long double>( 0.15L, effect( UNYIELDING, profile.ranks[UNYIELDING] ) / 220.0L );
@@ -1195,6 +1200,10 @@ namespace
             if ( bestId == FRENZY || bestId == LAST_STAND ) {
                 refresh( FRENZY );
                 refresh( LAST_STAND );
+            }
+            if ( bestId == GIANT_SLAYER || bestId == BULWARK ) {
+                refresh( GIANT_SLAYER );
+                refresh( BULWARK );
             }
             if ( bestId == OPENING_BLOW || bestId == DISCIPLINE || bestId == UNYIELDING ) {
                 refresh( OPENING_BLOW );
