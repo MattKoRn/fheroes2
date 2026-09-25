@@ -2906,6 +2906,8 @@ void fheroes2::RPG::recordPhysicalDoctrineUse( const PlayerColor attacker, const
 {
     if ( attacker == activePlayerColor ) {
         recordDoctrineUse( attacker, FEROCITY );
+        recordDoctrineUse( attacker, ARMS_TRAINING );
+        recordDoctrineUse( attacker, VETERAN_CORE );
         if ( ranged ) {
             recordDoctrineUse( attacker, MARKSMAN );
         }
@@ -2951,6 +2953,8 @@ void fheroes2::RPG::recordPhysicalDoctrineUse( const PlayerColor attacker, const
 
     if ( defender == activePlayerColor ) {
         recordDoctrineUse( defender, IRON_SKIN );
+        recordDoctrineUse( defender, ARMOR_TRAINING );
+        recordDoctrineUse( defender, VETERAN_CORE );
         if ( ranged ) {
             recordDoctrineUse( defender, ARROW_WARD );
         }

@@ -678,7 +678,8 @@ uint32_t Battle::Unit::GetDamage( const Unit & enemy, Rand::PCG32 & randomGenera
     long double adjustedDamage = res;
     if ( !Modes( CAP_TOWER ) ) {
         const bool rangedAttack = isArchers() && !isHandFighting() && !isHandFighting( *this, enemy );
-        const bool inMelee = isArchers() && ( isHandFighting() || isHandFighting( *this, enemy ) );
+        const bool inMelee = isArchers() && !isAbilityPresent( fheroes2::MonsterAbilityType::NO_MELEE_PENALTY )
+                             && ( isHandFighting() || isHandFighting( *this, enemy ) );
         const uint64_t attackerStartingHitPoints = static_cast<uint64_t>( GetInitialCount() ) * Monster::GetHitPoints();
         const uint64_t defenderStartingHitPoints = static_cast<uint64_t>( enemy.GetInitialCount() ) * enemy.Monster::GetHitPoints();
         const bool attackerFullHealth = attackerStartingHitPoints > 0 && static_cast<uint64_t>( GetHitPoints() ) >= attackerStartingHitPoints;
@@ -1558,12 +1559,11 @@ uint32_t Battle::Unit::CalculateSpellDamage( const Spell & spell, uint32_t spell
         }
     }
 
-    if ( applyingHero != nullptr ) {
-        const double adjustedDamage = static_cast<double>( dmg ) * fheroes2::RPG::spellMultiplier( applyingHero->GetColor(), GetColor(), spell.GetID() );
-        const double boundedDamage = std::min( adjustedDamage, static_cast<double>( std::numeric_limits<uint32_t>::max() ) );
-        dmg = dmg == 0 ? 0 : std::max<uint32_t>( 1, static_cast<uint32_t>( boundedDamage ) );
-        fheroes2::RPG::recordSpellDoctrineUse( applyingHero->GetColor(), GetColor(), spell.GetID() );
-    }
+    const PlayerColor attackerColor = applyingHero != nullptr ? applyingHero->GetColor() : PlayerColor::NONE;
+    const double adjustedDamage = static_cast<double>( dmg ) * fheroes2::RPG::spellMultiplier( attackerColor, GetColor(), spell.GetID() );
+    const double boundedDamage = std::min( adjustedDamage, static_cast<double>( std::numeric_limits<uint32_t>::max() ) );
+    dmg = dmg == 0 ? 0 : std::max<uint32_t>( 1, static_cast<uint32_t>( boundedDamage ) );
+    fheroes2::RPG::recordSpellDoctrineUse( attackerColor, GetColor(), spell.GetID() );
 
     return dmg;
 }
