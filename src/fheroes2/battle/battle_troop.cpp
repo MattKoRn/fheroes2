@@ -545,9 +545,7 @@ uint32_t Battle::Unit::getPotentialDamage( const Unit & enemy ) const
     }
 
     if ( !Modes( CAP_TOWER ) ) {
-        const double critChance = fheroes2::RPG::criticalChance( GetColor() );
-        const double critBonus = fheroes2::RPG::criticalDamageBonusPercent( GetColor() );
-        const double critFactor = 1.0 + ( critChance / 100.0 ) * ( critBonus / 100.0 );
+        const double critFactor = fheroes2::RPG::expectedCriticalDamageMultiplier( GetColor() );
 
         double evasionFactor = 1.0;
         if ( !enemy.Modes( CAP_TOWER ) ) {
@@ -645,7 +643,7 @@ uint32_t Battle::Unit::CalculateDamageUnit( const Unit & enemy, double dmg ) con
         const bool defenderBelowHalf = defenderStartingHitPoints > 0 && static_cast<uint64_t>( enemy.GetHitPoints() ) * 2 < defenderStartingHitPoints;
 
         dmg = std::min(
-            dmg * fheroes2::RPG::damageMultiplier( GetColor(), enemy.Modes( CAP_TOWER ) ? PlayerColor::UNUSED : enemy.GetColor(), rangedAttack,
+            dmg * fheroes2::RPG::damageMultiplier( GetColor(), enemy.Modes( CAP_TOWER ) ? PlayerColor::NONE : enemy.GetColor(), rangedAttack,
                                                    GetCount() < enemy.GetCount(), enemy.GetCount() < GetCount(), attackerFullHealth,
                                                    defenderFullHealth, attackerBelowHalf, defenderBelowHalf ),
             static_cast<double>( std::numeric_limits<uint32_t>::max() ) );
