@@ -179,6 +179,7 @@ namespace
 
     Profile playerProfile;
     std::map<PlayerColor, Profile> enemyProfiles;
+    std::set<PlayerColor> eliteEnemyColors;
     std::set<uint64_t> visitedActionTiles;
     PlayerColor activePlayerColor = PlayerColor::NONE;
 
@@ -756,6 +757,57 @@ namespace
                * autoBuyPlaystyleFactor( profile, id ) / static_cast<long double>( cost( id, rank ) );
     }
 
+    struct StewardGoal
+    {
+        size_t id{ upgradeCount };
+        uint64_t targetRank{ 0 };
+        long double score{ 0.0L };
+    };
+
+    StewardGoal findStewardGoal( const Profile & profile )
+    {
+        constexpr size_t goalHorizon = 3;
+        StewardGoal bestGoal;
+
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            Profile simulated = profile;
+            long double totalUtility = 0.0L;
+            uint64_t totalCost = 0;
+            size_t plannedRanks = 0;
+
+            for ( size_t step = 0; step < goalHorizon; ++step ) {
+                const long double marginal = autoBuyMarginalReturn( simulated, id );
+                if ( marginal <= 0.0L ) {
+                    break;
+                }
+
+                const uint64_t rankCost = cost( id, simulated.ranks[id] );
+                totalUtility += marginal * static_cast<long double>( rankCost );
+                totalCost = saturatedAdd( totalCost, rankCost );
+                ++simulated.ranks[id];
+                ++plannedRanks;
+            }
+
+            if ( plannedRanks == 0 || totalCost == 0 ) {
+                continue;
+            }
+
+            // Reward doctrines that stay efficient across several ranks instead of selecting a
+            // flashy one-rank spike. The bonus is deliberately small so immediate combat value
+            // can still override a long-term plan when the difference is substantial.
+            const long double durabilityBonus = 1.0L + static_cast<long double>( plannedRanks - 1 ) * 0.035L;
+            const long double score = totalUtility / static_cast<long double>( totalCost ) * durabilityBonus;
+            if ( bestGoal.id == upgradeCount || score > bestGoal.score
+                 || ( score == bestGoal.score && simulated.ranks[id] < bestGoal.targetRank ) ) {
+                bestGoal.id = id;
+                bestGoal.targetRank = simulated.ranks[id];
+                bestGoal.score = score;
+            }
+        }
+
+        return bestGoal;
+    }
+
     void autoBuy( Profile & profile )
     {
         // Cache doctrine scores so a large stored point balance does not recalculate every hall on
@@ -765,6 +817,8 @@ namespace
         for ( size_t id = 0; id < upgradeCount; ++id ) {
             marginalReturns[id] = autoBuyMarginalReturn( profile, id );
         }
+
+        StewardGoal goal = findStewardGoal( profile );
 
         for ( size_t purchases = 0; purchases < 100000; ++purchases ) {
             size_t bestId = upgradeCount;
@@ -779,9 +833,12 @@ namespace
                     continue;
                 }
 
-                if ( bestId == upgradeCount || marginalReturns[id] > bestReturn
-                     || ( marginalReturns[id] == bestReturn && profile.ranks[id] < profile.ranks[bestId] ) ) {
-                    bestReturn = marginalReturns[id];
+                const bool pursuingGoal = id == goal.id && profile.ranks[id] < goal.targetRank;
+                const long double candidateReturn = marginalReturns[id] * ( pursuingGoal ? 1.18L : 1.0L );
+
+                if ( bestId == upgradeCount || candidateReturn > bestReturn
+                     || ( candidateReturn == bestReturn && profile.ranks[id] < profile.ranks[bestId] ) ) {
+                    bestReturn = candidateReturn;
                     bestId = id;
                 }
             }
@@ -848,6 +905,10 @@ namespace
                 refresh( COLD_WARD );
                 refresh( STORM_WARD );
                 refresh( CATACLYSM_WARD );
+            }
+
+            if ( goal.id == upgradeCount || profile.ranks[goal.id] >= goal.targetRank || marginalReturns[goal.id] <= 0.0L ) {
+                goal = findStewardGoal( profile );
             }
         }
     }
@@ -1473,6 +1534,15 @@ namespace
                        + formatEffect( ( stewardFocusFactor - 1.0L ) * 100.0L ) + " preference)";
         }
 
+        const StewardGoal stewardGoal = findStewardGoal( playerProfile );
+        if ( stewardGoal.id < upgradeCount && stewardGoal.targetRank > playerProfile.ranks[stewardGoal.id] ) {
+            message += "\nSteward Long-Term Goal: " + std::string( upgrades[stewardGoal.id].name ) + " -> Rank "
+                       + formatNumber( stewardGoal.targetRank );
+        }
+        if ( !eliteEnemyColors.empty() ) {
+            message += "\nElite Rival Kingdoms This Map: " + formatNumber( eliteEnemyColors.size() );
+        }
+
         size_t stewardPick = upgradeCount;
         long double stewardPickValue = 0.0L;
         for ( size_t id = 0; id < upgradeCount; ++id ) {
@@ -1547,6 +1617,7 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
 {
     activePlayerColor = playerColor;
     enemyProfiles.clear();
+    eliteEnemyColors.clear();
     visitedActionTiles.clear();
     playerProfile = {};
     if ( playerColor == PlayerColor::NONE ) {
@@ -1610,7 +1681,8 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     std::mt19937_64 rng( seed );
 
     const auto makeTemporaryProfile
-        = [&rng]( const int minimumPower, const int maximumPower, const bool roundUpSmallRanks, const bool sophisticatedKingdom ) {
+        = [&rng]( const int minimumPower, const int maximumPower, const bool roundUpSmallRanks, const bool sophisticatedKingdom,
+                  const bool eliteKingdom ) {
               std::uniform_int_distribution<int> variation( minimumPower, maximumPower );
               const int levelPercent = variation( rng );
 
@@ -1636,14 +1708,12 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
               int sophisticationTier = 0;
               if ( investedTabCount > 0 ) {
                   if ( sophisticatedKingdom ) {
-                      // A weaker kingdom roll uses one coherent hall, a roughly equal opponent
-                      // coordinates two, and a stronger roll can coordinate three. This changes
-                      // build quality without expanding the existing rank-power envelope.
-                      sophisticationTier = levelPercent >= 105 ? 3 : levelPercent >= 95 ? 2 : 1;
+                      // Ordinary rivals coordinate one to three invested halls according to their
+                      // strength roll. Elite rivals always use the maximum planning tier and can
+                      // coordinate a fourth hall if the player's build is broad enough.
+                      sophisticationTier = eliteKingdom ? 4 : levelPercent >= 105 ? 3 : levelPercent >= 95 ? 2 : 1;
                       focusTabCount = std::min( static_cast<size_t>( sophisticationTier ), investedTabCount );
 
-                      // Prefer the player's genuinely-developed halls. A tiny deterministic random
-                      // tie-break keeps equal-investment opponents from becoming identical clones.
                       std::array<uint64_t, tabNames.size()> priorities{};
                       std::uniform_int_distribution<uint64_t> tieBreak( 0, 15 );
                       for ( size_t i = 0; i < investedTabCount; ++i ) {
@@ -1654,8 +1724,6 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
                                  [&priorities]( const size_t first, const size_t second ) { return priorities[first] > priorities[second]; } );
                   }
                   else {
-                      // Neutral monsters stay deliberately simpler than kingdoms: one random hall
-                      // gives them an identity without making ordinary map stacks tactically dense.
                       sophisticationTier = 1;
                       focusTabCount = 1;
                       std::uniform_int_distribution<size_t> tabPick( 0, investedTabCount - 1 );
@@ -1673,12 +1741,12 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
               };
 
               const auto hasPurchased = []( const size_t id ) { return playerProfile.ranks[id] > 0; };
-              const auto packageBonus = [sophisticationTier, &hasPurchased]( const size_t id ) {
+              const auto packageBonus = [sophisticationTier, eliteKingdom, &hasPurchased]( const size_t id ) {
                   if ( sophisticationTier < 2 ) {
                       return 0;
                   }
 
-                  const int bonus = sophisticationTier >= 3 ? 6 : 3;
+                  const int bonus = eliteKingdom ? 10 : sophisticationTier >= 3 ? 6 : 3;
                   switch ( id ) {
                   case BLOOD_DRINKER:
                   case REAPER:
@@ -1742,7 +1810,9 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
                   int percent = variation( rng );
                   const size_t focus = isFocusedTab( id / upgradesPerTab );
                   if ( focus < focusTabCount ) {
-                      percent += focus == 0 ? 8 : focus == 1 ? 5 : 3;
+                      percent += focus == 0 ? ( eliteKingdom ? 12 : 8 )
+                                           : focus == 1 ? ( eliteKingdom ? 8 : 5 )
+                                                        : focus == 2 ? ( eliteKingdom ? 5 : 3 ) : 3;
                   }
                   else {
                       percent -= 2;
@@ -1763,15 +1833,28 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
               return temporary;
           };
 
+    // Elite rivals are deterministic for this map because they use the same seeded generator.
+    // They only begin appearing after a few RPG levels, and their chance rises slowly before
+    // capping so most rival kingdoms remain ordinary.
+    const int eliteChance = playerProfile.level < 5 ? 0 : static_cast<int>( std::min<uint64_t>( 30, 10 + playerProfile.level / 4 ) );
+    std::uniform_int_distribution<int> eliteRoll( 0, 99 );
+
     for ( const Player * player : Settings::Get().GetPlayers().getVector() ) {
         if ( player == nullptr || !player->isPlay() || player->GetColor() == playerColor
              || Players::isFriends( playerColor, static_cast<PlayerColorsSet>( player->GetColor() ) ) ) {
             continue;
         }
 
-        enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 85, 115, true, true ) );
+        const bool elite = eliteChance > 0 && eliteRoll( rng ) < eliteChance;
+        if ( elite ) {
+            eliteEnemyColors.insert( player->GetColor() );
+            enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 100, 115, true, true, true ) );
+        }
+        else {
+            enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 85, 115, true, true, false ) );
+        }
     }
-    enemyProfiles.emplace( PlayerColor::NONE, makeTemporaryProfile( 60, 90, false, false ) );
+    enemyProfiles.emplace( PlayerColor::NONE, makeTemporaryProfile( 60, 90, false, false, false ) );
 }
 
 void fheroes2::RPG::endMap()
@@ -1781,6 +1864,7 @@ void fheroes2::RPG::endMap()
     }
     activePlayerColor = PlayerColor::NONE;
     enemyProfiles.clear();
+    eliteEnemyColors.clear();
     visitedActionTiles.clear();
 }
 
@@ -1839,6 +1923,11 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
         // Beating a stronger RPG profile deserves a modest heroic bonus on top of the normal
         // challenge multiplier. The bonus reaches +25% at the existing 2x challenge cap.
         base *= 1.0L + ( challenge - 1.0L ) * 0.25L;
+    }
+    if ( won && opponent != PlayerColor::NONE && eliteEnemyColors.count( opponent ) > 0 ) {
+        // Elite rivals are harder because of build coherence rather than hidden doctrines. Pay a
+        // visible progression premium for overcoming that extra tactical density.
+        base *= 1.35L;
     }
     const long double earned = base * challenge;
     static_cast<void>( addExperience( color, static_cast<uint64_t>( std::min( earned, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) ),
