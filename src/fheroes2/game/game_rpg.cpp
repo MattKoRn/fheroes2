@@ -262,24 +262,6 @@ namespace
         return 4 + static_cast<size_t>( std::min<uint64_t>( 2, prestigeRankForLevel( level ) / 2 ) );
     }
 
-    const char * rivalArchetypeName( const RivalArchetype archetype )
-    {
-        switch ( archetype ) {
-        case RivalArchetype::WARLORD:
-            return "Warlord";
-        case RivalArchetype::PREDATOR:
-            return "Predator";
-        case RivalArchetype::ARCANIST:
-            return "Arcanist";
-        case RivalArchetype::SENTINEL:
-            return "Sentinel";
-        case RivalArchetype::TRICKSTER:
-            return "Trickster";
-        default:
-            return "Unknown";
-        }
-    }
-
     uint64_t rivalArchetypeHallBias( const RivalArchetype archetype, const size_t tab )
     {
         switch ( archetype ) {
