@@ -175,11 +175,24 @@ namespace
         bool autoBuy{ false };
     };
 
+    enum class RivalArchetype
+    {
+        NONE,
+        WARLORD,
+        PREDATOR,
+        ARCANIST,
+        SENTINEL,
+        TRICKSTER
+    };
+
+    constexpr std::array<const char *, 5> rivalArchetypeNames{ "Warlord", "Predator", "Arcanist", "Sentinel", "Trickster" };
+
     uint64_t consumeAffordableLevels( Profile & profile );
 
     Profile playerProfile;
     std::map<PlayerColor, Profile> enemyProfiles;
     std::set<PlayerColor> eliteEnemyColors;
+    std::map<PlayerColor, RivalArchetype> eliteRivalArchetypes;
     std::set<uint64_t> visitedActionTiles;
     PlayerColor activePlayerColor = PlayerColor::NONE;
 
@@ -247,6 +260,42 @@ namespace
     size_t eliteRivalFocusHallLimit( const uint64_t level )
     {
         return 4 + static_cast<size_t>( std::min<uint64_t>( 2, prestigeRankForLevel( level ) / 2 ) );
+    }
+
+    const char * rivalArchetypeName( const RivalArchetype archetype )
+    {
+        switch ( archetype ) {
+        case RivalArchetype::WARLORD:
+            return "Warlord";
+        case RivalArchetype::PREDATOR:
+            return "Predator";
+        case RivalArchetype::ARCANIST:
+            return "Arcanist";
+        case RivalArchetype::SENTINEL:
+            return "Sentinel";
+        case RivalArchetype::TRICKSTER:
+            return "Trickster";
+        default:
+            return "Unknown";
+        }
+    }
+
+    uint64_t rivalArchetypeHallBias( const RivalArchetype archetype, const size_t tab )
+    {
+        switch ( archetype ) {
+        case RivalArchetype::WARLORD:
+            return tab == 0 || tab == 6 ? 144 : tab == 3 ? 72 : 0;
+        case RivalArchetype::PREDATOR:
+            return tab == 1 || tab == 2 ? 144 : tab == 7 ? 96 : 0;
+        case RivalArchetype::ARCANIST:
+            return tab == 4 || tab == 5 ? 144 : tab == 7 ? 72 : 0;
+        case RivalArchetype::SENTINEL:
+            return tab == 3 || tab == 5 ? 144 : tab == 0 ? 72 : 0;
+        case RivalArchetype::TRICKSTER:
+            return tab == 2 || tab == 7 ? 144 : tab == 6 ? 72 : 0;
+        default:
+            return 0;
+        }
     }
 
     uint64_t baseCost( const size_t id )
@@ -793,6 +842,120 @@ namespace
                * autoBuyPlaystyleFactor( profile, id ) / static_cast<long double>( cost( id, rank ) );
     }
 
+    size_t stewardPackagePartner( const Profile & profile, const size_t id )
+    {
+        std::array<size_t, 6> candidates{};
+        candidates.fill( upgradeCount );
+        size_t candidateCount = 0;
+
+        const auto addCandidate = [&candidates, &candidateCount, id]( const size_t candidate ) {
+            if ( candidate != id && candidateCount < candidates.size() ) {
+                candidates[candidateCount++] = candidate;
+            }
+        };
+
+        switch ( id ) {
+        case BLOOD_DRINKER:
+        case REAPER:
+        case REGENERATION:
+            addCandidate( BLOOD_DRINKER );
+            addCandidate( REAPER );
+            addCandidate( REGENERATION );
+            break;
+        case MARKSMAN:
+        case CLOSE_QUARTERS:
+            addCandidate( MARKSMAN );
+            addCandidate( CLOSE_QUARTERS );
+            break;
+        case EXECUTIONER:
+        case RUTHLESS:
+            addCandidate( EXECUTIONER );
+            addCandidate( RUTHLESS );
+            break;
+        case GIANT_SLAYER:
+        case BULWARK:
+            addCandidate( GIANT_SLAYER );
+            addCandidate( BULWARK );
+            break;
+        case FRENZY:
+        case LAST_STAND:
+            addCandidate( FRENZY );
+            addCandidate( LAST_STAND );
+            break;
+        case OPENING_BLOW:
+        case DISCIPLINE:
+        case UNYIELDING:
+            addCandidate( OPENING_BLOW );
+            addCandidate( DISCIPLINE );
+            addCandidate( UNYIELDING );
+            break;
+        case SORCERY:
+        case PYROMANCY:
+        case CRYOMANCY:
+        case STORMCRAFT:
+        case CATACLYSM:
+        case ARCANE_PIERCING:
+            addCandidate( SORCERY );
+            addCandidate( PYROMANCY );
+            addCandidate( CRYOMANCY );
+            addCandidate( STORMCRAFT );
+            addCandidate( CATACLYSM );
+            addCandidate( ARCANE_PIERCING );
+            break;
+        case IRON_SKIN:
+        case ARROW_WARD:
+        case MELEE_GUARD:
+            addCandidate( IRON_SKIN );
+            addCandidate( ARROW_WARD );
+            addCandidate( MELEE_GUARD );
+            break;
+        case SPELL_WARD:
+        case FIRE_WARD:
+        case COLD_WARD:
+        case STORM_WARD:
+        case CATACLYSM_WARD:
+            addCandidate( SPELL_WARD );
+            addCandidate( FIRE_WARD );
+            addCandidate( COLD_WARD );
+            addCandidate( STORM_WARD );
+            addCandidate( CATACLYSM_WARD );
+            break;
+        case LEADERSHIP:
+        case FORTUNE:
+            addCandidate( LEADERSHIP );
+            addCandidate( FORTUNE );
+            break;
+        case CRITICAL_TRAINING:
+        case BRUTAL_CRITICALS:
+            addCandidate( CRITICAL_TRAINING );
+            addCandidate( BRUTAL_CRITICALS );
+            break;
+        default:
+            break;
+        }
+
+        size_t best = upgradeCount;
+        long double bestScore = 0.0L;
+        for ( size_t index = 0; index < candidateCount; ++index ) {
+            const size_t candidate = candidates[index];
+            const long double marginal = autoBuyMarginalReturn( profile, candidate );
+            if ( marginal <= 0.0L ) {
+                continue;
+            }
+
+            const long double activityBonus
+                = 1.0L + std::min<long double>( 0.10L, std::log1p( static_cast<long double>( profile.useCounts[candidate] ) ) / 40.0L );
+            const long double score = marginal * activityBonus;
+            if ( best == upgradeCount || score > bestScore
+                 || ( score == bestScore && profile.ranks[candidate] < profile.ranks[best] ) ) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+
+        return best;
+    }
+
     struct StewardGoal
     {
         size_t id{ upgradeCount };
@@ -829,10 +992,13 @@ namespace
             }
 
             // Reward doctrines that stay efficient across several ranks instead of selecting a
-            // flashy one-rank spike. The bonus is deliberately small so immediate combat value
-            // can still override a long-term plan when the difference is substantial.
+            // flashy one-rank spike. The Steward also values a goal more highly when it has a
+            // useful package partner available, so long-term plans build coherent combinations
+            // rather than repeatedly tunneling one isolated doctrine.
             const long double durabilityBonus = 1.0L + static_cast<long double>( plannedRanks - 1 ) * 0.035L;
-            const long double score = totalUtility / static_cast<long double>( totalCost ) * durabilityBonus;
+            const size_t packagePartner = stewardPackagePartner( simulated, id );
+            const long double packageBonus = packagePartner < upgradeCount ? ( profile.ranks[packagePartner] > 0 ? 1.12L : 1.08L ) : 1.0L;
+            const long double score = totalUtility / static_cast<long double>( totalCost ) * durabilityBonus * packageBonus;
             if ( bestGoal.id == upgradeCount || score > bestGoal.score
                  || ( score == bestGoal.score && simulated.ranks[id] < bestGoal.targetRank ) ) {
                 bestGoal.id = id;
@@ -859,6 +1025,7 @@ namespace
         for ( size_t purchases = 0; purchases < 100000; ++purchases ) {
             size_t bestId = upgradeCount;
             long double bestReturn = 0;
+            const size_t packagePartner = goal.id < upgradeCount ? stewardPackagePartner( profile, goal.id ) : upgradeCount;
 
             for ( size_t id = 0; id < upgradeCount; ++id ) {
                 if ( profile.points < cost( id, profile.ranks[id] ) ) {
@@ -870,7 +1037,9 @@ namespace
                 }
 
                 const bool pursuingGoal = id == goal.id && profile.ranks[id] < goal.targetRank;
-                const long double candidateReturn = marginalReturns[id] * ( pursuingGoal ? 1.18L : 1.0L );
+                const bool supportingPackage = id == packagePartner;
+                const long double planPreference = pursuingGoal ? 1.18L : supportingPackage ? 1.12L : 1.0L;
+                const long double candidateReturn = marginalReturns[id] * planPreference;
 
                 if ( bestId == upgradeCount || candidateReturn > bestReturn
                      || ( candidateReturn == bestReturn && profile.ranks[id] < profile.ranks[bestId] ) ) {
@@ -1523,6 +1692,7 @@ namespace
         message += "\nB, Enter, or Space: Buy the selected doctrine";
         message += "\nI: Inspect the selected doctrine";
         message += "\nO: Open the Royal Guild Overview";
+        message += "\nV: Open Elite Rival Intel";
         message += "\nS or A: Toggle Steward auto-buy";
         message += "\nR: Respec doctrines";
         message += "\nH: Open this help";
@@ -1544,6 +1714,49 @@ namespace
         message += "\nValid .bak and .tmp snapshots can recover a damaged primary profile on startup.";
 
         fheroes2::showStandardTextMessage( "Royal Guild Help", std::move( message ), Dialog::ZERO );
+    }
+
+    void showRivalIntel()
+    {
+        std::array<size_t, rivalArchetypeNames.size()> archetypeCounts{};
+        for ( const auto & [color, archetype] : eliteRivalArchetypes ) {
+            static_cast<void>( color );
+            const size_t index = static_cast<size_t>( archetype );
+            if ( index > 0 && index <= archetypeCounts.size() ) {
+                ++archetypeCounts[index - 1];
+            }
+        }
+
+        std::string message = "ELITE RIVAL INTEL\n";
+        message += "\nEncounter Chance / Hostile Kingdom: " + std::to_string( eliteRivalChanceForLevel( playerProfile.level ) ) + "%";
+        message += "\nMaximum Coordinated Halls: " + formatNumber( eliteRivalFocusHallLimit( playerProfile.level ) );
+        message += "\nElite Rivals This Map: " + formatNumber( eliteEnemyColors.size() );
+
+        bool anyArchetype = false;
+        for ( size_t index = 0; index < archetypeCounts.size(); ++index ) {
+            if ( archetypeCounts[index] == 0 ) {
+                continue;
+            }
+
+            if ( !anyArchetype ) {
+                message += "\n\nARCHETYPES";
+                anyArchetype = true;
+            }
+            message += "\n" + std::string( rivalArchetypeNames[index] ) + ": " + formatNumber( archetypeCounts[index] );
+        }
+        if ( !anyArchetype ) {
+            message += "\n\nNo Elite Rival archetypes are active on this map.";
+        }
+
+        message += "\n\nWarlord: ARMY / COMMAND pressure";
+        message += "\nPredator: OFFENSE / TACTICS pressure";
+        message += "\nArcanist: MAGIC / WARDS pressure";
+        message += "\nSentinel: DEFENSE / WARDS pressure";
+        message += "\nTrickster: TACTICS / MASTERY pressure";
+        message += "\n\nElite focus also reads your recorded doctrine-trigger history, so frequently used halls are more likely to be recognized.";
+        message += "\nRivals still use only doctrines you have purchased and every generated rank remains inside the existing 115% envelope.";
+
+        fheroes2::showStandardTextMessage( "Elite Rival Intel", std::move( message ), Dialog::ZERO );
     }
 
     void showKingdomOverview()
@@ -1619,9 +1832,26 @@ namespace
         if ( stewardGoal.id < upgradeCount && stewardGoal.targetRank > playerProfile.ranks[stewardGoal.id] ) {
             message += "\nSteward Long-Term Goal: " + std::string( upgrades[stewardGoal.id].name ) + " -> Rank "
                        + formatNumber( stewardGoal.targetRank );
+            const size_t packagePartner = stewardPackagePartner( playerProfile, stewardGoal.id );
+            if ( packagePartner < upgradeCount ) {
+                message += "\nSteward Package Partner: " + std::string( upgrades[packagePartner].name );
+            }
         }
         if ( !eliteEnemyColors.empty() ) {
             message += "\nElite Rival Kingdoms This Map: " + formatNumber( eliteEnemyColors.size() );
+            std::array<size_t, rivalArchetypeNames.size()> archetypeCounts{};
+            for ( const auto & [color, archetype] : eliteRivalArchetypes ) {
+                static_cast<void>( color );
+                const size_t index = static_cast<size_t>( archetype );
+                if ( index > 0 && index <= archetypeCounts.size() ) {
+                    ++archetypeCounts[index - 1];
+                }
+            }
+            for ( size_t index = 0; index < archetypeCounts.size(); ++index ) {
+                if ( archetypeCounts[index] > 0 ) {
+                    message += "\n  " + std::string( rivalArchetypeNames[index] ) + ": " + formatNumber( archetypeCounts[index] );
+                }
+            }
         }
 
         size_t stewardPick = upgradeCount;
@@ -1710,6 +1940,7 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     activePlayerColor = playerColor;
     enemyProfiles.clear();
     eliteEnemyColors.clear();
+    eliteRivalArchetypes.clear();
     visitedActionTiles.clear();
     playerProfile = {};
     if ( playerColor == PlayerColor::NONE ) {
@@ -1774,7 +2005,7 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
 
     const auto makeTemporaryProfile
         = [&rng]( const int minimumPower, const int maximumPower, const bool roundUpSmallRanks, const bool sophisticatedKingdom,
-                  const bool eliteKingdom ) {
+                  const bool eliteKingdom, const RivalArchetype archetype ) {
               std::uniform_int_distribution<int> variation( minimumPower, maximumPower );
               const int levelPercent = variation( rng );
 
@@ -1816,8 +2047,10 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
                           const uint64_t activityWeight = static_cast<uint64_t>(
                               std::min<long double>( 255.0L, std::log1p( static_cast<long double>( tabActivity[tab] ) ) * 24.0L ) );
                           const uint64_t adaptiveWeight = eliteKingdom ? activityWeight : activityWeight / 2;
+                          const uint64_t archetypeWeight = eliteKingdom ? rivalArchetypeHallBias( archetype, tab ) : 0;
                           priorities[tab] = saturatedAdd(
-                              saturatedAdd( saturatedMultiply( tabInvestments[tab], 16 ), adaptiveWeight ), tieBreak( rng ) );
+                              saturatedAdd( saturatedAdd( saturatedMultiply( tabInvestments[tab], 16 ), adaptiveWeight ), archetypeWeight ),
+                              tieBreak( rng ) );
                       }
                       std::sort( investedTabs.begin(), investedTabs.begin() + investedTabCount,
                                  [&priorities]( const size_t first, const size_t second ) { return priorities[first] > priorities[second]; } );
@@ -1937,6 +2170,7 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     // encounter rate gradually, while the hard cap keeps ordinary rival kingdoms common.
     const int eliteChance = eliteRivalChanceForLevel( playerProfile.level );
     std::uniform_int_distribution<int> eliteRoll( 0, 99 );
+    std::uniform_int_distribution<size_t> archetypeRoll( 0, rivalArchetypeNames.size() - 1 );
 
     for ( const Player * player : Settings::Get().GetPlayers().getVector() ) {
         if ( player == nullptr || !player->isPlay() || player->GetColor() == playerColor
@@ -1946,14 +2180,16 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
 
         const bool elite = eliteChance > 0 && eliteRoll( rng ) < eliteChance;
         if ( elite ) {
+            const RivalArchetype archetype = static_cast<RivalArchetype>( archetypeRoll( rng ) + 1 );
             eliteEnemyColors.insert( player->GetColor() );
-            enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 100, 115, true, true, true ) );
+            eliteRivalArchetypes[player->GetColor()] = archetype;
+            enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 100, 115, true, true, true, archetype ) );
         }
         else {
-            enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 85, 115, true, true, false ) );
+            enemyProfiles.emplace( player->GetColor(), makeTemporaryProfile( 85, 115, true, true, false, RivalArchetype::NONE ) );
         }
     }
-    enemyProfiles.emplace( PlayerColor::NONE, makeTemporaryProfile( 60, 90, false, false, false ) );
+    enemyProfiles.emplace( PlayerColor::NONE, makeTemporaryProfile( 60, 90, false, false, false, RivalArchetype::NONE ) );
 }
 
 void fheroes2::RPG::endMap()
@@ -1964,6 +2200,7 @@ void fheroes2::RPG::endMap()
     activePlayerColor = PlayerColor::NONE;
     enemyProfiles.clear();
     eliteEnemyColors.clear();
+    eliteRivalArchetypes.clear();
     visitedActionTiles.clear();
 }
 
@@ -2709,8 +2946,8 @@ void fheroes2::RPG::showMenu()
             drawSingleLine( "Rows " + std::to_string( firstVisibleRow ) + "-" + std::to_string( lastVisibleRow ) + "/"
                                 + std::to_string( upgradesPerTab ) + "   Up/Down Select   B/Enter/Space Buy   I Details",
                             area.x + 12, area.y + 333, area.width - 24, fheroes2::FontType::smallWhite() );
-            drawSingleLine( "1-8 Tabs   O Overview   H Help   S/A Steward   R Respec   Esc Close", area.x + 12, area.y + 344, area.width - 24,
-                            fheroes2::FontType::smallWhite() );
+            drawSingleLine( "1-8 Tabs   O Overview   V Rivals   H Help   S/A Steward   R Respec   Esc Close", area.x + 12, area.y + 344,
+                            area.width - 24, fheroes2::FontType::smallWhite() );
             window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
             window.renderTextAdaptedButtonSprite( respecButton, "Respec", { 0, 6 }, fheroes2::StandardWindow::Padding::BOTTOM_CENTER );
@@ -2842,6 +3079,12 @@ void fheroes2::RPG::showMenu()
             continue;
         }
 
+        if ( event.isKeyPressed( fheroes2::Key::KEY_V ) ) {
+            showRivalIntel();
+            redraw = true;
+            continue;
+        }
+
         if ( event.isKeyPressed( fheroes2::Key::KEY_O ) || event.isMouseRightButtonPressedInArea( statsArea ) || event.MouseLongPressLeft( statsArea )
              || event.MouseClickLeft( statsArea ) ) {
             showKingdomOverview();
@@ -2891,7 +3134,7 @@ void fheroes2::RPG::showMenu()
         if ( event.isMouseRightButtonPressedInArea( autoButton.area() ) || event.MouseLongPressLeft( autoButton.area() ) ) {
             fheroes2::showStandardTextMessage(
                 "Steward",
-                "Automatically buys the available next rank with the largest immediate mechanical gain per point. Battle-trigger history gives a modest preference to specialties your kingdom actually uses. Capped upgrades are skipped once another rank would add no effect.",
+                "Automatically buys the strongest available next rank while balancing immediate value, battle-trigger history, long-term goals, and complementary package partners. Capped or locked upgrades are skipped.",
                 Dialog::ZERO );
             redraw = true;
             continue;
