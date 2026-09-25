@@ -1459,6 +1459,20 @@ namespace
             message += "\nBuild Focus: " + std::string( tabNames[focusTab] ) + " (" + formatNumber( *focusIt ) + " points)";
         }
 
+        size_t stewardFocusTab = tabNames.size();
+        long double stewardFocusFactor = 1.0L;
+        for ( size_t tab = 0; tab < tabNames.size(); ++tab ) {
+            const long double factor = autoBuyPlaystyleFactor( playerProfile, tab * upgradesPerTab );
+            if ( factor > stewardFocusFactor ) {
+                stewardFocusFactor = factor;
+                stewardFocusTab = tab;
+            }
+        }
+        if ( stewardFocusTab < tabNames.size() ) {
+            message += "\nSteward Emerging Focus: " + std::string( tabNames[stewardFocusTab] ) + " (+"
+                       + formatEffect( ( stewardFocusFactor - 1.0L ) * 100.0L ) + " preference)";
+        }
+
         size_t stewardPick = upgradeCount;
         long double stewardPickValue = 0.0L;
         for ( size_t id = 0; id < upgradeCount; ++id ) {
