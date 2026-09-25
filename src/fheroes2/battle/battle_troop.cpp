@@ -280,7 +280,7 @@ uint32_t Battle::Unit::GetSpeed() const
     return GetSpeed( false, false );
 }
 
-int Battle::Unit::GetMorale() const
+int Battle::Unit::GetMoraleWithoutRPG() const
 {
     const Arena * arena = GetArena();
     assert( arena != nullptr );
@@ -292,11 +292,18 @@ int Battle::Unit::GetMorale() const
         --armyTroopMorale;
     }
 
+    return Morale::Normalize( armyTroopMorale );
+}
+
+int Battle::Unit::GetMorale() const
+{
+    int morale = GetMoraleWithoutRPG();
+
     if ( !Modes( CAP_TOWER ) && isAffectedByMorale() ) {
-        armyTroopMorale += fheroes2::RPG::moraleBonus( GetColor() );
+        morale += fheroes2::RPG::moraleBonus( GetColor() );
     }
 
-    return Morale::Normalize( armyTroopMorale );
+    return Morale::Normalize( morale );
 }
 
 int32_t Battle::Unit::GetHeadIndex() const
