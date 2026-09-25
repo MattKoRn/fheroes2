@@ -752,8 +752,8 @@ namespace
     const char * ascensionChannelDescription( const AscensionChannel channel )
     {
         switch ( channel ) {
-        case AscensionChannel::ATTACK: return "+1 creature Attack at Ascension I; later stages diminish to 75% / 55% / 40%";
-        case AscensionChannel::DEFENSE: return "+1 creature Defense at Ascension I; later stages diminish to 75% / 55% / 40%";
+        case AscensionChannel::ATTACK: return "diminishing +4 / +3 / +2 / +1 creature Attack across Ascension I-IV";
+        case AscensionChannel::DEFENSE: return "diminishing +4 / +3 / +2 / +1 creature Defense across Ascension I-IV";
         case AscensionChannel::PHYSICAL_DAMAGE: return "+1.25% physical damage at Ascension I; later stages diminish to 75% / 55% / 40%";
         case AscensionChannel::PHYSICAL_REDUCTION: return "+0.75% physical reduction at Ascension I; later stages diminish to 75% / 55% / 40%";
         case AscensionChannel::SPELL_DAMAGE: return "+1.25% spell power at Ascension I; later stages diminish to 75% / 55% / 40%";
@@ -808,21 +808,34 @@ namespace
         }
     }
 
-    long double ascensionTierScale( const uint8_t tier )
+    long double ascensionStageIncrement( const AscensionChannel channel, const uint8_t stage )
     {
-        long double scale = 0.0L;
-        for ( uint8_t stage = 1; stage <= tier; ++stage ) {
-            scale += ascensionStageWeight( stage );
+        if ( channel == AscensionChannel::ATTACK || channel == AscensionChannel::DEFENSE ) {
+            // Heroes II stores these stats as integers, so each Ascension must cross a real
+            // mechanical boundary. The increments still diminish at every milestone.
+            switch ( stage ) {
+            case 1: return 4.0L;
+            case 2: return 3.0L;
+            case 3: return 2.0L;
+            case 4: return 1.0L;
+            default: return 0.0L;
+            }
         }
-        return scale;
+
+        return ascensionPerTier( channel ) * ascensionStageWeight( stage );
     }
 
     long double ascensionChannelBonus( const Profile & profile, const AscensionChannel channel )
     {
         long double total = 0.0L;
         for ( size_t id = 0; id < upgradeCount; ++id ) {
-            if ( ascensionChannels[id] == channel ) {
-                total += ascensionTierScale( ascensionTierForRank( profile.ranks[id] ) ) * ascensionPerTier( channel );
+            if ( ascensionChannels[id] != channel ) {
+                continue;
+            }
+
+            const uint8_t tier = ascensionTierForRank( profile.ranks[id] );
+            for ( uint8_t stage = 1; stage <= tier; ++stage ) {
+                total += ascensionStageIncrement( channel, stage );
             }
         }
         return total;
@@ -866,7 +879,7 @@ namespace
         const uint8_t nextTier = ascensionTierForRank( currentRank + 1 );
         if ( nextTier > currentTier ) {
             const AscensionChannel channel = ascensionChannels[id];
-            const long double raw = ascensionPerTier( channel ) * ascensionStageWeight( nextTier );
+            const long double raw = ascensionStageIncrement( channel, nextTier );
             switch ( channel ) {
             case AscensionChannel::ATTACK:
             case AscensionChannel::DEFENSE:
