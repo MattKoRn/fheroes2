@@ -110,35 +110,35 @@ namespace
         "Whenever one of your creature stacks deals attack damage, it heals for up to 20% of the actual damage dealt. Healing repairs the surviving stack but does not resurrect killed creatures.",
         "Whenever one of your attacks kills creatures, the attacking stack heals for up to 30% of the slain creatures' hit points. It cannot resurrect creatures already lost from that stack.",
 
-        "Increases all physical damage dealt by your creature stacks.",
-        "Increases physical damage dealt by ranged attacks.",
-        "Increases physical damage dealt by melee attacks.",
-        "Increases physical damage against any stack that has already lost hit points or creatures.",
-        "Increases physical damage against a stack while it is currently at its full starting battle hit points.",
+        "Increases all physical damage dealt by your creature stacks, scaling evenly across melee and missile attacks.",
+        "Increases physical damage dealt by ranged creature attacks, rewarding archer superiority.",
+        "Increases physical damage dealt by melee creature attacks, rewarding infantry charges and close-quarters clashes.",
+        "Increases physical damage against any stack that has already lost hit points or creatures, accelerating frontline attrition.",
+        "Increases physical damage against an enemy stack while it is currently at its full starting battle hit points to break initial lines.",
 
-        "Increases physical damage when the attacking stack has fewer creatures than its target.",
-        "Increases physical damage when the attacking stack has more creatures than its target.",
-        "Increases physical damage while the attacking stack is below half of its starting battle hit points.",
-        "Increases physical damage while the attacking stack is still at its full starting battle hit points.",
+        "Increases physical damage when the attacking stack has fewer creatures than its target, rewarding courageous underdog strikes.",
+        "Increases physical damage when the attacking stack has more creatures than its target, punishing fractured enemy formations.",
+        "Increases physical damage while the attacking stack is below half of its starting battle hit points, fueling desperate comebacks.",
+        "Increases physical damage while the attacking stack is still at its full starting battle hit points, rewarding disciplined alpha strikes.",
         "Ignores up to 60% of the defender's RPG physical damage reduction after all applicable defensive upgrades are combined.",
 
         "Reduces all physical damage received by your creature stacks. Combined RPG physical reduction is capped at 70% before Armor Piercing.",
-        "Adds extra damage reduction against ranged creature attacks.",
-        "Adds extra damage reduction against melee creature attacks.",
-        "Adds extra physical damage reduction while the defending stack is below half of its starting battle hit points.",
-        "Adds extra physical damage reduction while the defending stack has fewer creatures than its attacker.",
+        "Adds extra physical damage reduction against ranged creature attacks, blunting opposing missile barrages.",
+        "Adds extra physical damage reduction against melee creature attacks, steadying frontliners against direct assaults.",
+        "Adds extra physical damage reduction while the defending stack is below half of its starting battle hit points to endure final assaults.",
+        "Adds extra physical damage reduction while the defending stack has fewer creatures than its attacker, mitigating outnumbered focus fire.",
 
-        "Increases damage from every damaging spell cast by a hero using this RPG profile.",
-        "Adds damage to Fireball and Fireblast.",
-        "Adds damage to Cold Ray and Cold Ring.",
-        "Adds damage to Lightning Bolt and Chain Lightning.",
-        "Adds damage to Elemental Storm, Meteor Shower, and Armageddon.",
+        "Increases damage from every damaging spell cast by a hero using this RPG profile, boosting direct and area arcana.",
+        "Adds damage to Fireball and Fireblast, amplifying blazing devastation.",
+        "Adds damage to Cold Ray and Cold Ring, empowering biting frost arcana.",
+        "Adds damage to Lightning Bolt and Chain Lightning, channeling concentrated celestial storms.",
+        "Adds damage to Elemental Storm, Meteor Shower, and Armageddon, magnifying world-shaking battlefield destruction.",
 
         "Reduces damage received from every damaging spell. Combined RPG spell reduction is capped at 70% before Arcane Piercing.",
-        "Adds RPG resistance against Fireball and Fireblast.",
-        "Adds RPG resistance against Cold Ray and Cold Ring.",
-        "Adds RPG resistance against Lightning Bolt and Chain Lightning.",
-        "Adds RPG resistance against Elemental Storm, Meteor Shower, and Armageddon.",
+        "Adds RPG resistance against Fireball and Fireblast, shielding your ranks against incinerating firestorms.",
+        "Adds RPG resistance against Cold Ray and Cold Ring, insulating your troops against chilling frost spells.",
+        "Adds RPG resistance against Lightning Bolt and Chain Lightning, grounding deadly lightning strikes.",
+        "Adds RPG resistance against Elemental Storm, Meteor Shower, and Armageddon, surviving apocalyptic planar cataclysms.",
 
         "Adds Morale to your creature stacks during combat, up to +3 from this upgrade.",
         "Adds Luck to your creature stacks during combat, up to +3 from this upgrade.",
@@ -290,10 +290,10 @@ namespace
             case VETERAN_CORE:
             case LEADERSHIP:
             case REGENERATION:
-                return 7;
+                return 9;
             case CRITICAL_TRAINING:
             case BRUTAL_CRITICALS:
-                return 4;
+                return 6;
             default:
                 return 0;
             }
@@ -305,7 +305,7 @@ namespace
             case OVERWHELM:
             case FRENZY:
             case ARMOR_PIERCING:
-                return 8;
+                return 10;
             default:
                 return 0;
             }
@@ -317,7 +317,7 @@ namespace
             case STORMCRAFT:
             case CATACLYSM:
             case ARCANE_PIERCING:
-                return 8;
+                return 10;
             default:
                 return 0;
             }
@@ -334,7 +334,7 @@ namespace
             case COLD_WARD:
             case STORM_WARD:
             case CATACLYSM_WARD:
-                return 7;
+                return 9;
             default:
                 return 0;
             }
@@ -346,7 +346,7 @@ namespace
             case DISCIPLINE:
             case FORTUNE:
             case CRITICAL_TRAINING:
-                return 8;
+                return 10;
             default:
                 return 0;
             }
@@ -711,18 +711,18 @@ namespace
         case ARMS_TRAINING:
         case ARMOR_TRAINING:
             // A single primary-stat point often changes physical damage by roughly 5-10%.
-            return delta * 7.0L;
+            return delta * 7.5L;
         case VETERAN_CORE:
-            return delta * 12.0L;
+            return delta * 12.5L;
         case BLOOD_DRINKER:
-            return delta * 0.75L;
+            return delta * 0.80L;
         case REAPER:
-            return delta * 0.45L;
+            return delta * 0.50L;
         case FEROCITY:
         case IRON_SKIN:
         case SORCERY:
         case SPELL_WARD:
-            return delta;
+            return delta * 1.05L;
         case MARKSMAN:
         case BRAWLER:
         case PYROMANCY:
@@ -735,7 +735,7 @@ namespace
         case COLD_WARD:
         case STORM_WARD:
         case CATACLYSM_WARD:
-            return delta * 0.70L;
+            return delta * 0.75L;
         case EXECUTIONER:
         case OPENING_BLOW:
         case GIANT_SLAYER:
@@ -746,23 +746,23 @@ namespace
         case BULWARK:
         case UNYIELDING:
         case RUTHLESS:
-            return delta * 0.55L;
+            return delta * 0.60L;
         case ARMOR_PIERCING:
         case ARCANE_PIERCING:
-            return delta * 0.45L;
+            return delta * 0.50L;
         case LEADERSHIP:
         case FORTUNE:
-            return delta * 4.0L;
+            return delta * 4.2L;
         case REGENERATION:
-            return delta * 0.80L;
+            return delta * 0.85L;
         case CRITICAL_TRAINING:
             return delta * ( 50.0L + effect( BRUTAL_CRITICALS, profile.ranks[BRUTAL_CRITICALS] ) ) / 100.0L;
         case BRUTAL_CRITICALS:
             return delta * effect( CRITICAL_TRAINING, profile.ranks[CRITICAL_TRAINING] ) / 100.0L;
         case EVASION:
-            return delta * 0.50L;
+            return delta * 0.55L;
         case CLOSE_QUARTERS:
-            return delta * 0.35L;
+            return delta * 0.40L;
         default:
             return delta;
         }
@@ -2301,7 +2301,7 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
                       return 0;
                   }
 
-                  const int bonus = eliteKingdom ? 10 : sophisticationTier >= 3 ? 6 : 3;
+                  const int bonus = eliteKingdom ? 12 : sophisticationTier >= 3 ? 8 : 4;
                   switch ( id ) {
                   case BLOOD_DRINKER:
                   case REAPER:
@@ -2520,7 +2520,7 @@ uint64_t fheroes2::RPG::previewAdventureActionExperience( const PlayerColor colo
     // Tiny lore/interactables are intentionally low-value so they cannot outshine real exploration.
     case MP2::OBJ_SIGN:
     case MP2::OBJ_BOTTLE:
-        base = 25;
+        base = 40;
         break;
 
     case MP2::OBJ_RESOURCE:
@@ -2531,19 +2531,19 @@ uint64_t fheroes2::RPG::previewAdventureActionExperience( const PlayerColor colo
     case MP2::OBJ_WATER_WHEEL:
     case MP2::OBJ_MAGIC_GARDEN:
     case MP2::OBJ_LEAN_TO:
-        base = 80;
+        base = 105;
         break;
 
     case MP2::OBJ_TREASURE_CHEST:
     case MP2::OBJ_SEA_CHEST:
     case MP2::OBJ_WAGON:
-        base = 180;
+        base = 210;
         break;
 
     case MP2::OBJ_ARTIFACT:
     case MP2::OBJ_SHIPWRECK_SURVIVOR:
     case MP2::OBJ_SKELETON:
-        base = 200;
+        base = 235;
         break;
 
     case MP2::OBJ_MINE:
@@ -2551,18 +2551,18 @@ uint64_t fheroes2::RPG::previewAdventureActionExperience( const PlayerColor colo
     case MP2::OBJ_SAWMILL:
     case MP2::OBJ_LIGHTHOUSE:
     case MP2::OBJ_ABANDONED_MINE:
-        base = 180;
+        base = 215;
         break;
 
     case MP2::OBJ_CASTLE:
-        base = 140;
+        base = 175;
         break;
 
     case MP2::OBJ_SHRINE_FIRST_CIRCLE:
     case MP2::OBJ_SHRINE_SECOND_CIRCLE:
     case MP2::OBJ_SHRINE_THIRD_CIRCLE:
     case MP2::OBJ_TEMPLE:
-        base = 130;
+        base = 165;
         break;
 
     // Character-growth sites are satisfying RPG destinations and deserve to stand above loose loot.
@@ -2574,7 +2574,7 @@ uint64_t fheroes2::RPG::previewAdventureActionExperience( const PlayerColor colo
     case MP2::OBJ_GAZEBO:
     case MP2::OBJ_WITCHS_HUT:
     case MP2::OBJ_TREE_OF_KNOWLEDGE:
-        base = 180;
+        base = 225;
         break;
 
     case MP2::OBJ_FOUNTAIN:
@@ -2584,22 +2584,22 @@ uint64_t fheroes2::RPG::previewAdventureActionExperience( const PlayerColor colo
     case MP2::OBJ_OASIS:
     case MP2::OBJ_WATERING_HOLE:
     case MP2::OBJ_BUOY:
-        base = 90;
+        base = 120;
         break;
 
     case MP2::OBJ_EVENT:
-        base = 100;
+        base = 135;
         break;
     case MP2::OBJ_ORACLE:
-        base = 170;
+        base = 205;
         break;
     case MP2::OBJ_SPHINX:
-        base = 220;
+        base = 270;
         break;
 
     case MP2::OBJ_STONE_LITHS:
     case MP2::OBJ_WHIRLPOOL:
-        base = 90;
+        base = 115;
         break;
 
     // Dangerous adventure sites should feel like RPG accomplishments rather than ordinary clicks.
@@ -2608,10 +2608,10 @@ uint64_t fheroes2::RPG::previewAdventureActionExperience( const PlayerColor colo
     case MP2::OBJ_SIRENS:
     case MP2::OBJ_GRAVEYARD:
     case MP2::OBJ_DAEMON_CAVE:
-        base = 210;
+        base = 260;
         break;
     case MP2::OBJ_PYRAMID:
-        base = 260;
+        base = 325;
         break;
 
     case MP2::OBJ_OBSERVATION_TOWER:
@@ -2619,7 +2619,7 @@ uint64_t fheroes2::RPG::previewAdventureActionExperience( const PlayerColor colo
     case MP2::OBJ_OBELISK:
     case MP2::OBJ_HUT_OF_MAGI:
     case MP2::OBJ_EYE_OF_MAGI:
-        base = 150;
+        base = 190;
         break;
 
     default:
@@ -2761,26 +2761,26 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
             attackBonus += effect( EXECUTIONER, attackProfile->ranks[EXECUTIONER] );
         }
         if ( defenderBelowHalf ) {
-            attackBonus += doctrinePairResonance( *attackProfile, EXECUTIONER, RUTHLESS, 0.25L, 6.0L );
+            attackBonus += doctrinePairResonance( *attackProfile, EXECUTIONER, RUTHLESS, 0.28L, 7.5L );
         }
         if ( defenderFullHealth ) {
             attackBonus += effect( OPENING_BLOW, attackProfile->ranks[OPENING_BLOW] );
         }
         if ( attackerOutnumbered ) {
             attackBonus += effect( GIANT_SLAYER, attackProfile->ranks[GIANT_SLAYER] );
-            attackBonus += doctrinePairResonance( *attackProfile, GIANT_SLAYER, BULWARK, 0.20L, 5.0L );
+            attackBonus += doctrinePairResonance( *attackProfile, GIANT_SLAYER, BULWARK, 0.24L, 6.0L );
         }
         if ( defenderOutnumbered ) {
             attackBonus += effect( OVERWHELM, attackProfile->ranks[OVERWHELM] );
         }
         if ( attackerBelowHalf ) {
             attackBonus += effect( FRENZY, attackProfile->ranks[FRENZY] );
-            attackBonus += doctrinePairResonance( *attackProfile, FRENZY, LAST_STAND, 0.20L, 5.0L );
+            attackBonus += doctrinePairResonance( *attackProfile, FRENZY, LAST_STAND, 0.24L, 6.0L );
         }
         if ( attackerFullHealth ) {
             attackBonus += effect( DISCIPLINE, attackProfile->ranks[DISCIPLINE] );
             if ( defenderFullHealth ) {
-                attackBonus += doctrineTripleResonance( *attackProfile, OPENING_BLOW, DISCIPLINE, UNYIELDING, 0.18L, 5.0L );
+                attackBonus += doctrineTripleResonance( *attackProfile, OPENING_BLOW, DISCIPLINE, UNYIELDING, 0.22L, 6.5L );
             }
         }
         if ( defenderBelowHalf ) {
@@ -2795,15 +2795,15 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
 
         if ( defenderBelowHalf ) {
             defenseReduction += effect( LAST_STAND, defenseProfile->ranks[LAST_STAND] );
-            defenseReduction += doctrinePairResonance( *defenseProfile, FRENZY, LAST_STAND, 0.16L, 4.0L );
+            defenseReduction += doctrinePairResonance( *defenseProfile, FRENZY, LAST_STAND, 0.20L, 5.0L );
         }
         if ( defenderOutnumbered ) {
             defenseReduction += effect( BULWARK, defenseProfile->ranks[BULWARK] );
-            defenseReduction += doctrinePairResonance( *defenseProfile, GIANT_SLAYER, BULWARK, 0.16L, 4.0L );
+            defenseReduction += doctrinePairResonance( *defenseProfile, GIANT_SLAYER, BULWARK, 0.20L, 5.0L );
         }
         if ( defenderFullHealth ) {
             defenseReduction += effect( UNYIELDING, defenseProfile->ranks[UNYIELDING] );
-            defenseReduction += doctrinePairResonance( *defenseProfile, DISCIPLINE, UNYIELDING, 0.16L, 4.0L );
+            defenseReduction += doctrinePairResonance( *defenseProfile, DISCIPLINE, UNYIELDING, 0.20L, 5.0L );
         }
     }
 
@@ -2829,12 +2829,12 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
     if ( specialization != upgradeCount ) {
         if ( attackProfile != nullptr ) {
             spellBonus += effect( specialization, attackProfile->ranks[specialization] );
-            spellBonus += doctrinePairResonance( *attackProfile, SORCERY, specialization, 0.20L, 6.0L );
+            spellBonus += doctrinePairResonance( *attackProfile, SORCERY, specialization, 0.25L, 7.5L );
         }
         if ( defenseProfile != nullptr ) {
             const size_t ward = spellWardId( spellId );
             defenseReduction += effect( ward, defenseProfile->ranks[ward] );
-            defenseReduction += doctrinePairResonance( *defenseProfile, SPELL_WARD, ward, 0.20L, 6.0L );
+            defenseReduction += doctrinePairResonance( *defenseProfile, SPELL_WARD, ward, 0.25L, 7.5L );
         }
     }
 
