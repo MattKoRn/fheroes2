@@ -170,6 +170,11 @@ namespace Battle
         void SetPosition( const Position & pos );
         void SetReflection( const bool isReflected );
 
+        // Battle values before persistent RPG Attack/Defense doctrines are applied. These are
+        // exposed for unit-stat UI so the doctrine contribution can be shown separately.
+        [[nodiscard]] uint32_t GetAttackWithoutRPG() const;
+        [[nodiscard]] uint32_t GetDefenseWithoutRPG() const;
+
         uint32_t GetAttack() const override;
         uint32_t GetDefense() const override;
 
