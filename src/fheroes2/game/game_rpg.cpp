@@ -623,10 +623,43 @@ namespace
     long double autoBuySynergyFactor( const Profile & profile, const size_t id )
     {
         switch ( id ) {
+        case BLOOD_DRINKER:
+            return 1.0L
+                   + std::min<long double>( 0.16L, effect( REGENERATION, profile.ranks[REGENERATION] ) / 150.0L
+                                                      + effect( REAPER, profile.ranks[REAPER] ) / 300.0L );
+        case REAPER:
+            return 1.0L
+                   + std::min<long double>( 0.16L, effect( REGENERATION, profile.ranks[REGENERATION] ) / 150.0L
+                                                      + effect( BLOOD_DRINKER, profile.ranks[BLOOD_DRINKER] ) / 250.0L );
+        case REGENERATION:
+            return 1.0L
+                   + std::min<long double>( 0.18L, ( effect( BLOOD_DRINKER, profile.ranks[BLOOD_DRINKER] )
+                                                     + effect( REAPER, profile.ranks[REAPER] ) )
+                                                       / 180.0L );
+
         case MARKSMAN:
             return 1.0L + std::min<long double>( 0.18L, effect( CLOSE_QUARTERS, profile.ranks[CLOSE_QUARTERS] ) / 500.0L );
         case CLOSE_QUARTERS:
             return 1.0L + std::min<long double>( 0.18L, effect( MARKSMAN, profile.ranks[MARKSMAN] ) / 100.0L );
+
+        case EXECUTIONER:
+            return 1.0L + std::min<long double>( 0.15L, effect( RUTHLESS, profile.ranks[RUTHLESS] ) / 150.0L );
+        case RUTHLESS:
+            return 1.0L + std::min<long double>( 0.15L, effect( EXECUTIONER, profile.ranks[EXECUTIONER] ) / 150.0L );
+
+        case FRENZY:
+            return 1.0L + std::min<long double>( 0.15L, effect( LAST_STAND, profile.ranks[LAST_STAND] ) / 150.0L );
+        case LAST_STAND:
+            return 1.0L + std::min<long double>( 0.15L, effect( FRENZY, profile.ranks[FRENZY] ) / 150.0L );
+
+        case OPENING_BLOW:
+        case DISCIPLINE:
+            return 1.0L + std::min<long double>( 0.15L, effect( UNYIELDING, profile.ranks[UNYIELDING] ) / 220.0L );
+        case UNYIELDING:
+            return 1.0L
+                   + std::min<long double>( 0.15L, ( effect( OPENING_BLOW, profile.ranks[OPENING_BLOW] )
+                                                     + effect( DISCIPLINE, profile.ranks[DISCIPLINE] ) )
+                                                       / 260.0L );
 
         case SORCERY: {
             const long double strongestElement = std::max( { effect( PYROMANCY, profile.ranks[PYROMANCY] ),
@@ -652,6 +685,24 @@ namespace
         case ARROW_WARD:
         case MELEE_GUARD:
             return 1.0L + std::min<long double>( 0.15L, effect( IRON_SKIN, profile.ranks[IRON_SKIN] ) / 150.0L );
+
+        case SPELL_WARD: {
+            const long double strongestElementWard = std::max( { effect( FIRE_WARD, profile.ranks[FIRE_WARD] ),
+                                                                 effect( COLD_WARD, profile.ranks[COLD_WARD] ),
+                                                                 effect( STORM_WARD, profile.ranks[STORM_WARD] ),
+                                                                 effect( CATACLYSM_WARD, profile.ranks[CATACLYSM_WARD] ) } );
+            return 1.0L + std::min<long double>( 0.15L, strongestElementWard / 120.0L );
+        }
+        case FIRE_WARD:
+        case COLD_WARD:
+        case STORM_WARD:
+        case CATACLYSM_WARD:
+            return 1.0L + std::min<long double>( 0.15L, effect( SPELL_WARD, profile.ranks[SPELL_WARD] ) / 150.0L );
+
+        case CRITICAL_TRAINING:
+            return 1.0L + std::min<long double>( 0.22L, effect( BRUTAL_CRITICALS, profile.ranks[BRUTAL_CRITICALS] ) / 250.0L );
+        case BRUTAL_CRITICALS:
+            return 1.0L + std::min<long double>( 0.22L, effect( CRITICAL_TRAINING, profile.ranks[CRITICAL_TRAINING] ) / 50.0L );
         default:
             return 1.0L;
         }
@@ -1482,12 +1533,56 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
         Profile temporary;
         temporary.level = std::max<uint64_t>( 1, scaledValue( playerProfile.level, variation( rng ) ) );
 
+        // Pick one or two doctrine halls that the player has actually invested in and bias this
+        // temporary opponent toward them. This preserves the player's progression envelope while
+        // making enemy builds feel like coherent archetypes instead of forty unrelated dice rolls.
+        std::array<size_t, tabNames.size()> investedTabs{};
+        size_t investedTabCount = 0;
+        for ( size_t tab = 0; tab < tabNames.size(); ++tab ) {
+            const size_t firstUpgrade = tab * upgradesPerTab;
+            bool hasInvestment = false;
+            for ( size_t offset = 0; offset < upgradesPerTab; ++offset ) {
+                if ( playerProfile.ranks[firstUpgrade + offset] > 0 ) {
+                    hasInvestment = true;
+                    break;
+                }
+            }
+            if ( hasInvestment ) {
+                investedTabs[investedTabCount++] = tab;
+            }
+        }
+
+        size_t primaryTab = tabNames.size();
+        size_t secondaryTab = tabNames.size();
+        if ( investedTabCount > 0 ) {
+            std::uniform_int_distribution<size_t> tabPick( 0, investedTabCount - 1 );
+            primaryTab = investedTabs[tabPick( rng )];
+
+            if ( investedTabCount > 1 ) {
+                do {
+                    secondaryTab = investedTabs[tabPick( rng )];
+                } while ( secondaryTab == primaryTab );
+            }
+        }
+
         for ( size_t id = 0; id < upgradeCount; ++id ) {
             if ( playerProfile.ranks[id] == 0 ) {
                 continue;
             }
 
-            const int percent = variation( rng );
+            int percent = variation( rng );
+            const size_t tab = id / upgradesPerTab;
+            if ( tab == primaryTab ) {
+                percent += 8;
+            }
+            else if ( tab == secondaryTab ) {
+                percent += 4;
+            }
+            else {
+                percent -= 2;
+            }
+            percent = std::clamp( percent, minimumPower, maximumPower );
+
             const long double scaledRank = static_cast<long double>( playerProfile.ranks[id] ) * percent / 100.0L;
             const long double roundedRank = roundUpSmallRanks ? std::floor( scaledRank + 0.5L ) : std::floor( scaledRank );
             temporary.ranks[id] = static_cast<uint64_t>( std::min<long double>(
