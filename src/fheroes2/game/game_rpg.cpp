@@ -2662,26 +2662,36 @@ void fheroes2::RPG::awardAdventureAction( const PlayerColor color, const int obj
     static_cast<void>( addExperience( color, reward, ExperienceKind::ADVENTURE ) );
 }
 
-uint32_t fheroes2::RPG::creatureAttackBonus( const PlayerColor color )
+uint64_t fheroes2::RPG::creatureAttackDoctrineModifier( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
     if ( profile == nullptr ) {
         return 0;
     }
 
-    const long double total = effect( ARMS_TRAINING, profile->ranks[ARMS_TRAINING] ) + effect( VETERAN_CORE, profile->ranks[VETERAN_CORE] );
-    return static_cast<uint32_t>( std::min<long double>( total, std::numeric_limits<uint32_t>::max() ) );
+    return saturatedAdd( profile->ranks[ARMS_TRAINING], profile->ranks[VETERAN_CORE] );
+}
+
+uint64_t fheroes2::RPG::creatureDefenseDoctrineModifier( const PlayerColor color )
+{
+    const Profile * profile = getProfile( color );
+    if ( profile == nullptr ) {
+        return 0;
+    }
+
+    return saturatedAdd( profile->ranks[ARMOR_TRAINING], profile->ranks[VETERAN_CORE] );
+}
+
+uint32_t fheroes2::RPG::creatureAttackBonus( const PlayerColor color )
+{
+    return static_cast<uint32_t>(
+        std::min<uint64_t>( creatureAttackDoctrineModifier( color ), std::numeric_limits<uint32_t>::max() ) );
 }
 
 uint32_t fheroes2::RPG::creatureDefenseBonus( const PlayerColor color )
 {
-    const Profile * profile = getProfile( color );
-    if ( profile == nullptr ) {
-        return 0;
-    }
-
-    const long double total = effect( ARMOR_TRAINING, profile->ranks[ARMOR_TRAINING] ) + effect( VETERAN_CORE, profile->ranks[VETERAN_CORE] );
-    return static_cast<uint32_t>( std::min<long double>( total, std::numeric_limits<uint32_t>::max() ) );
+    return static_cast<uint32_t>(
+        std::min<uint64_t>( creatureDefenseDoctrineModifier( color ), std::numeric_limits<uint32_t>::max() ) );
 }
 
 int fheroes2::RPG::moraleBonus( const PlayerColor color )
