@@ -2724,171 +2724,162 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
         saveProfile( preserveRecoveryBackup );
     }
 
-    // Temporary enemy RPG builds are deterministic for the same map/profile level and
-    // scale only upgrades the player has actually purchased. This avoids fresh profiles
-    // facing invisible free enemy perks and keeps opponent power tied to real RPG choices.
+    // Temporary enemy RPG builds scale with RNG from the player's profile and points budget,
+    // generating distinct randomized builds across doctrine archetypes rather than mimicking
+    // the player's profile.
     uint64_t seed = static_cast<uint64_t>( world.GetMapSeed() ) << 32;
     // Unsigned multiplication intentionally wraps here: this is a hash mix, not arithmetic progression.
     seed ^= playerProfile.level * 0x9E3779B185EBCA87ULL;
     seed ^= static_cast<uint64_t>( playerColor ) * 0xC2B2AE3D27D4EB4FULL;
     std::mt19937_64 rng( seed );
 
+    const uint64_t playerSpentPoints = totalSpentPoints( playerProfile );
+    const uint64_t playerTotalPoints = saturatedAdd( playerSpentPoints, playerProfile.points );
+    const uint64_t playerLevelPoints = saturatedMultiply( playerProfile.level > 0 ? playerProfile.level - 1 : 0, pointsPerLevel );
+    const uint64_t playerBudget = std::max( playerTotalPoints, playerLevelPoints );
+
+    // Elite rivals are deterministic for this map because they use the same seeded generator.
+    // They only begin appearing after a few RPG levels. Guild Prestige raises the late-game
+    // encounter rate gradually, while the hard cap keeps ordinary rival kingdoms common.
+    const int eliteChance = eliteRivalChanceForLevel( playerProfile.level );
+    std::uniform_int_distribution<int> eliteRoll( 0, 99 );
+    std::uniform_int_distribution<size_t> archetypeRoll( 0, rivalArchetypeNames.size() - 1 );
+
     const auto makeTemporaryProfile
-        = [&rng]( const int minimumPower, const int maximumPower, const bool roundUpSmallRanks, const bool sophisticatedKingdom,
-                  const bool eliteKingdom, const RivalArchetype archetype ) {
+        = [&rng, playerBudget, &archetypeRoll]( const int minimumPower, const int maximumPower, const bool roundUpSmallRanks,
+                                                const bool sophisticatedKingdom, const bool eliteKingdom, const RivalArchetype archetype ) {
               std::uniform_int_distribution<int> variation( minimumPower, maximumPower );
-              const int levelPercent = variation( rng );
+              const int powerPercent = variation( rng );
 
               Profile temporary;
-              temporary.level = std::max<uint64_t>( 1, scaledValue( playerProfile.level, levelPercent ) );
+              temporary.level = std::max<uint64_t>( 1, scaledValue( playerProfile.level, powerPercent ) );
 
-              std::array<size_t, tabNames.size()> investedTabs{};
-              std::array<uint64_t, tabNames.size()> tabInvestments{};
-              std::array<uint64_t, tabNames.size()> tabActivity{};
-              size_t investedTabCount = 0;
+              // Total doctrine point budget scales with RNG from the player's own profile.
+              uint64_t enemyBudget = scaledValue( playerBudget, powerPercent );
+              if ( enemyBudget == 0 && playerBudget > 0 && powerPercent > 0 && roundUpSmallRanks ) {
+                  enemyBudget = 1;
+              }
+              temporary.points = enemyBudget;
+
+              if ( enemyBudget == 0 ) {
+                  return temporary;
+              }
+
+              // Determine archetype for this enemy build
+              const RivalArchetype effectiveArchetype
+                  = archetype != RivalArchetype::NONE ? archetype : static_cast<RivalArchetype>( archetypeRoll( rng ) + 1 );
+
+              // Determine focus halls
+              size_t focusTabCount = 1;
+              if ( sophisticatedKingdom ) {
+                  focusTabCount = eliteKingdom ? std::min<size_t>( tabNames.size(), eliteRivalFocusHallLimit( playerProfile.level ) )
+                                               : powerPercent >= 105 ? 3 : powerPercent >= 95 ? 2 : 1;
+              }
+
+              std::array<size_t, tabNames.size()> sortedTabs{};
+              for ( size_t i = 0; i < tabNames.size(); ++i ) {
+                  sortedTabs[i] = i;
+              }
+
+              std::array<uint64_t, tabNames.size()> tabScores{};
+              std::uniform_int_distribution<uint64_t> hallJitter( 0, 30 );
               for ( size_t tab = 0; tab < tabNames.size(); ++tab ) {
-                  const size_t firstUpgrade = tab * upgradesPerTab;
-                  for ( size_t offset = 0; offset < upgradesPerTab; ++offset ) {
-                      const size_t id = firstUpgrade + offset;
-                      tabInvestments[tab] = saturatedAdd( tabInvestments[tab], rankInvestment( id, playerProfile.ranks[id] ) );
-                      tabActivity[tab] = saturatedAdd( tabActivity[tab], playerProfile.useCounts[id] );
-                  }
+                  tabScores[tab] = saturatedAdd( rivalArchetypeHallBias( effectiveArchetype, tab ), hallJitter( rng ) );
+              }
+              std::sort( sortedTabs.begin(), sortedTabs.end(), [&tabScores]( const size_t first, const size_t second ) {
+                  return tabScores[first] > tabScores[second];
+              } );
 
-                  if ( tabInvestments[tab] > 0 ) {
-                      investedTabs[investedTabCount++] = tab;
-                  }
+              std::array<size_t, tabNames.size()> focusTabs{};
+              for ( size_t i = 0; i < focusTabCount; ++i ) {
+                  focusTabs[i] = sortedTabs[i];
               }
 
-              size_t focusTabCount = 0;
-              int sophisticationTier = 0;
-              if ( investedTabCount > 0 ) {
-                  if ( sophisticatedKingdom ) {
-                      // Ordinary rivals coordinate one to three invested halls according to their
-                      // strength roll. Elite rivals begin at four focused halls and earn up to two
-                      // additional coordinated halls through the player's Guild Prestige.
-                      sophisticationTier = eliteKingdom ? static_cast<int>( eliteRivalFocusHallLimit( playerProfile.level ) )
-                                                       : levelPercent >= 105 ? 3 : levelPercent >= 95 ? 2 : 1;
-                      focusTabCount = std::min( static_cast<size_t>( sophisticationTier ), investedTabCount );
-
-                      std::array<uint64_t, tabNames.size()> priorities{};
-                      std::uniform_int_distribution<uint64_t> tieBreak( 0, 15 );
-                      for ( size_t i = 0; i < investedTabCount; ++i ) {
-                          const size_t tab = investedTabs[i];
-                          const uint64_t activityWeight = static_cast<uint64_t>(
-                              std::min<long double>( 255.0L, std::log1p( static_cast<long double>( tabActivity[tab] ) ) * 24.0L ) );
-                          const uint64_t adaptiveWeight = eliteKingdom ? activityWeight : activityWeight / 2;
-                          const uint64_t archetypeWeight = eliteKingdom ? rivalArchetypeHallBias( archetype, tab ) : 0;
-                          priorities[tab] = saturatedAdd(
-                              saturatedAdd( saturatedAdd( saturatedMultiply( tabInvestments[tab], 16 ), adaptiveWeight ), archetypeWeight ),
-                              tieBreak( rng ) );
-                      }
-                      std::sort( investedTabs.begin(), investedTabs.begin() + investedTabCount,
-                                 [&priorities]( const size_t first, const size_t second ) { return priorities[first] > priorities[second]; } );
-                  }
-                  else {
-                      sophisticationTier = 1;
-                      focusTabCount = 1;
-                      std::uniform_int_distribution<size_t> tabPick( 0, investedTabCount - 1 );
-                      std::swap( investedTabs[0], investedTabs[tabPick( rng )] );
-                  }
-              }
-
-              const auto isFocusedTab = [&investedTabs, focusTabCount]( const size_t tab ) {
-                  for ( size_t focus = 0; focus < focusTabCount; ++focus ) {
-                      if ( investedTabs[focus] == tab ) {
-                          return focus;
-                      }
-                  }
-                  return focusTabCount;
-              };
-
-              const auto hasPurchased = []( const size_t id ) { return playerProfile.ranks[id] > 0; };
-              const auto packageBonus = [sophisticationTier, eliteKingdom, &hasPurchased]( const size_t id ) {
-                  if ( sophisticationTier < 2 ) {
-                      return 0;
-                  }
-
-                  const int bonus = eliteKingdom ? 12 : sophisticationTier >= 3 ? 8 : 4;
-                  switch ( id ) {
-                  case BLOOD_DRINKER:
-                  case REAPER:
-                  case REGENERATION:
-                      return ( static_cast<int>( hasPurchased( BLOOD_DRINKER ) ) + static_cast<int>( hasPurchased( REAPER ) )
-                               + static_cast<int>( hasPurchased( REGENERATION ) ) )
-                                 >= 2
-                             ? bonus
-                             : 0;
-                  case MARKSMAN:
-                  case CLOSE_QUARTERS:
-                      return hasPurchased( MARKSMAN ) && hasPurchased( CLOSE_QUARTERS ) ? bonus : 0;
-                  case EXECUTIONER:
-                  case RUTHLESS:
-                      return hasPurchased( EXECUTIONER ) && hasPurchased( RUTHLESS ) ? bonus : 0;
-                  case FRENZY:
-                  case LAST_STAND:
-                      return hasPurchased( FRENZY ) && hasPurchased( LAST_STAND ) ? bonus : 0;
-                  case OPENING_BLOW:
-                  case DISCIPLINE:
-                  case UNYIELDING:
-                      return ( static_cast<int>( hasPurchased( OPENING_BLOW ) ) + static_cast<int>( hasPurchased( DISCIPLINE ) )
-                               + static_cast<int>( hasPurchased( UNYIELDING ) ) )
-                                 >= 2
-                             ? bonus
-                             : 0;
-                  case SORCERY:
-                  case PYROMANCY:
-                  case CRYOMANCY:
-                  case STORMCRAFT:
-                  case CATACLYSM:
-                  case ARCANE_PIERCING:
-                      return hasPurchased( SORCERY )
-                                 && ( hasPurchased( PYROMANCY ) || hasPurchased( CRYOMANCY ) || hasPurchased( STORMCRAFT )
-                                      || hasPurchased( CATACLYSM ) )
-                             ? bonus
-                             : 0;
-                  case SPELL_WARD:
-                  case FIRE_WARD:
-                  case COLD_WARD:
-                  case STORM_WARD:
-                  case CATACLYSM_WARD:
-                      return hasPurchased( SPELL_WARD )
-                                 && ( hasPurchased( FIRE_WARD ) || hasPurchased( COLD_WARD ) || hasPurchased( STORM_WARD )
-                                      || hasPurchased( CATACLYSM_WARD ) )
-                             ? bonus
-                             : 0;
-                  case CRITICAL_TRAINING:
-                  case BRUTAL_CRITICALS:
-                      return hasPurchased( CRITICAL_TRAINING ) && hasPurchased( BRUTAL_CRITICALS ) ? bonus : 0;
-                  default:
-                      return 0;
-                  }
-              };
-
+              // Doctrine weights based on archetype, focus halls, and RNG jitter
+              std::array<int, upgradeCount> doctrineWeights{};
+              std::uniform_int_distribution<int> docJitter( 8, 24 );
               for ( size_t id = 0; id < upgradeCount; ++id ) {
-                  if ( playerProfile.ranks[id] == 0 ) {
-                      continue;
+                  const size_t tab = id / upgradesPerTab;
+                  int weight = docJitter( rng );
+
+                  const uint64_t hallBias = rivalArchetypeHallBias( effectiveArchetype, tab );
+                  weight += static_cast<int>( hallBias / ( eliteKingdom ? 2 : 3 ) );
+
+                  const int docBias = rivalArchetypeDoctrineBias( effectiveArchetype, id );
+                  weight += docBias * ( eliteKingdom ? 6 : 4 );
+
+                  for ( size_t f = 0; f < focusTabCount; ++f ) {
+                      if ( focusTabs[f] == tab ) {
+                          weight += static_cast<int>( ( focusTabCount - f ) * 10 );
+                          break;
+                      }
                   }
 
-                  int percent = variation( rng );
-                  const size_t focus = isFocusedTab( id / upgradesPerTab );
-                  if ( focus < focusTabCount ) {
-                      percent += focus == 0 ? ( eliteKingdom ? 12 : 8 )
-                                           : focus == 1 ? ( eliteKingdom ? 8 : 5 )
-                                                        : focus == 2 ? ( eliteKingdom ? 5 : 3 ) : 3;
-                  }
-                  else {
-                      percent -= 2;
-                  }
-                  percent += packageBonus( id );
-                  if ( eliteKingdom ) {
-                      percent += rivalArchetypeDoctrineBias( archetype, id );
-                  }
-                  percent = std::clamp( percent, minimumPower, maximumPower );
+                  doctrineWeights[id] = std::max( 1, weight );
+              }
 
-                  const long double scaledRank = static_cast<long double>( playerProfile.ranks[id] ) * percent / 100.0L;
-                  const long double roundedRank = roundUpSmallRanks ? std::floor( scaledRank + 0.5L ) : std::floor( scaledRank );
-                  temporary.ranks[id] = static_cast<uint64_t>( std::min<long double>(
-                      static_cast<long double>( std::numeric_limits<uint64_t>::max() ), std::max<long double>( 0.0L, roundedRank ) ) );
+              // Allocate doctrine ranks using weighted random selection until budget is spent
+              while ( temporary.points > 0 ) {
+                  std::vector<size_t> candidates;
+                  std::vector<int> candidateWeights;
+                  candidates.reserve( upgradeCount );
+                  candidateWeights.reserve( upgradeCount );
+
+                  for ( size_t id = 0; id < upgradeCount; ++id ) {
+                      if ( !doctrineCanAdvance( id, temporary.ranks[id] ) ) {
+                          continue;
+                      }
+                      if ( cost( id, temporary.ranks[id] ) > temporary.points ) {
+                          continue;
+                      }
+                      if ( id == BRUTAL_CRITICALS && temporary.ranks[CRITICAL_TRAINING] == 0 ) {
+                          continue;
+                      }
+
+                      int w = doctrineWeights[id];
+
+                      // Synergy bonuses when related doctrines are acquired
+                      if ( id == BRUTAL_CRITICALS && temporary.ranks[CRITICAL_TRAINING] > 0 ) {
+                          w += 35;
+                      }
+                      if ( ( id == PYROMANCY || id == CRYOMANCY || id == STORMCRAFT || id == CATACLYSM || id == ARCANE_PIERCING )
+                           && temporary.ranks[SORCERY] > 0 ) {
+                          w += 30;
+                      }
+                      if ( ( id == FIRE_WARD || id == COLD_WARD || id == STORM_WARD || id == CATACLYSM_WARD )
+                           && temporary.ranks[SPELL_WARD] > 0 ) {
+                          w += 25;
+                      }
+                      if ( id == REAPER && temporary.ranks[BLOOD_DRINKER] > 0 ) {
+                          w += 20;
+                      }
+                      if ( id == RUTHLESS && temporary.ranks[EXECUTIONER] > 0 ) {
+                          w += 20;
+                      }
+                      if ( id == CLOSE_QUARTERS && temporary.ranks[MARKSMAN] > 0 ) {
+                          w += 20;
+                      }
+                      if ( id == LAST_STAND && temporary.ranks[FRENZY] > 0 ) {
+                          w += 20;
+                      }
+
+                      // Taper weight for already-high ranks to encourage cohesive builds rather than dumping into a single skill
+                      const int rankPenalty = static_cast<int>( temporary.ranks[id] * 3 );
+                      w = std::max( 1, w - rankPenalty );
+
+                      candidates.push_back( id );
+                      candidateWeights.push_back( w );
+                  }
+
+                  if ( candidates.empty() ) {
+                      break;
+                  }
+
+                  std::discrete_distribution<size_t> dist( candidateWeights.begin(), candidateWeights.end() );
+                  const size_t pick = candidates[dist( rng )];
+                  if ( !buy( temporary, pick ) ) {
+                      break;
+                  }
               }
 
               if ( temporary.ranks[CRITICAL_TRAINING] == 0 ) {
@@ -2897,13 +2888,6 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
 
               return temporary;
           };
-
-    // Elite rivals are deterministic for this map because they use the same seeded generator.
-    // They only begin appearing after a few RPG levels. Guild Prestige raises the late-game
-    // encounter rate gradually, while the hard cap keeps ordinary rival kingdoms common.
-    const int eliteChance = eliteRivalChanceForLevel( playerProfile.level );
-    std::uniform_int_distribution<int> eliteRoll( 0, 99 );
-    std::uniform_int_distribution<size_t> archetypeRoll( 0, rivalArchetypeNames.size() - 1 );
 
     for ( const Player * player : Settings::Get().GetPlayers().getVector() ) {
         if ( player == nullptr || !player->isPlay() || player->GetColor() == playerColor
