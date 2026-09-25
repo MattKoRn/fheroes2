@@ -48,15 +48,18 @@ namespace
     constexpr size_t upgradeCount = static_cast<size_t>( fheroes2::RPG::UPGRADE_COUNT );
     constexpr size_t upgradesPerTab = 5;
     constexpr uint64_t pointsPerLevel = 5;
-    constexpr uint64_t baseLevelExperience = 100000;
-    constexpr uint64_t experiencePerLevel = 50000;
-    constexpr uint64_t legacyBaseLevelExperience = 150000;
-    constexpr uint64_t legacyExperiencePerLevel = 100000;
-    constexpr int profileVersion = 7;
+    constexpr uint64_t baseLevelExperience = 50000;
+    constexpr uint64_t experiencePerLevel = 25000;
+    constexpr uint64_t legacyV7BaseLevelExperience = 100000;
+    constexpr uint64_t legacyV7ExperiencePerLevel = 50000;
+    constexpr uint64_t legacyV6BaseLevelExperience = 150000;
+    constexpr uint64_t legacyV6ExperiencePerLevel = 100000;
+    constexpr int profileVersion = 8;
     using namespace fheroes2::RPG;
 
     uint64_t xpToNextLevel( uint64_t level );
-    uint64_t legacyXpToNextLevel( uint64_t level );
+    uint64_t legacyV7XpToNextLevel( uint64_t level );
+    uint64_t legacyV6XpToNextLevel( uint64_t level );
 
     struct UpgradeInfo
     {
@@ -209,42 +212,65 @@ namespace
         return saturatedMultiply( first, second );
     }
 
-    uint64_t linearRankInvestment( const uint64_t rank, const uint64_t baseCost, const uint64_t rankCost )
+    uint64_t baseCost( const size_t id )
     {
-        return saturatedAdd( saturatedMultiply( rank, baseCost ), saturatedMultiply( saturatedTriangular( rank ), rankCost ) );
+        switch ( id ) {
+        case VETERAN_CORE:
+            return 3;
+        case ARMS_TRAINING:
+        case ARMOR_TRAINING:
+        case LEADERSHIP:
+        case FORTUNE:
+        case CRITICAL_TRAINING:
+        case BRUTAL_CRITICALS:
+        case EVASION:
+            return 2;
+        default:
+            return 1;
+        }
     }
 
-    uint64_t steppedRankInvestment( const uint64_t rank, const uint64_t baseCost, const uint64_t groupSize )
+    uint64_t rankInvestment( const size_t id, const uint64_t rank )
+    {
+        return saturatedMultiply( rank, baseCost( id ) );
+    }
+
+    uint64_t legacyLinearRankInvestment( const uint64_t rank, const uint64_t base, const uint64_t step )
+    {
+        return saturatedAdd( saturatedMultiply( rank, base ), saturatedMultiply( saturatedTriangular( rank ), step ) );
+    }
+
+    uint64_t legacySteppedRankInvestment( const uint64_t rank, const uint64_t base, const uint64_t groupSize )
     {
         assert( groupSize > 0 );
         const uint64_t completeGroups = rank / groupSize;
         const uint64_t remainder = rank % groupSize;
         const uint64_t completedGroupSteps = saturatedMultiply( groupSize, saturatedTriangular( completeGroups ) );
         const uint64_t remainderSteps = saturatedMultiply( completeGroups, remainder );
-        return saturatedAdd( saturatedMultiply( rank, baseCost ), saturatedAdd( completedGroupSteps, remainderSteps ) );
+        return saturatedAdd( saturatedMultiply( rank, base ), saturatedAdd( completedGroupSteps, remainderSteps ) );
     }
 
-    uint64_t rankInvestment( const size_t id, const uint64_t rank )
+    uint64_t legacyRankInvestment( const size_t id, const uint64_t rank )
     {
         switch ( id ) {
         case ARMS_TRAINING:
         case ARMOR_TRAINING:
-            return linearRankInvestment( rank, 2, 1 );
+            return legacyLinearRankInvestment( rank, 2, 1 );
         case VETERAN_CORE:
-            return linearRankInvestment( rank, 3, 2 );
+            return legacyLinearRankInvestment( rank, 3, 2 );
         case LEADERSHIP:
         case FORTUNE:
-            return linearRankInvestment( rank, 2, 2 );
+            return legacyLinearRankInvestment( rank, 2, 2 );
         case BLOOD_DRINKER:
         case REAPER:
         case REGENERATION:
-            return steppedRankInvestment( rank, 1, 4 );
+            return legacySteppedRankInvestment( rank, 1, 4 );
         case CRITICAL_TRAINING:
         case BRUTAL_CRITICALS:
         case EVASION:
-            return steppedRankInvestment( rank, 2, 3 );
+            return legacySteppedRankInvestment( rank, 2, 3 );
         default:
-            return steppedRankInvestment( rank, 1, 5 );
+            return legacySteppedRankInvestment( rank, 1, 5 );
         }
     }
 
@@ -426,28 +452,39 @@ namespace
         return isProfileStateValid( profile, xpToNextLevel( profile.level ) );
     }
 
-    uint64_t cost( const size_t id, const uint64_t rank )
+    bool isLegacyV7ProfileStateValid( const Profile & profile, const uint64_t nextLevelCost )
     {
-        switch ( id ) {
-        case ARMS_TRAINING:
-        case ARMOR_TRAINING:
-            return saturatedAdd( 2, rank );
-        case VETERAN_CORE:
-            return saturatedAdd( 3, saturatedMultiply( 2, rank ) );
-        case LEADERSHIP:
-        case FORTUNE:
-            return saturatedAdd( 2, saturatedMultiply( 2, rank ) );
-        case BLOOD_DRINKER:
-        case REAPER:
-        case REGENERATION:
-            return saturatedAdd( 1, rank / 4 );
-        case CRITICAL_TRAINING:
-        case BRUTAL_CRITICALS:
-        case EVASION:
-            return saturatedAdd( 2, rank / 3 );
-        default:
-            return saturatedAdd( 1, rank / 5 );
+        uint64_t investedPoints = 0;
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            const uint64_t rank = profile.ranks[id];
+            if ( rank > 0 && effect( id, rank ) <= effect( id, rank - 1 ) ) {
+                return false;
+            }
+
+            investedPoints = saturatedAdd( investedPoints, legacyRankInvestment( id, rank ) );
         }
+
+        if ( profile.ranks[BRUTAL_CRITICALS] > 0 && profile.ranks[CRITICAL_TRAINING] == 0 ) {
+            return false;
+        }
+
+        const uint64_t earnedPoints = saturatedMultiply( profile.level - 1, pointsPerLevel );
+        if ( investedPoints > earnedPoints || profile.points != earnedPoints - investedPoints ) {
+            return false;
+        }
+
+        if ( profile.experience != saturatedAdd( profile.fieldExperience, profile.offlineExperience )
+             || profile.fieldExperience
+                    != saturatedAdd( saturatedAdd( profile.heroExperience, profile.battleExperience ), profile.adventureExperience ) ) {
+            return false;
+        }
+
+        return profile.progress <= profile.experience && profile.progress < nextLevelCost;
+    }
+
+    uint64_t cost( const size_t id, const uint64_t /* rank */ )
+    {
+        return baseCost( id );
     }
 
     bool buy( Profile & profile, const size_t id )
@@ -784,7 +821,13 @@ namespace
             // Version 6 used the harder 250k + 100k/level progression curve. Validate every
             // invariant against that historical progress threshold before granting levels made
             // affordable by the new curve.
-            if ( !isProfileStateValid( candidate, legacyXpToNextLevel( candidate.level ) ) ) {
+            if ( !isLegacyV7ProfileStateValid( candidate, legacyV6XpToNextLevel( candidate.level ) ) ) {
+                return false;
+            }
+        }
+        else if ( version == 7 ) {
+            // Version 7 used the 150k + 50k/level progression curve and escalating doctrine costs.
+            if ( !isLegacyV7ProfileStateValid( candidate, legacyV7XpToNextLevel( candidate.level ) ) ) {
                 return false;
             }
         }
@@ -793,8 +836,30 @@ namespace
         }
 
         if ( version < profileVersion ) {
-            const uint64_t gainedLevels = consumeAffordableLevels( candidate );
-            if ( gainedLevels > 0 && candidate.autoBuy ) {
+            uint64_t oldInvested = 0;
+            uint64_t newInvested = 0;
+            for ( size_t id = 0; id < upgradeCount; ++id ) {
+                oldInvested = saturatedAdd( oldInvested, legacyRankInvestment( id, candidate.ranks[id] ) );
+                newInvested = saturatedAdd( newInvested, rankInvestment( id, candidate.ranks[id] ) );
+            }
+            if ( oldInvested > newInvested ) {
+                candidate.points = saturatedAdd( candidate.points, oldInvested - newInvested );
+            }
+
+            Profile simulated;
+            simulated.level = 1;
+            simulated.progress = candidate.experience;
+            consumeAffordableLevels( simulated );
+
+            const uint64_t newLevel = std::max( candidate.level, simulated.level );
+            const uint64_t gainedLevels = newLevel > candidate.level ? newLevel - candidate.level : 0;
+            candidate.level = newLevel;
+            candidate.progress = simulated.level >= candidate.level
+                                     ? simulated.progress
+                                     : std::min( candidate.progress, xpToNextLevel( candidate.level ) == 0 ? 0 : xpToNextLevel( candidate.level ) - 1 );
+            candidate.points = saturatedAdd( candidate.points, saturatedMultiply( gainedLevels, pointsPerLevel ) );
+
+            if ( ( gainedLevels > 0 || oldInvested > newInvested ) && candidate.autoBuy ) {
                 autoBuy( candidate );
             }
 
@@ -913,9 +978,14 @@ namespace
         return xpToNextLevelForCurve( level, baseLevelExperience, experiencePerLevel );
     }
 
-    uint64_t legacyXpToNextLevel( const uint64_t level )
+    uint64_t legacyV7XpToNextLevel( const uint64_t level )
     {
-        return xpToNextLevelForCurve( level, legacyBaseLevelExperience, legacyExperiencePerLevel );
+        return xpToNextLevelForCurve( level, legacyV7BaseLevelExperience, legacyV7ExperiencePerLevel );
+    }
+
+    uint64_t legacyV6XpToNextLevel( const uint64_t level )
+    {
+        return xpToNextLevelForCurve( level, legacyV6BaseLevelExperience, legacyV6ExperiencePerLevel );
     }
 
     bool canGainLevels( const Profile & profile, const uint64_t count )
