@@ -187,7 +187,8 @@ namespace
 
     constexpr std::array<const char *, 5> rivalArchetypeNames{ "Warlord", "Predator", "Arcanist", "Sentinel", "Trickster" };
 
-    uint64_t consumeAffordableLevels( Profile & profile );
+    uint64_t consumeAffordableLevelsWithCarry( Profile & profile );
+    uint64_t consumeRuntimeLevelAndReset( Profile & profile );
 
     Profile playerProfile;
     std::map<PlayerColor, Profile> enemyProfiles;
@@ -1393,7 +1394,7 @@ namespace
             Profile simulated;
             simulated.level = 1;
             simulated.progress = candidate.experience;
-            consumeAffordableLevels( simulated );
+            consumeAffordableLevelsWithCarry( simulated );
 
             const uint64_t newLevel = std::max( candidate.level, simulated.level );
             const uint64_t gainedLevels = newLevel > candidate.level ? newLevel - candidate.level : 0;
@@ -1559,7 +1560,7 @@ namespace
                              saturatedMultiply( experiencePerLevel, saturatedTriangular( count ) ) );
     }
 
-    uint64_t consumeAffordableLevels( Profile & profile )
+    uint64_t consumeAffordableLevelsWithCarry( Profile & profile )
     {
         const uint64_t firstCost = xpToNextLevel( profile.level );
         if ( firstCost == 0 || profile.progress < firstCost ) {
@@ -1587,6 +1588,22 @@ namespace
         profile.level += low;
         profile.points = saturatedAdd( profile.points, saturatedMultiply( low, pointsPerLevel ) );
         return low;
+    }
+
+    uint64_t consumeRuntimeLevelAndReset( Profile & profile )
+    {
+        const uint64_t levelCost = xpToNextLevel( profile.level );
+        if ( levelCost == 0 || profile.progress < levelCost || profile.level == std::numeric_limits<uint64_t>::max() ) {
+            return 0;
+        }
+
+        // Runtime leveling deliberately discards any XP overflow from the award that crossed the
+        // threshold. Every newly earned kingdom level therefore begins at exactly 0 current XP.
+        // Lifetime/source Renown ledgers remain untouched for statistics and validation.
+        profile.progress = 0;
+        ++profile.level;
+        profile.points = saturatedAdd( profile.points, pointsPerLevel );
+        return 1;
     }
 
     void drawText( const std::string & value, const int32_t x, const int32_t y, const int32_t width, const fheroes2::FontType & font )
@@ -2137,7 +2154,8 @@ namespace
         message += "\nSteward Auto-Buyer: ";
         message += playerProfile.autoBuy ? "Active (ON)" : "Paused (OFF)";
         message += "\n\nRENOWN (RPG EXPERIENCE)";
-        message += "\nTotal Renown: " + formatNumber( playerProfile.experience );
+        message += "\nCurrent Level XP: " + formatNumber( playerProfile.progress ) + " / " + formatNumber( nextLevelCost );
+        message += "\nLifetime Renown: " + formatNumber( playerProfile.experience );
         message += "\n  From Hero Experience: " + formatNumber( playerProfile.heroExperience );
         message += "\n  From Battles: " + formatNumber( playerProfile.battleExperience );
         message += "\n  From Adventure Sites: " + formatNumber( playerProfile.adventureExperience );
@@ -2489,7 +2507,7 @@ uint64_t fheroes2::RPG::addExperience( const PlayerColor color, const uint64_t a
         *detailedSource = saturatedAdd( *detailedSource, credited );
     }
 
-    const uint64_t gainedLevels = consumeAffordableLevels( playerProfile );
+    const uint64_t gainedLevels = consumeRuntimeLevelAndReset( playerProfile );
     if ( gainedLevels > 0 && kind != ExperienceKind::OFFLINE ) {
         AudioManager::PlaySound( M82::NWHEROLV );
     }
@@ -3161,7 +3179,8 @@ void fheroes2::RPG::showMenu()
             const uint64_t remainingXP = xpToNextLevel( playerProfile.level ) > playerProfile.progress
                                              ? xpToNextLevel( playerProfile.level ) - playerProfile.progress
                                              : 0;
-            drawText( "Renown " + formatExperience( playerProfile.experience ) + "    " + formatExperience( remainingXP ) + " to next level",
+            drawText( "XP " + formatExperience( playerProfile.progress ) + " / " + formatExperience( xpToNextLevel( playerProfile.level ) )
+                          + "    " + formatExperience( remainingXP ) + " to next",
                       statsArea.x + 8, statsArea.y + 20, statsArea.width - 16, fheroes2::FontType::smallWhite() );
 
             const int32_t barWidth = statsArea.width - 24;
