@@ -78,6 +78,23 @@ else(MACOS_APP_BUNDLE)
 		${PROJECT_SOURCE_DIR}/$<TARGET_FILE_NAME:fheroes2>
 		)
 
+	if(WIN32)
+		add_custom_command(
+			TARGET fheroes2 POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			$<TARGET_RUNTIME_DLLS:fheroes2>
+			${PROJECT_SOURCE_DIR}
+			COMMAND_EXPAND_LISTS
+			)
+		add_custom_command(
+			TARGET fheroes2 POST_BUILD
+			COMMAND ${CMAKE_COMMAND}
+			-DSRC=$<TARGET_FILE_DIR:fheroes2>
+			-DDST=${PROJECT_SOURCE_DIR}
+			-P ${CMAKE_SOURCE_DIR}/cmake/copy_dlls.cmake
+			)
+	endif(WIN32)
+
 	install(TARGETS fheroes2 DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif(MACOS_APP_BUNDLE)
 
