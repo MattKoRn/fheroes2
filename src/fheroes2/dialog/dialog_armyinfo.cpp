@@ -139,11 +139,13 @@ namespace
             }
         }
 
-        const bool receivesRpgDoctrineBonus = !troop.isBattle() || !troop.isModes( Battle::CAP_TOWER );
+        const auto * armyTroop = dynamic_cast<const ArmyTroop *>( &troop );
+        const bool receivesRpgDoctrineBonus
+            = armyTroop != nullptr && ( !troop.isBattle() || !troop.isModes( Battle::CAP_TOWER ) );
         const uint64_t doctrineModifier
             = receivesRpgDoctrineBonus
-                  ? ( attack ? fheroes2::RPG::creatureAttackDoctrineModifier( troop.GetColor() )
-                             : fheroes2::RPG::creatureDefenseDoctrineModifier( troop.GetColor() ) )
+                  ? ( attack ? fheroes2::RPG::creatureAttackDoctrineModifier( armyTroop->GetColor() )
+                             : fheroes2::RPG::creatureDefenseDoctrineModifier( armyTroop->GetColor() ) )
                   : 0;
 
         std::string output = std::to_string( baseValue );
