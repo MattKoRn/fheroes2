@@ -104,11 +104,11 @@ namespace
         "EV", "MP", "CQ", "UY", "RT"
     };
     constexpr std::array<const char *, upgradeCount> upgradeDetails{
-        "Adds +1 Attack per rank to every creature stack controlled by this RPG profile, up to +8 Attack.",
-        "Adds +1 Defense per rank to every creature stack controlled by this RPG profile, up to +8 Defense.",
-        "Adds +1 Attack and +1 Defense per rank to every creature stack, up to +4 of each. Its ranks cost more because both stats increase together.",
-        "Whenever one of your creature stacks deals attack damage, it heals for up to 20% of the actual damage dealt. Healing repairs the surviving stack but does not resurrect killed creatures.",
-        "Whenever one of your attacks kills creatures, the attacking stack heals for up to 30% of the slain creatures' hit points. It cannot resurrect creatures already lost from that stack.",
+        "Adds +1 Attack per rank to every creature stack controlled by this RPG profile with no doctrine cap.",
+        "Adds +1 Defense per rank to every creature stack controlled by this RPG profile with no doctrine cap.",
+        "Adds +1 Attack and +1 Defense per rank to every creature stack with no doctrine cap. Its ranks cost more because both stats increase together.",
+        "Whenever one of your creature stacks deals attack damage, it heals for a logarithmically scaling percentage of the actual damage dealt with no doctrine cap. Healing is still limited by the stack's missing hit points and cannot resurrect killed creatures.",
+        "Whenever one of your attacks kills creatures, the attacking stack heals for a logarithmically scaling percentage of the slain creatures' hit points with no doctrine cap. Healing is still limited by missing hit points and cannot resurrect creatures already lost from that stack.",
 
         "Increases all physical damage dealt by your creature stacks, scaling evenly across melee and missile attacks.",
         "Increases physical damage dealt by ranged creature attacks, rewarding archer superiority.",
@@ -120,7 +120,7 @@ namespace
         "Increases physical damage when the attacking stack has more creatures than its target, punishing fractured enemy formations.",
         "Increases physical damage while the attacking stack is below half of its starting battle hit points, fueling desperate comebacks.",
         "Increases physical damage while the attacking stack is still at its full starting battle hit points, rewarding disciplined alpha strikes.",
-        "Ignores up to 60% of the defender's RPG physical damage reduction after all applicable defensive upgrades are combined.",
+        "Ignores an increasing share of the defender's RPG physical damage reduction after all applicable defensive upgrades are combined, with a hard safety ceiling of 100% resistance bypass.",
 
         "Reduces all physical damage received by your creature stacks. Combined RPG physical reduction is capped at 70% before Armor Piercing.",
         "Adds extra physical damage reduction against ranged creature attacks, blunting opposing missile barrages.",
@@ -142,12 +142,12 @@ namespace
 
         "Adds Morale to your creature stacks during combat, up to +3 from this upgrade.",
         "Adds Luck to your creature stacks during combat, up to +3 from this upgrade.",
-        "At the beginning of a stack's turn, restores up to 15% of one creature's maximum hit points to the surviving stack. This repairs the wounded top creature but never resurrects dead creatures.",
-        "Gives each creature attack up to a 20% chance to become a critical hit. A critical hit deals 50% extra damage before Brutal Criticals is added.",
+        "At the beginning of a stack's turn, restores a logarithmically scaling percentage of one creature's maximum hit points to the surviving stack with no doctrine cap. Actual healing cannot exceed the stack's missing hit points and never resurrects dead creatures.",
+        "Gives each creature attack an increasing chance to become a critical hit, hard-capped at 100% because probability cannot exceed certainty. A critical hit deals 50% extra damage before Brutal Criticals is added.",
         "Increases the bonus damage of critical hits beyond their normal +50%. Requires at least one rank of Critical Training.",
 
-        "Gives your creature stacks up to a 15% chance to reduce an incoming creature attack's final damage by 50%.",
-        "Ignores up to 60% of the target's combined RPG spell resistance when your hero casts a damaging spell.",
+        "Gives your creature stacks an increasing chance to reduce an incoming creature attack's final damage by 50%, hard-capped at 100% because probability cannot exceed certainty.",
+        "Ignores an increasing share of the target's combined RPG spell resistance when your hero casts a damaging spell, with a hard safety ceiling of 100% resistance bypass.",
         "Recovers part of the normal 50% melee penalty suffered by ranged creatures forced into hand-to-hand combat. At 100% recovery, the RPG penalty modifier removes that penalty.",
         "Reduces physical damage while the defending stack is currently at its full starting battle hit points.",
         "Adds another damage bonus against enemy stacks below half of their starting battle hit points, rewarding aggressive finishing attacks."
@@ -481,28 +481,34 @@ namespace
         switch ( id ) {
         case ARMS_TRAINING:
         case ARMOR_TRAINING:
-            return static_cast<long double>( std::min<uint64_t>( rank, 8 ) );
         case VETERAN_CORE:
-            return static_cast<long double>( std::min<uint64_t>( rank, 4 ) );
+            // Flat combat stats are intentionally open-ended. The underlying engine accessors
+            // still clamp to their native integer storage limits.
+            return static_cast<long double>( rank );
         case LEADERSHIP:
         case FORTUNE:
+            // Heroes II only has three positive Morale/Luck steps. Additional ranks would have no
+            // mechanical meaning, so these remain hard-capped engine mechanics.
             return static_cast<long double>( std::min<uint64_t>( rank, 3 ) );
         case BLOOD_DRINKER:
-            return std::min<long double>( 20.0L, 3.0L * std::log1p( static_cast<long double>( rank ) ) );
+            return 3.0L * std::log1p( static_cast<long double>( rank ) );
         case REAPER:
-            return std::min<long double>( 30.0L, 4.0L * std::log1p( static_cast<long double>( rank ) ) );
+            return 4.0L * std::log1p( static_cast<long double>( rank ) );
         case REGENERATION:
-            return std::min<long double>( 15.0L, 2.5L * std::log1p( static_cast<long double>( rank ) ) );
+            return 2.5L * std::log1p( static_cast<long double>( rank ) );
         case CRITICAL_TRAINING:
-            return std::min<long double>( 20.0L, 4.0L * std::log1p( static_cast<long double>( rank ) ) );
+            // Probability mechanics cannot exceed certainty.
+            return std::min<long double>( 100.0L, 4.0L * std::log1p( static_cast<long double>( rank ) ) );
         case BRUTAL_CRITICALS:
-            return std::min<long double>( 100.0L, 8.0L * std::log1p( static_cast<long double>( rank ) ) );
+            return 8.0L * std::log1p( static_cast<long double>( rank ) );
         case EVASION:
-            return std::min<long double>( 15.0L, 2.5L * std::log1p( static_cast<long double>( rank ) ) );
+            return std::min<long double>( 100.0L, 2.5L * std::log1p( static_cast<long double>( rank ) ) );
         case ARMOR_PIERCING:
         case ARCANE_PIERCING:
-            return std::min<long double>( 60.0L, 6.0L * std::log1p( static_cast<long double>( rank ) ) );
+            // More than 100% resistance bypass has no useful interpretation.
+            return std::min<long double>( 100.0L, 6.0L * std::log1p( static_cast<long double>( rank ) ) );
         case CLOSE_QUARTERS:
+            // 100% means the normal ranged-in-melee penalty is completely recovered.
             return std::min<long double>( 100.0L, 10.0L * std::log1p( static_cast<long double>( rank ) ) );
         case IRON_SKIN:
         case ARROW_WARD:
@@ -515,7 +521,9 @@ namespace
         case COLD_WARD:
         case STORM_WARD:
         case CATACLYSM_WARD:
-            return std::min<long double>( 50.0L, 3.5L * std::log1p( static_cast<long double>( rank ) ) );
+            // Individual defensive doctrines keep scaling; the combined reduction is clamped
+            // later to 70% so no stack can become invulnerable.
+            return 3.5L * std::log1p( static_cast<long double>( rank ) );
         default:
             return percentEffect( rank );
         }
@@ -611,8 +619,8 @@ namespace
             const uint64_t rank = profile.ranks[id];
 
             // A stored rank must have produced a real mechanical increase when it was bought.
-            // This rejects parseable corruption that pushes bounded doctrines beyond their
-            // effective cap, which could otherwise mint saturated refunds during a respec.
+            // This rejects parseable corruption that pushes hard safety-capped mechanics beyond
+            // their meaningful limit, which could otherwise mint saturated refunds during a respec.
             if ( rank > 0 && effect( id, rank ) <= effect( id, rank - 1 ) ) {
                 return false;
             }
@@ -2807,7 +2815,8 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
         }
     }
 
-    attackBonus = std::min<long double>( attackBonus, 100.0L );
+    // Offensive doctrine power is open-ended. Defensive reduction remains capped so no stack
+    // can become invulnerable through rank stacking.
     defenseReduction = std::min<long double>( defenseReduction, 70.0L );
     if ( attackProfile != nullptr && defenseReduction > 0 ) {
         const long double piercing = effect( ARMOR_PIERCING, attackProfile->ranks[ARMOR_PIERCING] );
@@ -2838,7 +2847,8 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
         }
     }
 
-    spellBonus = std::min<long double>( spellBonus, 100.0L );
+    // Damaging spell doctrine power is open-ended. Spell reduction keeps the same 70% global
+    // safety ceiling before Arcane Piercing.
     defenseReduction = std::min<long double>( defenseReduction, 70.0L );
     if ( attackProfile != nullptr && defenseReduction > 0 ) {
         const long double piercing = effect( ARCANE_PIERCING, attackProfile->ranks[ARCANE_PIERCING] );
