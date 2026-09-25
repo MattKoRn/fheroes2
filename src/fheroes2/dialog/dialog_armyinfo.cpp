@@ -126,6 +126,27 @@ namespace
         return Spell::NONE;
     }
 
+    const ArmyTroop * getRpgArmyTroop( const Troop & troop )
+    {
+        const auto * armyTroop = dynamic_cast<const ArmyTroop *>( &troop );
+        if ( armyTroop == nullptr || ( troop.isBattle() && troop.isModes( Battle::CAP_TOWER ) ) ) {
+            return nullptr;
+        }
+        return armyTroop;
+    }
+
+    std::string appendFlatRpgModifier( std::string value, const uint64_t modifier )
+    {
+        value += " +" + fheroes2::RPG::formatExperience( modifier );
+        return value;
+    }
+
+    std::string appendPercentRpgModifier( std::string value, const double modifier )
+    {
+        value += " +" + fheroes2::RPG::formatDoctrineModifier( modifier, true );
+        return value;
+    }
+
     std::string formatRpgDoctrineStat( const Troop & troop, const bool attack )
     {
         const Monster monster{ troop.GetMonster() };
@@ -139,24 +160,67 @@ namespace
             }
         }
 
-        const auto * armyTroop = dynamic_cast<const ArmyTroop *>( &troop );
-        const bool receivesRpgDoctrineBonus
-            = armyTroop != nullptr && ( !troop.isBattle() || !troop.isModes( Battle::CAP_TOWER ) );
+        const ArmyTroop * armyTroop = getRpgArmyTroop( troop );
         const uint64_t doctrineModifier
-            = receivesRpgDoctrineBonus
-                  ? ( attack ? fheroes2::RPG::creatureAttackDoctrineModifier( armyTroop->GetColor() )
-                             : fheroes2::RPG::creatureDefenseDoctrineModifier( armyTroop->GetColor() ) )
-                  : 0;
+            = armyTroop == nullptr
+                  ? 0
+                  : ( attack ? fheroes2::RPG::creatureAttackDoctrineModifier( armyTroop->GetColor() )
+                             : fheroes2::RPG::creatureDefenseDoctrineModifier( armyTroop->GetColor() ) );
 
         std::string output = std::to_string( baseValue );
         if ( normalModifiedValue != baseValue ) {
             output += " (" + std::to_string( normalModifiedValue ) + ")";
         }
-        if ( doctrineModifier > 0 ) {
-            output += " +" + fheroes2::RPG::formatExperience( doctrineModifier );
+
+        return appendFlatRpgModifier( std::move( output ), doctrineModifier );
+    }
+
+    double damageDoctrineModifierPercent( const Troop & troop )
+    {
+        const ArmyTroop * armyTroop = getRpgArmyTroop( troop );
+        if ( armyTroop == nullptr ) {
+            return 0.0;
         }
 
-        return output;
+        bool rangedAttack = troop.isArchers();
+        const auto * battleUnit = dynamic_cast<const Battle::Unit *>( &troop );
+        if ( battleUnit != nullptr && battleUnit->isHandFighting() ) {
+            rangedAttack = false;
+        }
+
+        double multiplier = fheroes2::RPG::damageMultiplier( armyTroop->GetColor(), PlayerColor::UNUSED, rangedAttack, false, false, false, false, false, false );
+        if ( battleUnit != nullptr && troop.isArchers() && battleUnit->isHandFighting() ) {
+            const double closeQuarters = fheroes2::RPG::rangedMeleePenaltyRecoveryPercent( armyTroop->GetColor() );
+            multiplier *= 1.0 + std::clamp( closeQuarters, 0.0, 100.0 ) / 100.0;
+        }
+
+        return std::max( 0.0, ( multiplier - 1.0 ) * 100.0 );
+    }
+
+    std::string formatMoraleWithRpgModifier( const Troop & troop )
+    {
+        int normalMorale = troop.GetMorale();
+        const auto * battleUnit = dynamic_cast<const Battle::Unit *>( &troop );
+        if ( battleUnit != nullptr ) {
+            normalMorale = battleUnit->GetMoraleWithoutRPG();
+        }
+
+        const ArmyTroop * armyTroop = getRpgArmyTroop( troop );
+        const uint64_t doctrineModifier
+            = armyTroop != nullptr && troop.isAffectedByMorale()
+                  ? static_cast<uint64_t>( std::max( 0, fheroes2::RPG::moraleBonus( armyTroop->GetColor() ) ) )
+                  : 0;
+
+        return appendFlatRpgModifier( Morale::String( normalMorale ), doctrineModifier );
+    }
+
+    std::string formatLuckWithRpgModifier( const Troop & troop )
+    {
+        const ArmyTroop * armyTroop = getRpgArmyTroop( troop );
+        const uint64_t doctrineModifier
+            = armyTroop == nullptr ? 0 : static_cast<uint64_t>( std::max( 0, fheroes2::RPG::luckBonus( armyTroop->GetColor() ) ) );
+
+        return appendFlatRpgModifier( Luck::String( troop.GetLuck() ), doctrineModifier );
     }
 
     void DrawMonsterStats( const fheroes2::Point & dst, const Troop & troop, fheroes2::Display & display )
@@ -213,7 +277,7 @@ namespace
             text.fitToOneRow( leftSideLength );
             text.draw( textPos.x, textPos.y, display );
 
-            text.set( troop.GetShotString(), font );
+            text.set( appendFlatRpgModifier( troop.GetShotString(), 0 ), font );
             textPos.x = leftSidePosX;
             text.fitToOneRow( rightSideLength );
             text.draw( textPos.x, textPos.y, display );
@@ -231,12 +295,14 @@ namespace
 
         const Monster monster{ troop.GetMonster() };
 
+        std::string damageText;
         if ( monster.GetDamageMin() != monster.GetDamageMax() ) {
-            text.set( std::to_string( monster.GetDamageMin() ) + '-' + std::to_string( monster.GetDamageMax() ), font );
+            damageText = std::to_string( monster.GetDamageMin() ) + '-' + std::to_string( monster.GetDamageMax() );
         }
         else {
-            text.set( std::to_string( monster.GetDamageMin() ), font );
+            damageText = std::to_string( monster.GetDamageMin() );
         }
+        text.set( appendPercentRpgModifier( std::move( damageText ), damageDoctrineModifierPercent( troop ) ), font );
 
         textPos.x = leftSidePosX;
         text.fitToOneRow( rightSideLength );
@@ -252,7 +318,7 @@ namespace
         text.fitToOneRow( leftSideLength );
         text.draw( textPos.x, textPos.y, display );
 
-        text.set( std::to_string( monster.GetHitPoints() ), font );
+        text.set( appendFlatRpgModifier( std::to_string( monster.GetHitPoints() ), 0 ), font );
         textPos.x = leftSidePosX;
         text.fitToOneRow( rightSideLength );
         text.draw( textPos.x, textPos.y, display );
@@ -267,7 +333,7 @@ namespace
             text.fitToOneRow( leftSideLength );
             text.draw( textPos.x, textPos.y, display );
 
-            text.set( std::to_string( troop.GetHitPointsLeft() ), font );
+            text.set( appendFlatRpgModifier( std::to_string( troop.GetHitPointsLeft() ), 0 ), font );
             textPos.x = leftSidePosX;
             text.fitToOneRow( rightSideLength );
             text.draw( textPos.x, textPos.y, display );
@@ -283,7 +349,7 @@ namespace
         text.fitToOneRow( leftSideLength );
         text.draw( textPos.x, textPos.y, display );
 
-        text.set( troop.GetSpeedString(), font );
+        text.set( appendFlatRpgModifier( troop.GetSpeedString(), 0 ), font );
         textPos.x = leftSidePosX;
         text.fitToOneRow( rightSideLength );
         text.draw( textPos.x, textPos.y, display );
@@ -298,7 +364,7 @@ namespace
         text.fitToOneRow( leftSideLength );
         text.draw( textPos.x, textPos.y, display );
 
-        text.set( Morale::String( troop.GetMorale() ), font );
+        text.set( formatMoraleWithRpgModifier( troop ), font );
         textPos.x = leftSidePosX;
         text.fitToOneRow( rightSideLength );
         text.draw( textPos.x, textPos.y, display );
@@ -313,7 +379,7 @@ namespace
         text.fitToOneRow( leftSideLength );
         text.draw( textPos.x, textPos.y, display );
 
-        text.set( Luck::String( troop.GetLuck() ), font );
+        text.set( formatLuckWithRpgModifier( troop ), font );
         textPos.x = leftSidePosX;
         text.fitToOneRow( rightSideLength );
         text.draw( textPos.x, textPos.y, display );
