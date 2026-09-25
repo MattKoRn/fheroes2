@@ -110,5 +110,8 @@ namespace fheroes2::RPG
                                            bool attackerFullHealth, bool defenderFullHealth, bool attackerBelowHalf, bool defenderBelowHalf );
     [[nodiscard]] double spellMultiplier( PlayerColor attacker, PlayerColor defender, int spellId );
     [[nodiscard]] std::string formatExperience( uint64_t value );
+    // Compact formatter for UI doctrine modifiers. It shares the generated, unbounded suffix
+    // naming scheme used by RPG counters and preserves decimal percentages.
+    [[nodiscard]] std::string formatDoctrineModifier( double value, bool percentage );
     void showMenu();
 }
