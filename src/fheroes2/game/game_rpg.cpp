@@ -2389,7 +2389,7 @@ namespace
         saveProfile();
     }
 
-    void showUpgradeDetails( const size_t id )
+    void showUpgradeDetails( const size_t id, const int buttons = Dialog::ZERO )
     {
         if ( id >= upgradeCount ) {
             return;
@@ -2497,7 +2497,7 @@ namespace
         }
         message += "\nScaling: Diminishing returns - each later primary rank adds less than the previous one.";
         message += "\nAvailable points: " + formatNumber( playerProfile.points );
-        fheroes2::showStandardTextMessage( upgrades[id].name, std::move( message ), Dialog::ZERO );
+        fheroes2::showStandardTextMessage( upgrades[id].name, std::move( message ), buttons );
     }
 
     void showTabDetails( const size_t tabIndex )
@@ -2547,7 +2547,7 @@ namespace
         fheroes2::showStandardTextMessage( tabNames[tabIndex], std::move( message ), Dialog::ZERO );
     }
 
-    void showRoyalGuildHelp()
+    void showRoyalGuildHelp( const int buttons = Dialog::ZERO )
     {
         const std::string path = profilePath();
         const bool hasBackup = System::IsFile( path + ".bak" );
@@ -2583,10 +2583,10 @@ namespace
         message += "\nPurchases, Steward changes, respecs, and RPG progression save automatically.";
         message += "\nValid .bak and .tmp snapshots can recover a damaged primary profile on startup.";
 
-        fheroes2::showStandardTextMessage( "Royal Guild Help", std::move( message ), Dialog::ZERO );
+        fheroes2::showStandardTextMessage( "Royal Guild Help", std::move( message ), buttons );
     }
 
-    void showBuildAnalytics()
+    void showBuildAnalytics( const int buttons = Dialog::ZERO )
     {
         const std::string path = profilePath();
         const uint64_t totalInvested = totalSpentPoints( playerProfile );
@@ -2684,10 +2684,10 @@ namespace
         message += "\nRecovery (.tmp): ";
         message += System::IsFile( path + ".tmp" ) ? "Available" : "None";
 
-        fheroes2::showStandardTextMessage( "Build Analytics", std::move( message ), Dialog::ZERO );
+        fheroes2::showStandardTextMessage( "Build Analytics", std::move( message ), buttons );
     }
 
-    void showRivalIntel()
+    void showRivalIntel( const int buttons = Dialog::ZERO )
     {
         std::array<size_t, rivalArchetypeNames.size()> archetypeCounts{};
         for ( const auto & [color, archetype] : eliteRivalArchetypes ) {
@@ -2756,10 +2756,10 @@ namespace
         message += "\n\nElite focus also reads your recorded doctrine-trigger history, so frequently used halls are more likely to be recognized.";
         message += "\nRivals still use only doctrines you have purchased and every generated rank remains inside the existing 115% envelope. Mutations are separate encounter affixes and never create doctrine ranks.";
 
-        fheroes2::showStandardTextMessage( "Elite Rival Intel", std::move( message ), Dialog::ZERO );
+        fheroes2::showStandardTextMessage( "Elite Rival Intel", std::move( message ), buttons );
     }
 
-    void showKingdomOverview()
+    void showKingdomOverview( const int buttons = Dialog::ZERO )
     {
         const uint64_t remainingXP = xpToNextLevel( playerProfile.level ) > playerProfile.progress
                                          ? xpToNextLevel( playerProfile.level ) - playerProfile.progress
@@ -2917,7 +2917,7 @@ namespace
         message += System::IsFile( path + ".tmp" ) ? "Available" : "None";
         message += "\nAutosave: purchases, Steward changes, respecs, and RPG progression";
 
-        fheroes2::showStandardTextMessage( "Royal Guild Overview", std::move( message ), Dialog::ZERO );
+        fheroes2::showStandardTextMessage( "Royal Guild Overview", std::move( message ), buttons );
     }
 }
 
@@ -4234,31 +4234,35 @@ void fheroes2::RPG::showMenu()
         }
 
         if ( event.isKeyPressed( fheroes2::Key::KEY_I ) ) {
-            showUpgradeDetails( tab * upgradesPerTab + selectedOffsets[tab] );
+            showUpgradeDetails( tab * upgradesPerTab + selectedOffsets[tab], Dialog::OK );
             redraw = true;
             continue;
         }
 
         if ( event.isKeyPressed( fheroes2::Key::KEY_H ) ) {
-            showRoyalGuildHelp();
+            showRoyalGuildHelp( Dialog::OK );
             redraw = true;
             continue;
         }
 
         if ( event.isKeyPressed( fheroes2::Key::KEY_V ) ) {
-            showRivalIntel();
+            showRivalIntel( Dialog::OK );
             redraw = true;
             continue;
         }
 
         if ( event.isKeyPressed( fheroes2::Key::KEY_K ) ) {
-            showBuildAnalytics();
+            showBuildAnalytics( Dialog::OK );
             redraw = true;
             continue;
         }
 
-        if ( event.isKeyPressed( fheroes2::Key::KEY_O ) || event.isMouseRightButtonPressedInArea( statsArea ) || event.MouseLongPressLeft( statsArea )
-             || event.MouseClickLeft( statsArea ) ) {
+        if ( event.isKeyPressed( fheroes2::Key::KEY_O ) || event.MouseClickLeft( statsArea ) ) {
+            showKingdomOverview( Dialog::OK );
+            redraw = true;
+            continue;
+        }
+        if ( event.isMouseRightButtonPressedInArea( statsArea ) || event.MouseLongPressLeft( statsArea ) ) {
             showKingdomOverview();
             redraw = true;
             continue;
@@ -4278,14 +4282,14 @@ void fheroes2::RPG::showMenu()
                     saveProfile();
                 }
                 else {
-                    showUpgradeDetails( i );
+                    showUpgradeDetails( i, Dialog::OK );
                 }
                 redraw = true;
                 break;
             }
             if ( event.MouseClickLeft( visibleUpgradeAreas[row] ) ) {
                 selectedOffsets[tab] = scrollOffset + row;
-                showUpgradeDetails( i );
+                showUpgradeDetails( i, Dialog::OK );
                 redraw = true;
                 break;
             }
@@ -4297,7 +4301,7 @@ void fheroes2::RPG::showMenu()
                 saveProfile();
             }
             else {
-                showUpgradeDetails( i );
+                showUpgradeDetails( i, Dialog::OK );
             }
             redraw = true;
             continue;
