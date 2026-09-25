@@ -115,6 +115,12 @@ The menu supports full keyboard and touch controls:
 - **S** or **A**: Toggle Steward auto-buyer
 - **R**: Respec doctrines with confirmation prompt
 
+## Hero Renown
+
+Victorious adventure heroes now build their own persistent **Hero Renown** alongside kingdom-wide RPG Renown. A hero receives the calculated battle-Renown award whenever that hero wins a battle, and capturing an enemy castle grants an additional **500 Hero Renown**. This personal ledger is deliberately non-combat: it does not change stats, doctrine points, kingdom level, or battle rewards.
+
+Hero Renown is stored in a separate `hero_renown.dat` companion ledger keyed by the engine's stable hero ID, leaving the existing `rpg_profile.dat` format unchanged for save compatibility. The **Royal Guild Overview** lists the five highest-Renown heroes currently recorded, using their in-game names when available.
+
 ## XP and economy
 
 RPG XP is now only the progression currency that earns levels and guild points. **Upgrade ranks do not multiply RPG XP and no upgrade pays resource bundles.** Hero XP awards, battles, and first-time adventure actions still feed the persistent RPG profile so ordinary play advances the combat tree.

@@ -32,7 +32,9 @@ namespace fheroes2::RPG
     [[nodiscard]] uint64_t addExperience( PlayerColor color, uint64_t amount, ExperienceKind kind = ExperienceKind::HERO );
     void awardAdventureAction( PlayerColor color, int objectType, int32_t tileIndex );
     [[nodiscard]] uint64_t previewAdventureActionExperience( PlayerColor color, int objectType, int32_t tileIndex );
-    void awardBattle( PlayerColor color, PlayerColor opponent, uint32_t battleExperience, bool won, bool defending, bool siege );
+    void awardBattle( PlayerColor color, PlayerColor opponent, uint32_t battleExperience, bool won, bool defending, bool siege, int32_t heroId = -1 );
+    void awardTownCapture( PlayerColor color, int32_t heroId );
+    [[nodiscard]] uint64_t heroRenown( int32_t heroId );
 
     // Persistent RPG combat affixes used by battle stacks. These accessors are intentionally
     // nodiscard: silently dropping a modifier is almost always a gameplay integration bug.

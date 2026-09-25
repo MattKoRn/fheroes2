@@ -537,8 +537,12 @@ Battle::Result Battle::Loader( Army & attackingArmy, Army & defendingArmy, const
     defendingArmy.resetInvalidMonsters();
 
     const bool siege = tileIndex >= 0 && world.getTile( tileIndex ).getMainObjectType() == MP2::OBJ_CASTLE;
-    fheroes2::RPG::awardBattle( attackingArmy.GetColor(), defendingArmy.GetColor(), result.attackerExperience, result.isAttackerWin(), false, siege );
-    fheroes2::RPG::awardBattle( defendingArmy.GetColor(), attackingArmy.GetColor(), result.defenderExperience, result.isDefenderWin(), true, siege );
+    const Heroes * attackingAdventureHero = dynamic_cast<const Heroes *>( attackingArmyCommander );
+    const Heroes * defendingAdventureHero = dynamic_cast<const Heroes *>( defendingArmyCommander );
+    fheroes2::RPG::awardBattle( attackingArmy.GetColor(), defendingArmy.GetColor(), result.attackerExperience, result.isAttackerWin(), false, siege,
+                               attackingAdventureHero != nullptr ? attackingAdventureHero->GetID() : -1 );
+    fheroes2::RPG::awardBattle( defendingArmy.GetColor(), attackingArmy.GetColor(), result.defenderExperience, result.isDefenderWin(), true, siege,
+                               defendingAdventureHero != nullptr ? defendingAdventureHero->GetID() : -1 );
 
     DEBUG_LOG( DBG_BATTLE, DBG_INFO,
                "attacker: " << ( result.attacker & RESULT_WINS ? "wins" : "loss" ) << ", defender: " << ( result.defender & RESULT_WINS ? "wins" : "loss" ) )

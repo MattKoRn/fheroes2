@@ -534,6 +534,7 @@ namespace
             Interface::AdventureMap::Get().GetIconsPanel().resetIcons( ICON_CASTLES );
 
             world.CaptureObject( dstIndex, hero.GetColor() );
+            fheroes2::RPG::awardTownCapture( hero.GetColor(), hero.GetID() );
 
             castle->Scout();
 

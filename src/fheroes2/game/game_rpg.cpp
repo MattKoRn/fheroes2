@@ -25,6 +25,7 @@
 #include "dialog.h"
 #include "game_assets.h"
 #include "game_hotkeys.h"
+#include "heroes.h"
 #include "icn.h"
 #include "image.h"
 #include "kingdom.h"
@@ -55,7 +56,11 @@ namespace
     constexpr uint64_t legacyV7ExperiencePerLevel = 50000;
     constexpr uint64_t legacyV6BaseLevelExperience = 150000;
     constexpr uint64_t legacyV6ExperiencePerLevel = 100000;
+    constexpr uint64_t heroCaptureRenown = 500;
+    constexpr int heroRenownFileVersion = 1;
     constexpr int profileVersion = 8;
+    static_assert( heroCaptureRenown > 0 );
+    static_assert( heroRenownFileVersion == 1 );
     using namespace fheroes2::RPG;
 
     uint64_t xpToNextLevel( uint64_t level );
@@ -248,6 +253,7 @@ namespace
     std::set<PlayerColor> eliteEnemyColors;
     std::map<PlayerColor, RivalArchetype> eliteRivalArchetypes;
     std::map<PlayerColor, std::vector<EliteMutation>> eliteRivalMutations;
+    std::map<int32_t, uint64_t> heroRenownLedger;
     std::set<uint64_t> visitedActionTiles;
     PlayerColor activePlayerColor = PlayerColor::NONE;
 
@@ -1630,6 +1636,108 @@ namespace
         return System::concatPath( fheroes2::RPG::dataDirectory(), "rpg_profile.dat" );
     }
 
+    std::string heroRenownPath()
+    {
+        return System::concatPath( fheroes2::RPG::dataDirectory(), "hero_renown.dat" );
+    }
+
+    bool readHeroRenown( const std::string & path, std::map<int32_t, uint64_t> & ledger )
+    {
+        std::ifstream input( path );
+        int version = 0;
+        size_t count = 0;
+        if ( !( input >> version >> count ) || version != heroRenownFileVersion || count > 4096 ) {
+            return false;
+        }
+
+        std::map<int32_t, uint64_t> candidate;
+        for ( size_t i = 0; i < count; ++i ) {
+            int32_t heroId = -1;
+            uint64_t renown = 0;
+            if ( !( input >> heroId >> renown ) || heroId < 0 || !candidate.emplace( heroId, renown ).second ) {
+                return false;
+            }
+        }
+
+        input >> std::ws;
+        if ( !input.eof() ) {
+            return false;
+        }
+
+        ledger = std::move( candidate );
+        return true;
+    }
+
+    void loadHeroRenown()
+    {
+        heroRenownLedger.clear();
+
+        const std::string path = heroRenownPath();
+        for ( const std::string & candidatePath : { path, path + ".bak" } ) {
+            std::map<int32_t, uint64_t> loaded;
+            if ( readHeroRenown( candidatePath, loaded ) ) {
+                heroRenownLedger = std::move( loaded );
+                return;
+            }
+        }
+    }
+
+    void saveHeroRenown()
+    {
+        const std::string path = heroRenownPath();
+        const std::string tempPath = path + ".tmp";
+        const std::string backupPath = path + ".bak";
+
+        std::ofstream output( tempPath, std::ios::trunc );
+        if ( !output ) {
+            ERROR_LOG( "Unable to write hero Renown ledger." )
+            return;
+        }
+
+        output << heroRenownFileVersion << ' ' << heroRenownLedger.size();
+        for ( const auto & [heroId, renown] : heroRenownLedger ) {
+            output << ' ' << heroId << ' ' << renown;
+        }
+        output << '\n';
+        output.close();
+        if ( !output ) {
+            System::Unlink( tempPath );
+            ERROR_LOG( "Unable to finish hero Renown ledger." )
+            return;
+        }
+
+        const bool hadOriginal = System::IsFile( path );
+        if ( hadOriginal ) {
+            System::Unlink( backupPath );
+            if ( std::rename( path.c_str(), backupPath.c_str() ) != 0 ) {
+                System::Unlink( tempPath );
+                ERROR_LOG( "Unable to rotate hero Renown backup." )
+                return;
+            }
+        }
+
+        if ( std::rename( tempPath.c_str(), path.c_str() ) != 0 ) {
+            if ( hadOriginal ) {
+                static_cast<void>( std::rename( backupPath.c_str(), path.c_str() ) );
+            }
+            System::Unlink( tempPath );
+            ERROR_LOG( "Unable to install hero Renown ledger." )
+        }
+    }
+
+    uint64_t addHeroRenown( const PlayerColor color, const int32_t heroId, const uint64_t amount )
+    {
+        if ( color != activePlayerColor || color == PlayerColor::NONE || heroId < 0 || amount == 0 ) {
+            return 0;
+        }
+
+        uint64_t & total = heroRenownLedger[heroId];
+        const uint64_t credited = std::min( amount, std::numeric_limits<uint64_t>::max() - total );
+        total += credited;
+        saveHeroRenown();
+        return credited;
+    }
+
     bool readProfile( const std::string & path, Profile & profile, std::set<uint64_t> & visitedTiles, bool * needsMigration = nullptr )
     {
         std::ifstream input( path );
@@ -2553,6 +2661,27 @@ namespace
         message += "\n\nRenown to Next Level: " + formatNumber( remainingXP );
         message += "\nUnique Map Sites Visited: " + formatNumber( visitedActionTiles.size() );
 
+        if ( !heroRenownLedger.empty() ) {
+            std::vector<std::pair<int32_t, uint64_t>> rankedHeroes( heroRenownLedger.begin(), heroRenownLedger.end() );
+            std::sort( rankedHeroes.begin(), rankedHeroes.end(), []( const auto & left, const auto & right ) {
+                return left.second != right.second ? left.second > right.second : left.first < right.first;
+            } );
+
+            message += "\n\nHERO RENOWN";
+            size_t shown = 0;
+            for ( const auto & [heroId, renown] : rankedHeroes ) {
+                const Heroes * hero = world.GetHeroes( heroId );
+                const std::string heroName = hero != nullptr ? hero->GetName() : "Hero #" + std::to_string( heroId );
+                message += "\n  " + heroName + ": " + formatNumber( renown );
+                if ( ++shown == 5 ) {
+                    break;
+                }
+            }
+            if ( rankedHeroes.size() > shown ) {
+                message += "\n  +" + formatNumber( rankedHeroes.size() - shown ) + " more heroes";
+            }
+        }
+
         const std::string path = profilePath();
         message += "\n\nPROFILE & RECOVERY";
         message += "\nData Folder: " + fheroes2::RPG::dataDirectory();
@@ -2584,7 +2713,8 @@ std::string fheroes2::RPG::dataDirectory()
 
         const std::string oldConfig = System::GetConfigDirectory( "fheroes2" );
         for ( const char * fileName : { "rpg_profile.dat", "rpg_profile.dat.tmp", "rpg_profile.dat.bak",
-                                       "offline_progress.dat", "offline_progress.dat.tmp", "offline_progress.dat.bak" } ) {
+                                       "offline_progress.dat", "offline_progress.dat.tmp", "offline_progress.dat.bak",
+                                        "hero_renown.dat", "hero_renown.dat.tmp", "hero_renown.dat.bak" } ) {
             const std::filesystem::path source( System::concatPath( oldConfig, fileName ) );
             const std::filesystem::path target( System::concatPath( directory, fileName ) );
             std::error_code error;
@@ -2613,11 +2743,14 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     eliteEnemyColors.clear();
     eliteRivalArchetypes.clear();
     eliteRivalMutations.clear();
+    heroRenownLedger.clear();
     visitedActionTiles.clear();
     playerProfile = {};
     if ( playerColor == PlayerColor::NONE ) {
         return;
     }
+
+    loadHeroRenown();
 
     const std::string path = profilePath();
     // stable_sort preserves this priority when filesystem timestamps tie. A complete temporary
@@ -2878,12 +3011,14 @@ void fheroes2::RPG::endMap()
 {
     if ( activePlayerColor != PlayerColor::NONE ) {
         saveProfile();
+        saveHeroRenown();
     }
     activePlayerColor = PlayerColor::NONE;
     enemyProfiles.clear();
     eliteEnemyColors.clear();
     eliteRivalArchetypes.clear();
     eliteRivalMutations.clear();
+    heroRenownLedger.clear();
     visitedActionTiles.clear();
 }
 
@@ -2921,7 +3056,7 @@ uint64_t fheroes2::RPG::addExperience( const PlayerColor color, const uint64_t a
 }
 
 void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor opponent, const uint32_t battleExperience, const bool won,
-                                  const bool defending, const bool siege )
+                                  const bool defending, const bool siege, const int32_t heroId )
 {
     if ( color != activePlayerColor ) {
         return;
@@ -2961,8 +3096,25 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
         base *= 1.0L + static_cast<long double>( activeEliteMutationCount( opponent ) ) * 0.05L;
     }
     const long double earned = base * challenge;
-    static_cast<void>( addExperience( color, static_cast<uint64_t>( std::min( earned, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) ),
-                                      ExperienceKind::BATTLE ) );
+    const uint64_t reward = static_cast<uint64_t>( std::min( earned, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) );
+    static_cast<void>( addExperience( color, reward, ExperienceKind::BATTLE ) );
+
+    // Individual Hero Renown is a separate progression record. It deliberately does not alter
+    // combat stats, doctrine ranks, kingdom level or the kingdom-level Renown economy.
+    if ( won ) {
+        static_cast<void>( addHeroRenown( color, heroId, reward ) );
+    }
+}
+
+void fheroes2::RPG::awardTownCapture( const PlayerColor color, const int32_t heroId )
+{
+    static_cast<void>( addHeroRenown( color, heroId, heroCaptureRenown ) );
+}
+
+uint64_t fheroes2::RPG::heroRenown( const int32_t heroId )
+{
+    const auto found = heroRenownLedger.find( heroId );
+    return found == heroRenownLedger.end() ? 0 : found->second;
 }
 
 uint64_t fheroes2::RPG::previewAdventureActionExperience( const PlayerColor color, const int objectType, const int32_t tileIndex )
