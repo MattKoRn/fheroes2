@@ -467,6 +467,38 @@ namespace
         return formatDecimalNumber( std::to_string( value ) );
     }
 
+    std::string formatCompactDoctrineNumber( long double value )
+    {
+        if ( !std::isfinite( static_cast<double>( value ) ) ) {
+            return "0";
+        }
+
+        const bool negative = value < 0.0L;
+        value = std::abs( value );
+
+        size_t group = 0;
+        while ( value >= 1000.0L ) {
+            value /= 1000.0L;
+            ++group;
+        }
+
+        std::ostringstream text;
+        const int precision = value >= 100.0L ? 0 : value >= 10.0L ? 1 : 2;
+        text << std::fixed << std::setprecision( precision ) << static_cast<double>( value );
+        std::string result = text.str();
+        while ( result.size() > 1 && result.back() == '0' && result.find( '.' ) != std::string::npos ) {
+            result.pop_back();
+        }
+        if ( !result.empty() && result.back() == '.' ) {
+            result.pop_back();
+        }
+
+        if ( negative ) {
+            result.insert( result.begin(), '-' );
+        }
+        return result + numberSuffix( group );
+    }
+
     long double percentEffect( const uint64_t rank )
     {
         return 4.0L * std::log1p( static_cast<long double>( rank ) );
@@ -2871,6 +2903,15 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
 std::string fheroes2::RPG::formatExperience( const uint64_t value )
 {
     return formatNumber( value );
+}
+
+std::string fheroes2::RPG::formatDoctrineModifier( const double value, const bool percentage )
+{
+    std::string output = formatCompactDoctrineNumber( static_cast<long double>( value ) );
+    if ( percentage ) {
+        output += '%';
+    }
+    return output;
 }
 
 void fheroes2::RPG::recordDoctrineUse( const PlayerColor color, const size_t upgradeId, const uint64_t count )
