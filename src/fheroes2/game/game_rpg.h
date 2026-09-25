@@ -36,6 +36,12 @@ namespace fheroes2::RPG
 
     // Persistent RPG combat affixes used by battle stacks. These accessors are intentionally
     // nodiscard: silently dropping a modifier is almost always a gameplay integration bug.
+    // Exact persistent doctrine contribution used by UI/analytics. These stay 64-bit so the
+    // displayed modifier can use generated number suffixes even when the battle engine stat
+    // itself has reached its native uint32_t ceiling.
+    [[nodiscard]] uint64_t creatureAttackDoctrineModifier( PlayerColor color );
+    [[nodiscard]] uint64_t creatureDefenseDoctrineModifier( PlayerColor color );
+
     [[nodiscard]] uint32_t creatureAttackBonus( PlayerColor color );
     [[nodiscard]] uint32_t creatureDefenseBonus( PlayerColor color );
     [[nodiscard]] int moraleBonus( PlayerColor color );
