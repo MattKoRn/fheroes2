@@ -119,7 +119,17 @@ The menu supports full keyboard and touch controls:
 
 Victorious adventure heroes now build their own persistent **Hero Renown** alongside kingdom-wide RPG Renown. A hero receives the calculated battle-Renown award whenever that hero wins a battle, and capturing an enemy castle grants an additional **500 Hero Renown**. This personal ledger is deliberately non-combat: it does not change stats, doctrine points, kingdom level, or battle rewards.
 
-Hero Renown is stored in a separate `hero_renown.dat` companion ledger keyed by the engine's stable hero ID, leaving the existing `rpg_profile.dat` format unchanged for save compatibility. The **Royal Guild Overview** lists the five highest-Renown heroes currently recorded, using their in-game names when available.
+Hero Renown is stored in a separate `hero_renown.dat` companion ledger keyed by the engine's stable hero ID, leaving the existing `rpg_profile.dat` format unchanged for save compatibility.
+
+Hero Renown now derives a cosmetic **Hero Legacy** title without adding any new saved fields:
+
+- **Unknown:** 0-999 Renown
+- **Proven:** 1,000-4,999 Renown
+- **Famous:** 5,000-24,999 Renown
+- **Legendary:** 25,000-99,999 Renown
+- **Mythic:** 100,000+ Renown
+
+Crossing a threshold displays a concise Hero Legacy notification with the new title. The **Royal Guild Overview** lists the five highest-Renown heroes currently recorded, showing each in-game hero name, current title, total Renown, and progress toward the next title. Mythic heroes are marked as having reached the maximum legacy tier.
 
 ## XP and economy
 

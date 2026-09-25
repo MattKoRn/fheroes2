@@ -59,8 +59,28 @@ namespace
     constexpr uint64_t heroCaptureRenown = 500;
     constexpr int heroRenownFileVersion = 1;
     constexpr int profileVersion = 8;
+
+    struct HeroLegacyTier
+    {
+        const char * title;
+        uint64_t threshold;
+    };
+
+    constexpr std::array<HeroLegacyTier, 5> heroLegacyTiers{ {
+        { "Unknown", 0 },
+        { "Proven", 1000 },
+        { "Famous", 5000 },
+        { "Legendary", 25000 },
+        { "Mythic", 100000 },
+    } };
+
     static_assert( heroCaptureRenown > 0 );
     static_assert( heroRenownFileVersion == 1 );
+    static_assert( heroLegacyTiers[0].threshold == 0 );
+    static_assert( heroLegacyTiers[0].threshold < heroLegacyTiers[1].threshold );
+    static_assert( heroLegacyTiers[1].threshold < heroLegacyTiers[2].threshold );
+    static_assert( heroLegacyTiers[2].threshold < heroLegacyTiers[3].threshold );
+    static_assert( heroLegacyTiers[3].threshold < heroLegacyTiers[4].threshold );
     using namespace fheroes2::RPG;
 
     uint64_t xpToNextLevel( uint64_t level );
@@ -548,6 +568,36 @@ namespace
     std::string formatNumber( const uint64_t value )
     {
         return formatDecimalNumber( std::to_string( value ) );
+    }
+
+    size_t heroLegacyTierIndex( const uint64_t renown )
+    {
+        for ( size_t i = heroLegacyTiers.size(); i > 0; --i ) {
+            if ( renown >= heroLegacyTiers[i - 1].threshold ) {
+                return i - 1;
+            }
+        }
+
+        return 0;
+    }
+
+    std::string heroLegacyProgressText( const uint64_t renown )
+    {
+        const size_t tierIndex = heroLegacyTierIndex( renown );
+        std::string text = heroLegacyTiers[tierIndex].title;
+        text += " - " + formatNumber( renown );
+
+        if ( tierIndex + 1 < heroLegacyTiers.size() ) {
+            const HeroLegacyTier & nextTier = heroLegacyTiers[tierIndex + 1];
+            const uint64_t remaining = nextTier.threshold > renown ? nextTier.threshold - renown : 0;
+            text += " / " + formatNumber( nextTier.threshold );
+            text += " (" + formatNumber( remaining ) + " to " + std::string( nextTier.title ) + ")";
+        }
+        else {
+            text += " (maximum legacy tier)";
+        }
+
+        return text;
     }
 
     std::string formatCompactDoctrineNumber( long double value )
@@ -1732,9 +1782,29 @@ namespace
         }
 
         uint64_t & total = heroRenownLedger[heroId];
+        const size_t previousTier = heroLegacyTierIndex( total );
         const uint64_t credited = std::min( amount, std::numeric_limits<uint64_t>::max() - total );
         total += credited;
         saveHeroRenown();
+
+        const size_t currentTier = heroLegacyTierIndex( total );
+        if ( credited > 0 && currentTier > previousTier ) {
+            const Heroes * hero = world.GetHeroes( heroId );
+            const std::string heroName = hero != nullptr ? hero->GetName() : "Hero #" + std::to_string( heroId );
+
+            std::string message = heroName + " has earned the " + std::string( heroLegacyTiers[currentTier].title ) + " legacy title.";
+            message += "\n\nHero Renown: " + formatNumber( total );
+            if ( currentTier + 1 < heroLegacyTiers.size() ) {
+                const HeroLegacyTier & nextTier = heroLegacyTiers[currentTier + 1];
+                message += "\nNext title: " + std::string( nextTier.title ) + " at " + formatNumber( nextTier.threshold ) + " Renown";
+            }
+            else {
+                message += "\nThis is the highest Hero Legacy tier.";
+            }
+
+            fheroes2::showStandardTextMessage( "Hero Legacy", std::move( message ), Dialog::OK );
+        }
+
         return credited;
     }
 
@@ -2672,7 +2742,7 @@ namespace
             for ( const auto & [heroId, renown] : rankedHeroes ) {
                 const Heroes * hero = world.GetHeroes( heroId );
                 const std::string heroName = hero != nullptr ? hero->GetName() : "Hero #" + std::to_string( heroId );
-                message += "\n  " + heroName + ": " + formatNumber( renown );
+                message += "\n  " + heroName + ": " + heroLegacyProgressText( renown );
                 if ( ++shown == 5 ) {
                     break;
                 }
