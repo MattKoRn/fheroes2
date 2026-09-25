@@ -131,6 +131,16 @@ Hero Renown now derives a cosmetic **Hero Legacy** title without adding any new 
 
 Crossing a threshold displays a concise Hero Legacy notification with the new title. The **Royal Guild Overview** lists the five highest-Renown heroes currently recorded, showing each in-game hero name, current title, total Renown, and progress toward the next title. Mythic heroes are marked as having reached the maximum legacy tier.
 
+### Hero Chronicle
+
+Each hero also has a persistent, cosmetic **Hero Chronicle** that records **battle victories**, **enemy castle captures**, and **Elite Rival victories**. Chronicle deeds never modify combat stats, rewards, doctrine points, kingdom level, AI strength, or Hero Renown.
+
+Chronicle records live in a separate versioned `hero_chronicle.dat` ledger keyed by stable hero ID. The loader rejects unsupported versions, duplicate hero records, negative hero IDs, impossible Elite-win counts greater than total battle wins, excessive record counts, and trailing data. A valid `.bak` ledger is used when the primary is damaged, while writes use a temporary file and backup rotation.
+
+The hero's strongest deed profile derives a deterministic flavour epithet. **Veteran** represents ordinary battle victories, **Castlebreaker** represents castle captures, **Rival-Bane** represents Elite Rival victories, and **Unwritten** represents a hero with no recorded deed. For epithet selection only, castle captures count as four ordinary victories and Elite Rival victories count as twelve, with deterministic tie priority **Rival-Bane > Castlebreaker > Veteran**. These weights are display-only.
+
+The Royal Guild Overview shows the Chronicle epithet and exact deed counts beneath each leading Hero Renown entry.
+
 ## XP and economy
 
 RPG XP is now only the progression currency that earns levels and guild points. **Upgrade ranks do not multiply RPG XP and no upgrade pays resource bundles.** Hero XP awards, battles, and first-time adventure actions still feed the persistent RPG profile so ordinary play advances the combat tree.

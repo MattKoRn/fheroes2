@@ -58,6 +58,7 @@ namespace
     constexpr uint64_t legacyV6ExperiencePerLevel = 100000;
     constexpr uint64_t heroCaptureRenown = 500;
     constexpr int heroRenownFileVersion = 1;
+    constexpr int heroChronicleFileVersion = 1;
     constexpr int profileVersion = 8;
 
     struct HeroLegacyTier
@@ -76,6 +77,7 @@ namespace
 
     static_assert( heroCaptureRenown > 0 );
     static_assert( heroRenownFileVersion == 1 );
+    static_assert( heroChronicleFileVersion == 1 );
     static_assert( heroLegacyTiers[0].threshold == 0 );
     static_assert( heroLegacyTiers[0].threshold < heroLegacyTiers[1].threshold );
     static_assert( heroLegacyTiers[1].threshold < heroLegacyTiers[2].threshold );
@@ -266,6 +268,13 @@ namespace
         }
     }
 
+    struct HeroChronicle
+    {
+        uint64_t battleVictories{ 0 };
+        uint64_t castleCaptures{ 0 };
+        uint64_t eliteVictories{ 0 };
+    };
+
     uint64_t consumeAffordableLevelsWithCarry( Profile & profile );
 
     Profile playerProfile;
@@ -274,6 +283,7 @@ namespace
     std::map<PlayerColor, RivalArchetype> eliteRivalArchetypes;
     std::map<PlayerColor, std::vector<EliteMutation>> eliteRivalMutations;
     std::map<int32_t, uint64_t> heroRenownLedger;
+    std::map<int32_t, HeroChronicle> heroChronicleLedger;
     std::set<uint64_t> visitedActionTiles;
     PlayerColor activePlayerColor = PlayerColor::NONE;
 
@@ -598,6 +608,33 @@ namespace
         }
 
         return text;
+    }
+
+    const char * heroChronicleEpithet( const HeroChronicle & chronicle )
+    {
+        if ( chronicle.battleVictories == 0 && chronicle.castleCaptures == 0 && chronicle.eliteVictories == 0 ) {
+            return "Unwritten";
+        }
+
+        // These display-only weights identify the hero's defining deed profile.
+        const long double battleScore = static_cast<long double>( chronicle.battleVictories );
+        const long double castleScore = static_cast<long double>( chronicle.castleCaptures ) * 4.0L;
+        const long double eliteScore = static_cast<long double>( chronicle.eliteVictories ) * 12.0L;
+
+        // Deliberate deterministic tie priority: Elite > castle > ordinary battle deeds.
+        if ( chronicle.eliteVictories > 0 && eliteScore >= castleScore && eliteScore >= battleScore ) {
+            return "Rival-Bane";
+        }
+        if ( chronicle.castleCaptures > 0 && castleScore >= battleScore ) {
+            return "Castlebreaker";
+        }
+        return "Veteran";
+    }
+
+    std::string heroChronicleSummary( const HeroChronicle & chronicle )
+    {
+        return std::string( heroChronicleEpithet( chronicle ) ) + " | " + formatNumber( chronicle.battleVictories ) + " battle wins, "
+               + formatNumber( chronicle.castleCaptures ) + " castles, " + formatNumber( chronicle.eliteVictories ) + " Elite wins";
     }
 
     std::string formatCompactDoctrineNumber( long double value )
@@ -1775,6 +1812,122 @@ namespace
         }
     }
 
+    std::string heroChroniclePath()
+    {
+        return System::concatPath( fheroes2::RPG::dataDirectory(), "hero_chronicle.dat" );
+    }
+
+    bool readHeroChronicle( const std::string & path, std::map<int32_t, HeroChronicle> & ledger )
+    {
+        std::ifstream input( path );
+        int version = 0;
+        size_t count = 0;
+        if ( !( input >> version >> count ) || version != heroChronicleFileVersion || count > 4096 ) {
+            return false;
+        }
+
+        std::map<int32_t, HeroChronicle> candidate;
+        for ( size_t i = 0; i < count; ++i ) {
+            int32_t heroId = -1;
+            HeroChronicle chronicle;
+            if ( !( input >> heroId >> chronicle.battleVictories >> chronicle.castleCaptures >> chronicle.eliteVictories )
+                 || heroId < 0 || chronicle.eliteVictories > chronicle.battleVictories
+                 || !candidate.emplace( heroId, chronicle ).second ) {
+                return false;
+            }
+        }
+
+        input >> std::ws;
+        if ( !input.eof() ) {
+            return false;
+        }
+
+        ledger = std::move( candidate );
+        return true;
+    }
+
+    void loadHeroChronicle()
+    {
+        heroChronicleLedger.clear();
+
+        const std::string path = heroChroniclePath();
+        for ( const std::string & candidatePath : { path, path + ".bak" } ) {
+            std::map<int32_t, HeroChronicle> loaded;
+            if ( readHeroChronicle( candidatePath, loaded ) ) {
+                heroChronicleLedger = std::move( loaded );
+                return;
+            }
+        }
+    }
+
+    void saveHeroChronicle()
+    {
+        const std::string path = heroChroniclePath();
+        const std::string tempPath = path + ".tmp";
+        const std::string backupPath = path + ".bak";
+
+        std::ofstream output( tempPath, std::ios::trunc );
+        if ( !output ) {
+            ERROR_LOG( "Unable to write Hero Chronicle ledger." )
+            return;
+        }
+
+        output << heroChronicleFileVersion << ' ' << heroChronicleLedger.size();
+        for ( const auto & [heroId, chronicle] : heroChronicleLedger ) {
+            output << ' ' << heroId << ' ' << chronicle.battleVictories << ' ' << chronicle.castleCaptures << ' ' << chronicle.eliteVictories;
+        }
+        output << '\n';
+        output.close();
+        if ( !output ) {
+            System::Unlink( tempPath );
+            ERROR_LOG( "Unable to finish Hero Chronicle ledger." )
+            return;
+        }
+
+        const bool hadOriginal = System::IsFile( path );
+        if ( hadOriginal ) {
+            System::Unlink( backupPath );
+            if ( std::rename( path.c_str(), backupPath.c_str() ) != 0 ) {
+                System::Unlink( tempPath );
+                ERROR_LOG( "Unable to rotate Hero Chronicle backup." )
+                return;
+            }
+        }
+
+        if ( std::rename( tempPath.c_str(), path.c_str() ) != 0 ) {
+            if ( hadOriginal ) {
+                static_cast<void>( std::rename( backupPath.c_str(), path.c_str() ) );
+            }
+            System::Unlink( tempPath );
+            ERROR_LOG( "Unable to install Hero Chronicle ledger." )
+        }
+    }
+
+    void recordHeroBattleVictory( const PlayerColor color, const int32_t heroId, const bool eliteVictory )
+    {
+        if ( color != activePlayerColor || color == PlayerColor::NONE || heroId < 0 ) {
+            return;
+        }
+
+        HeroChronicle & chronicle = heroChronicleLedger[heroId];
+        chronicle.battleVictories = saturatedAdd( chronicle.battleVictories, 1 );
+        if ( eliteVictory ) {
+            chronicle.eliteVictories = saturatedAdd( chronicle.eliteVictories, 1 );
+        }
+        saveHeroChronicle();
+    }
+
+    void recordHeroCastleCapture( const PlayerColor color, const int32_t heroId )
+    {
+        if ( color != activePlayerColor || color == PlayerColor::NONE || heroId < 0 ) {
+            return;
+        }
+
+        HeroChronicle & chronicle = heroChronicleLedger[heroId];
+        chronicle.castleCaptures = saturatedAdd( chronicle.castleCaptures, 1 );
+        saveHeroChronicle();
+    }
+
     uint64_t addHeroRenown( const PlayerColor color, const int32_t heroId, const uint64_t amount )
     {
         if ( color != activePlayerColor || color == PlayerColor::NONE || heroId < 0 || amount == 0 ) {
@@ -2743,6 +2896,9 @@ namespace
                 const Heroes * hero = world.GetHeroes( heroId );
                 const std::string heroName = hero != nullptr ? hero->GetName() : "Hero #" + std::to_string( heroId );
                 message += "\n  " + heroName + ": " + heroLegacyProgressText( renown );
+                const auto chronicleIt = heroChronicleLedger.find( heroId );
+                const HeroChronicle chronicle = chronicleIt != heroChronicleLedger.end() ? chronicleIt->second : HeroChronicle{};
+                message += "\n    Chronicle: " + heroChronicleSummary( chronicle );
                 if ( ++shown == 5 ) {
                     break;
                 }
@@ -2784,7 +2940,8 @@ std::string fheroes2::RPG::dataDirectory()
         const std::string oldConfig = System::GetConfigDirectory( "fheroes2" );
         for ( const char * fileName : { "rpg_profile.dat", "rpg_profile.dat.tmp", "rpg_profile.dat.bak",
                                        "offline_progress.dat", "offline_progress.dat.tmp", "offline_progress.dat.bak",
-                                        "hero_renown.dat", "hero_renown.dat.tmp", "hero_renown.dat.bak" } ) {
+                                       "hero_renown.dat", "hero_renown.dat.tmp", "hero_renown.dat.bak",
+                                       "hero_chronicle.dat", "hero_chronicle.dat.tmp", "hero_chronicle.dat.bak" } ) {
             const std::filesystem::path source( System::concatPath( oldConfig, fileName ) );
             const std::filesystem::path target( System::concatPath( directory, fileName ) );
             std::error_code error;
@@ -2814,6 +2971,7 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     eliteRivalArchetypes.clear();
     eliteRivalMutations.clear();
     heroRenownLedger.clear();
+    heroChronicleLedger.clear();
     visitedActionTiles.clear();
     playerProfile = {};
     if ( playerColor == PlayerColor::NONE ) {
@@ -2821,6 +2979,7 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
     }
 
     loadHeroRenown();
+    loadHeroChronicle();
 
     const std::string path = profilePath();
     // stable_sort preserves this priority when filesystem timestamps tie. A complete temporary
@@ -3082,6 +3241,7 @@ void fheroes2::RPG::endMap()
     if ( activePlayerColor != PlayerColor::NONE ) {
         saveProfile();
         saveHeroRenown();
+        saveHeroChronicle();
     }
     activePlayerColor = PlayerColor::NONE;
     enemyProfiles.clear();
@@ -3089,6 +3249,7 @@ void fheroes2::RPG::endMap()
     eliteRivalArchetypes.clear();
     eliteRivalMutations.clear();
     heroRenownLedger.clear();
+    heroChronicleLedger.clear();
     visitedActionTiles.clear();
 }
 
@@ -3173,12 +3334,15 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
     // combat stats, doctrine ranks, kingdom level or the kingdom-level Renown economy.
     if ( won ) {
         static_cast<void>( addHeroRenown( color, heroId, reward ) );
+        const bool eliteVictory = opponent != PlayerColor::NONE && eliteEnemyColors.count( opponent ) > 0;
+        recordHeroBattleVictory( color, heroId, eliteVictory );
     }
 }
 
 void fheroes2::RPG::awardTownCapture( const PlayerColor color, const int32_t heroId )
 {
     static_cast<void>( addHeroRenown( color, heroId, heroCaptureRenown ) );
+    recordHeroCastleCapture( color, heroId );
 }
 
 uint64_t fheroes2::RPG::heroRenown( const int32_t heroId )
