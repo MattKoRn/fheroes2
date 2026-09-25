@@ -280,6 +280,81 @@ namespace
         }
     }
 
+    int rivalArchetypeDoctrineBias( const RivalArchetype archetype, const size_t id )
+    {
+        switch ( archetype ) {
+        case RivalArchetype::WARLORD:
+            switch ( id ) {
+            case ARMS_TRAINING:
+            case ARMOR_TRAINING:
+            case VETERAN_CORE:
+            case LEADERSHIP:
+            case REGENERATION:
+                return 7;
+            case CRITICAL_TRAINING:
+            case BRUTAL_CRITICALS:
+                return 4;
+            default:
+                return 0;
+            }
+        case RivalArchetype::PREDATOR:
+            switch ( id ) {
+            case EXECUTIONER:
+            case RUTHLESS:
+            case GIANT_SLAYER:
+            case OVERWHELM:
+            case FRENZY:
+            case ARMOR_PIERCING:
+                return 8;
+            default:
+                return 0;
+            }
+        case RivalArchetype::ARCANIST:
+            switch ( id ) {
+            case SORCERY:
+            case PYROMANCY:
+            case CRYOMANCY:
+            case STORMCRAFT:
+            case CATACLYSM:
+            case ARCANE_PIERCING:
+                return 8;
+            default:
+                return 0;
+            }
+        case RivalArchetype::SENTINEL:
+            switch ( id ) {
+            case IRON_SKIN:
+            case ARROW_WARD:
+            case MELEE_GUARD:
+            case LAST_STAND:
+            case BULWARK:
+            case UNYIELDING:
+            case SPELL_WARD:
+            case FIRE_WARD:
+            case COLD_WARD:
+            case STORM_WARD:
+            case CATACLYSM_WARD:
+                return 7;
+            default:
+                return 0;
+            }
+        case RivalArchetype::TRICKSTER:
+            switch ( id ) {
+            case EVASION:
+            case CLOSE_QUARTERS:
+            case OPENING_BLOW:
+            case DISCIPLINE:
+            case FORTUNE:
+            case CRITICAL_TRAINING:
+                return 8;
+            default:
+                return 0;
+            }
+        default:
+            return 0;
+        }
+    }
+
     uint64_t baseCost( const size_t id )
     {
         switch ( id ) {
@@ -443,6 +518,60 @@ namespace
             return std::min<long double>( 50.0L, 3.5L * std::log1p( static_cast<long double>( rank ) ) );
         default:
             return percentEffect( rank );
+        }
+    }
+
+    long double doctrinePairResonance( const Profile & profile, const size_t first, const size_t second, const long double scale,
+                                        const long double cap )
+    {
+        if ( profile.ranks[first] == 0 || profile.ranks[second] == 0 ) {
+            return 0.0L;
+        }
+
+        return std::min( cap, std::min( effect( first, profile.ranks[first] ), effect( second, profile.ranks[second] ) ) * scale );
+    }
+
+    long double doctrineTripleResonance( const Profile & profile, const size_t first, const size_t second, const size_t third,
+                                          const long double scale, const long double cap )
+    {
+        if ( profile.ranks[first] == 0 || profile.ranks[second] == 0 || profile.ranks[third] == 0 ) {
+            return 0.0L;
+        }
+
+        return std::min(
+            cap, std::min( { effect( first, profile.ranks[first] ), effect( second, profile.ranks[second] ), effect( third, profile.ranks[third] ) } ) * scale );
+    }
+
+    const char * doctrineResonanceHint( const size_t id )
+    {
+        switch ( id ) {
+        case EXECUTIONER:
+        case RUTHLESS:
+            return "Finisher - both doctrines add a bonus against targets below half health.";
+        case GIANT_SLAYER:
+        case BULWARK:
+            return "Underdog - the pair reinforces offense and defense while outnumbered.";
+        case FRENZY:
+        case LAST_STAND:
+            return "Last Fury - the pair reinforces offense and defense below half health.";
+        case OPENING_BLOW:
+        case DISCIPLINE:
+        case UNYIELDING:
+            return "Vanguard - the three-doctrine package rewards starting an exchange at full health.";
+        case SORCERY:
+        case PYROMANCY:
+        case CRYOMANCY:
+        case STORMCRAFT:
+        case CATACLYSM:
+            return "Spell Convergence - Sorcery plus an elemental discipline adds extra matching spell power.";
+        case SPELL_WARD:
+        case FIRE_WARD:
+        case COLD_WARD:
+        case STORM_WARD:
+        case CATACLYSM_WARD:
+            return "Ward Matrix - Spell Ward plus an elemental ward adds extra matching spell resistance.";
+        default:
+            return nullptr;
         }
     }
 
@@ -1613,6 +1742,9 @@ namespace
         if ( playerProfile.useCounts[id] > 0 ) {
             message += "\nBattle triggers: " + formatNumber( playerProfile.useCounts[id] );
         }
+        if ( const char * resonance = doctrineResonanceHint( id ); resonance != nullptr ) {
+            message += "\nResonance: " + std::string( resonance );
+        }
         message += "\nAvailable points: " + formatNumber( playerProfile.points );
         fheroes2::showStandardTextMessage( upgrades[id].name, std::move( message ), Dialog::ZERO );
     }
@@ -1674,6 +1806,7 @@ namespace
         message += "\nB, Enter, or Space: Buy the selected doctrine";
         message += "\nI: Inspect the selected doctrine";
         message += "\nO: Open the Royal Guild Overview";
+        message += "\nK: Open Build Analytics";
         message += "\nV: Open Elite Rival Intel";
         message += "\nS or A: Toggle Steward auto-buy";
         message += "\nR: Respec doctrines";
@@ -1698,6 +1831,95 @@ namespace
         fheroes2::showStandardTextMessage( "Royal Guild Help", std::move( message ), Dialog::ZERO );
     }
 
+    void showBuildAnalytics()
+    {
+        const std::string path = profilePath();
+        const uint64_t totalInvested = totalSpentPoints( playerProfile );
+        const uint64_t earnedPoints = saturatedMultiply( playerProfile.level - 1, pointsPerLevel );
+
+        std::string message = "BUILD ANALYTICS\n";
+        message += "\nProfile Ledger: ";
+        message += isCurrentProfileStateValid( playerProfile ) ? "VALID" : "INVALID - autosave protection active";
+        message += "\nEarned Guild Points: " + formatNumber( earnedPoints );
+        message += "\nInvested Guild Points: " + formatNumber( totalInvested );
+        message += "\nAvailable Guild Points: " + formatNumber( playerProfile.points );
+
+        std::array<uint64_t, tabNames.size()> investedByTab{};
+        std::array<uint64_t, tabNames.size()> triggersByTab{};
+        uint64_t totalTriggers = 0;
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            investedByTab[id / upgradesPerTab] = saturatedAdd( investedByTab[id / upgradesPerTab], rankInvestment( id, playerProfile.ranks[id] ) );
+            triggersByTab[id / upgradesPerTab] = saturatedAdd( triggersByTab[id / upgradesPerTab], playerProfile.useCounts[id] );
+            totalTriggers = saturatedAdd( totalTriggers, playerProfile.useCounts[id] );
+        }
+
+        const auto investmentFocus = std::max_element( investedByTab.begin(), investedByTab.end() );
+        if ( investmentFocus != investedByTab.end() && *investmentFocus > 0 ) {
+            message += "\nBuild Focus: "
+                       + std::string( tabNames[static_cast<size_t>( std::distance( investedByTab.begin(), investmentFocus ) )] );
+        }
+        const auto activityFocus = std::max_element( triggersByTab.begin(), triggersByTab.end() );
+        if ( activityFocus != triggersByTab.end() && *activityFocus > 0 ) {
+            message += "\nCombat Focus: "
+                       + std::string( tabNames[static_cast<size_t>( std::distance( triggersByTab.begin(), activityFocus ) )] )
+                       + " (" + formatNumber( *activityFocus ) + " triggers)";
+        }
+        message += "\nTotal Doctrine Triggers: " + formatNumber( totalTriggers );
+
+        const StewardGoal stewardGoal = findStewardGoal( playerProfile );
+        if ( stewardGoal.id < upgradeCount ) {
+            message += "\n\nSTEWARD ROADMAP";
+            message += "\nPrimary: " + std::string( upgrades[stewardGoal.id].name ) + " -> Rank " + formatNumber( stewardGoal.targetRank );
+            const size_t packagePartner = stewardPackagePartner( playerProfile, stewardGoal.id );
+            if ( packagePartner < upgradeCount ) {
+                message += "\nPackage Partner: " + std::string( upgrades[packagePartner].name );
+            }
+            message += "\nPlanning Horizon: " + formatNumber( stewardPlanningHorizon( playerProfile.level ) ) + " ranks";
+        }
+
+        message += "\n\nACTIVE COMBAT RESONANCES";
+        bool anyResonance = false;
+        const auto addResonance = [&message, &anyResonance]( const char * name, const long double bonus, const char * condition ) {
+            if ( bonus <= 0.0L ) {
+                return;
+            }
+            anyResonance = true;
+            message += "\n" + std::string( name ) + ": +" + formatEffect( bonus ) + " - " + condition;
+        };
+
+        addResonance( "Finisher", doctrinePairResonance( playerProfile, EXECUTIONER, RUTHLESS, 0.25L, 6.0L ), "damage vs targets below half HP" );
+        addResonance( "Underdog", doctrinePairResonance( playerProfile, GIANT_SLAYER, BULWARK, 0.20L, 5.0L ), "offense/defense while outnumbered" );
+        addResonance( "Last Fury", doctrinePairResonance( playerProfile, FRENZY, LAST_STAND, 0.20L, 5.0L ), "offense/defense below half HP" );
+        addResonance( "Vanguard", doctrineTripleResonance( playerProfile, OPENING_BLOW, DISCIPLINE, UNYIELDING, 0.18L, 5.0L ),
+                      "opening pressure while at full HP" );
+
+        long double strongestSpellResonance = 0.0L;
+        for ( size_t id = PYROMANCY; id <= CATACLYSM; ++id ) {
+            strongestSpellResonance = std::max( strongestSpellResonance, doctrinePairResonance( playerProfile, SORCERY, id, 0.20L, 6.0L ) );
+        }
+        addResonance( "Spell Convergence", strongestSpellResonance, "matching elemental spell damage" );
+
+        long double strongestWardResonance = 0.0L;
+        for ( size_t id = FIRE_WARD; id <= CATACLYSM_WARD; ++id ) {
+            strongestWardResonance = std::max( strongestWardResonance, doctrinePairResonance( playerProfile, SPELL_WARD, id, 0.20L, 6.0L ) );
+        }
+        addResonance( "Ward Matrix", strongestWardResonance, "matching elemental spell resistance" );
+
+        if ( !anyResonance ) {
+            message += "\nNone active yet. Pair complementary doctrines to unlock resonance bonuses.";
+        }
+
+        message += "\n\nPROFILE SNAPSHOTS";
+        message += "\nPrimary: ";
+        message += System::IsFile( path ) ? "Ready" : "Missing";
+        message += "\nBackup (.bak): ";
+        message += System::IsFile( path + ".bak" ) ? "Ready" : "Not created yet";
+        message += "\nRecovery (.tmp): ";
+        message += System::IsFile( path + ".tmp" ) ? "Available" : "None";
+
+        fheroes2::showStandardTextMessage( "Build Analytics", std::move( message ), Dialog::ZERO );
+    }
+
     void showRivalIntel()
     {
         std::array<size_t, rivalArchetypeNames.size()> archetypeCounts{};
@@ -1713,6 +1935,16 @@ namespace
         message += "\nEncounter Chance / Hostile Kingdom: " + std::to_string( eliteRivalChanceForLevel( playerProfile.level ) ) + "%";
         message += "\nMaximum Coordinated Halls: " + formatNumber( eliteRivalFocusHallLimit( playerProfile.level ) );
         message += "\nElite Rivals This Map: " + formatNumber( eliteEnemyColors.size() );
+
+        std::array<uint64_t, tabNames.size()> activityByTab{};
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            activityByTab[id / upgradesPerTab] = saturatedAdd( activityByTab[id / upgradesPerTab], playerProfile.useCounts[id] );
+        }
+        const auto observedFocus = std::max_element( activityByTab.begin(), activityByTab.end() );
+        if ( observedFocus != activityByTab.end() && *observedFocus > 0 ) {
+            message += "\nObserved Player Combat Focus: "
+                       + std::string( tabNames[static_cast<size_t>( std::distance( activityByTab.begin(), observedFocus ) )] );
+        }
 
         bool anyArchetype = false;
         for ( size_t index = 0; index < archetypeCounts.size(); ++index ) {
@@ -2132,6 +2364,9 @@ void fheroes2::RPG::beginMap( const PlayerColor playerColor )
                       percent -= 2;
                   }
                   percent += packageBonus( id );
+                  if ( eliteKingdom ) {
+                      percent += rivalArchetypeDoctrineBias( archetype, id );
+                  }
                   percent = std::clamp( percent, minimumPower, maximumPower );
 
                   const long double scaledRank = static_cast<long double>( playerProfile.ranks[id] ) * percent / 100.0L;
@@ -2516,20 +2751,28 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
         if ( !defenderFullHealth ) {
             attackBonus += effect( EXECUTIONER, attackProfile->ranks[EXECUTIONER] );
         }
+        if ( defenderBelowHalf ) {
+            attackBonus += doctrinePairResonance( *attackProfile, EXECUTIONER, RUTHLESS, 0.25L, 6.0L );
+        }
         if ( defenderFullHealth ) {
             attackBonus += effect( OPENING_BLOW, attackProfile->ranks[OPENING_BLOW] );
         }
         if ( attackerOutnumbered ) {
             attackBonus += effect( GIANT_SLAYER, attackProfile->ranks[GIANT_SLAYER] );
+            attackBonus += doctrinePairResonance( *attackProfile, GIANT_SLAYER, BULWARK, 0.20L, 5.0L );
         }
         if ( defenderOutnumbered ) {
             attackBonus += effect( OVERWHELM, attackProfile->ranks[OVERWHELM] );
         }
         if ( attackerBelowHalf ) {
             attackBonus += effect( FRENZY, attackProfile->ranks[FRENZY] );
+            attackBonus += doctrinePairResonance( *attackProfile, FRENZY, LAST_STAND, 0.20L, 5.0L );
         }
         if ( attackerFullHealth ) {
             attackBonus += effect( DISCIPLINE, attackProfile->ranks[DISCIPLINE] );
+            if ( defenderFullHealth ) {
+                attackBonus += doctrineTripleResonance( *attackProfile, OPENING_BLOW, DISCIPLINE, UNYIELDING, 0.18L, 5.0L );
+            }
         }
         if ( defenderBelowHalf ) {
             attackBonus += effect( RUTHLESS, attackProfile->ranks[RUTHLESS] );
@@ -2543,12 +2786,15 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
 
         if ( defenderBelowHalf ) {
             defenseReduction += effect( LAST_STAND, defenseProfile->ranks[LAST_STAND] );
+            defenseReduction += doctrinePairResonance( *defenseProfile, FRENZY, LAST_STAND, 0.16L, 4.0L );
         }
         if ( defenderOutnumbered ) {
             defenseReduction += effect( BULWARK, defenseProfile->ranks[BULWARK] );
+            defenseReduction += doctrinePairResonance( *defenseProfile, GIANT_SLAYER, BULWARK, 0.16L, 4.0L );
         }
         if ( defenderFullHealth ) {
             defenseReduction += effect( UNYIELDING, defenseProfile->ranks[UNYIELDING] );
+            defenseReduction += doctrinePairResonance( *defenseProfile, DISCIPLINE, UNYIELDING, 0.16L, 4.0L );
         }
     }
 
@@ -2574,10 +2820,12 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
     if ( specialization != upgradeCount ) {
         if ( attackProfile != nullptr ) {
             spellBonus += effect( specialization, attackProfile->ranks[specialization] );
+            spellBonus += doctrinePairResonance( *attackProfile, SORCERY, specialization, 0.20L, 6.0L );
         }
         if ( defenseProfile != nullptr ) {
             const size_t ward = spellWardId( spellId );
             defenseReduction += effect( ward, defenseProfile->ranks[ward] );
+            defenseReduction += doctrinePairResonance( *defenseProfile, SPELL_WARD, ward, 0.20L, 6.0L );
         }
     }
 
@@ -2928,7 +3176,7 @@ void fheroes2::RPG::showMenu()
             drawSingleLine( "Rows " + std::to_string( firstVisibleRow ) + "-" + std::to_string( lastVisibleRow ) + "/"
                                 + std::to_string( upgradesPerTab ) + "   Up/Down Select   B/Enter/Space Buy   I Details",
                             area.x + 12, area.y + 333, area.width - 24, fheroes2::FontType::smallWhite() );
-            drawSingleLine( "1-8 Tabs   O Overview   V Rivals   H Help   S/A Steward   R Respec   Esc Close", area.x + 12, area.y + 344,
+            drawSingleLine( "1-8 Tabs   O Overview   K Analytics   V Rivals   H Help   S/A Steward   R Respec", area.x + 12, area.y + 344,
                             area.width - 24, fheroes2::FontType::smallWhite() );
             window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
@@ -3063,6 +3311,12 @@ void fheroes2::RPG::showMenu()
 
         if ( event.isKeyPressed( fheroes2::Key::KEY_V ) ) {
             showRivalIntel();
+            redraw = true;
+            continue;
+        }
+
+        if ( event.isKeyPressed( fheroes2::Key::KEY_K ) ) {
+            showBuildAnalytics();
             redraw = true;
             continue;
         }
