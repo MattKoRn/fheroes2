@@ -6,12 +6,18 @@ on:
     paths:
       - 'src/fheroes2/game/game_rpg.cpp'
       - 'src/fheroes2/game/game_rpg.h'
+      - 'src/fheroes2/battle/**'
+      - 'src/fheroes2/dialog/dialog_armyinfo.cpp'
+      - 'src/fheroes2/army/army_troop.*'
       - 'src/fheroes2/ai/**'
       - '.github/workflows/rpg_smoke.yml'
   pull_request:
     paths:
       - 'src/fheroes2/game/game_rpg.cpp'
       - 'src/fheroes2/game/game_rpg.h'
+      - 'src/fheroes2/battle/**'
+      - 'src/fheroes2/dialog/dialog_armyinfo.cpp'
+      - 'src/fheroes2/army/army_troop.*'
       - 'src/fheroes2/ai/**'
       - '.github/workflows/rpg_smoke.yml'
   workflow_dispatch:
