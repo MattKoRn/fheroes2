@@ -1473,6 +1473,43 @@ namespace
         fheroes2::showStandardTextMessage( tabNames[tabIndex], std::move( message ), Dialog::ZERO );
     }
 
+    void showRoyalGuildHelp()
+    {
+        const std::string path = profilePath();
+        const bool hasBackup = System::IsFile( path + ".bak" );
+        const bool hasRecoverySnapshot = System::IsFile( path + ".tmp" );
+
+        std::string message = "KEYBOARD\n";
+        message += "\n1-8: Jump directly to a doctrine hall";
+        message += "\nLeft/Right or Tab: Cycle doctrine halls";
+        message += "\nUp/Down: Select a doctrine";
+        message += "\nPageUp/PageDown/Home/End: Jump to first or last doctrine";
+        message += "\nB, Enter, or Space: Buy the selected doctrine";
+        message += "\nI: Inspect the selected doctrine";
+        message += "\nO: Open the Royal Guild Overview";
+        message += "\nS or A: Toggle Steward auto-buy";
+        message += "\nR: Respec doctrines";
+        message += "\nH: Open this help";
+        message += "\nF9 or Esc: Close the Royal Guild";
+
+        message += "\n\nMOUSE & TOUCH";
+        message += "\nClick/tap a doctrine row to inspect it and use BUY to purchase.";
+        message += "\nRight-click/hold a doctrine hall to inspect all five doctrines.";
+        message += "\nClick/tap the Renown panel to open the Overview.";
+        message += "\nUse the wheel, scroll arrows, or scrollbar track to move through doctrine rows.";
+
+        message += "\n\nPROFILE SAFETY";
+        message += "\nData folder: " + fheroes2::RPG::dataDirectory();
+        message += "\nPersistent backup: ";
+        message += hasBackup ? "Ready" : "Not created yet";
+        message += "\nPending recovery snapshot: ";
+        message += hasRecoverySnapshot ? "Available" : "None";
+        message += "\nPurchases, Steward changes, respecs, and RPG progression save automatically.";
+        message += "\nValid .bak and .tmp snapshots can recover a damaged primary profile on startup.";
+
+        fheroes2::showStandardTextMessage( "Royal Guild Help", std::move( message ), Dialog::ZERO );
+    }
+
     void showKingdomOverview()
     {
         const uint64_t remainingXP = xpToNextLevel( playerProfile.level ) > playerProfile.progress
@@ -1570,6 +1607,15 @@ namespace
         message += "\n  From Offline Progress: " + formatNumber( playerProfile.offlineExperience );
         message += "\n\nRenown to Next Level: " + formatNumber( remainingXP );
         message += "\nUnique Map Sites Visited: " + formatNumber( visitedActionTiles.size() );
+
+        const std::string path = profilePath();
+        message += "\n\nPROFILE & RECOVERY";
+        message += "\nData Folder: " + fheroes2::RPG::dataDirectory();
+        message += "\nPersistent Backup: ";
+        message += System::IsFile( path + ".bak" ) ? "Ready" : "Not created yet";
+        message += "\nPending Recovery Snapshot: ";
+        message += System::IsFile( path + ".tmp" ) ? "Available" : "None";
+        message += "\nAutosave: purchases, Steward changes, respecs, and RPG progression";
 
         fheroes2::showStandardTextMessage( "Royal Guild Overview", std::move( message ), Dialog::ZERO );
     }
@@ -2604,7 +2650,7 @@ void fheroes2::RPG::showMenu()
             drawSingleLine( "Rows " + std::to_string( firstVisibleRow ) + "-" + std::to_string( lastVisibleRow ) + "/"
                                 + std::to_string( upgradesPerTab ) + "   Up/Down Select   B/Enter/Space Buy   I Details",
                             area.x + 12, area.y + 333, area.width - 24, fheroes2::FontType::smallWhite() );
-            drawSingleLine( "1-8 Tabs   O Overview   S/A Steward   R Respec   Esc Close", area.x + 12, area.y + 344, area.width - 24,
+            drawSingleLine( "1-8 Tabs   O Overview   H Help   S/A Steward   R Respec   Esc Close", area.x + 12, area.y + 344, area.width - 24,
                             fheroes2::FontType::smallWhite() );
             window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
@@ -2727,6 +2773,12 @@ void fheroes2::RPG::showMenu()
 
         if ( event.isKeyPressed( fheroes2::Key::KEY_I ) ) {
             showUpgradeDetails( tab * upgradesPerTab + selectedOffsets[tab] );
+            redraw = true;
+            continue;
+        }
+
+        if ( event.isKeyPressed( fheroes2::Key::KEY_H ) ) {
+            showRoyalGuildHelp();
             redraw = true;
             continue;
         }
