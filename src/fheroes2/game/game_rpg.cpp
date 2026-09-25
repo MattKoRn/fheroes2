@@ -188,7 +188,6 @@ namespace
     constexpr std::array<const char *, 5> rivalArchetypeNames{ "Warlord", "Predator", "Arcanist", "Sentinel", "Trickster" };
 
     uint64_t consumeAffordableLevelsWithCarry( Profile & profile );
-    uint64_t consumeRuntimeLevelAndReset( Profile & profile );
 
     Profile playerProfile;
     std::map<PlayerColor, Profile> enemyProfiles;
@@ -1590,22 +1589,6 @@ namespace
         return low;
     }
 
-    uint64_t consumeRuntimeLevelAndReset( Profile & profile )
-    {
-        const uint64_t levelCost = xpToNextLevel( profile.level );
-        if ( levelCost == 0 || profile.progress < levelCost || profile.level == std::numeric_limits<uint64_t>::max() ) {
-            return 0;
-        }
-
-        // Runtime leveling deliberately discards any XP overflow from the award that crossed the
-        // threshold. Every newly earned kingdom level therefore begins at exactly 0 current XP.
-        // Lifetime/source Renown ledgers remain untouched for statistics and validation.
-        profile.progress = 0;
-        ++profile.level;
-        profile.points = saturatedAdd( profile.points, pointsPerLevel );
-        return 1;
-    }
-
     void drawText( const std::string & value, const int32_t x, const int32_t y, const int32_t width, const fheroes2::FontType & font )
     {
         fheroes2::Text( value, font ).draw( x, y, width, fheroes2::Display::instance() );
@@ -2507,7 +2490,9 @@ uint64_t fheroes2::RPG::addExperience( const PlayerColor color, const uint64_t a
         *detailedSource = saturatedAdd( *detailedSource, credited );
     }
 
-    const uint64_t gainedLevels = consumeRuntimeLevelAndReset( playerProfile );
+    // Spend each completed level threshold in order and carry the exact remainder into the
+    // resulting level. Very large awards can legitimately cross multiple thresholds at once.
+    const uint64_t gainedLevels = consumeAffordableLevelsWithCarry( playerProfile );
     if ( gainedLevels > 0 && kind != ExperienceKind::OFFLINE ) {
         AudioManager::PlaySound( M82::NWHEROLV );
     }
