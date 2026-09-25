@@ -297,7 +297,16 @@ int Battle::Unit::GetMoraleWithoutRPG() const
 
 int Battle::Unit::GetMorale() const
 {
-    int morale = GetMoraleWithoutRPG();
+    const Arena * arena = GetArena();
+    assert( arena != nullptr );
+
+    int morale = ArmyTroop::GetMorale();
+
+    // Preserve the original battle ordering: temporary penalties are applied before persistent
+    // Leadership and only then normalized. The separate UI accessor normalizes the non-RPG view.
+    if ( isAffectedByMorale() && arena->getEnemyForce( GetArmyColor() ).HasMonster( Monster::BONE_DRAGON ) && morale > Morale::TREASON ) {
+        --morale;
+    }
 
     if ( !Modes( CAP_TOWER ) && isAffectedByMorale() ) {
         morale += fheroes2::RPG::moraleBonus( GetColor() );
