@@ -31,7 +31,7 @@ Every doctrine now has a second progression layer at **ranks 10, 25, 50, and 100
 
 Ascension is derived directly from doctrine rank, so it needs **no new save field or profile-version bump**. Respecing a doctrine naturally removes its Ascension stages because its rank returns to zero. The Royal Guild doctrine inspector shows the current Ascension stage, its named evolution, the secondary effect, and the next milestone. **Build Analytics** shows how many doctrines have ascended and the total number of Ascension stages unlocked.
 
-Ascension itself now follows diminishing returns too. **Ascension I gives 100% of the listed base evolution bonus, Ascension II adds 75%, Ascension III adds 55%, and Ascension IV adds 40%.** The listed base channels are **+1 Attack**, **+1 Defense**, **+1.25% physical damage**, **+0.75% physical reduction**, **+1.25% damaging-spell power**, **+0.75% spell reduction**, **+0.5% critical chance**, **+2.5% critical bonus damage**, **+0.5% Evasion**, **+1% life steal**, **+0.75% Regeneration**, **+1.5% Armor Piercing**, or **+1.5% Arcane Piercing**. Thus all four stages together equal 2.70x the Stage-I base bonus rather than 4.00x. Existing safety ceilings still apply after Ascension: total physical/spell reduction remains capped at 70%, probability mechanics at 100%, and resistance bypass at 100%.
+Ascension itself follows diminishing returns too. Percentage-based secondary channels use **100% / 75% / 55% / 40%** of the listed Ascension-I base effect at stages I-IV, for a 2.70x total instead of 4.00x. **Attack and Defense Ascensions are special-cased to guaranteed integer gains of +4 / +3 / +2 / +1**, because Heroes II stores those stats as integers and every Ascension milestone must produce an immediate real game effect. Existing safety ceilings still apply after Ascension: total physical/spell reduction remains capped at 70%, probability mechanics at 100%, and resistance bypass at 100%.
 
 Each doctrine has its own named evolution and secondary channel:
 
@@ -42,32 +42,32 @@ Each doctrine has its own named evolution and secondary channel:
 | Veteran Core | **Veteran Instinct** | +2.5% critical bonus damage |
 | Blood Drinker | **Blood Rush** | +0.5% critical chance |
 | Reaper | **Harvest Cycle** | +0.75% Regeneration |
-| Ferocity | **War Temper** | +1 Attack |
+| Ferocity | **War Temper** | Attack (+4/+3/+2/+1 across I-IV) |
 | Marksman | **Piercing Volley** | +1.5% Armor Piercing |
 | Brawler | **Guarded Brawl** | +0.75% physical reduction |
 | Executioner | **Finality** | +2.5% critical bonus damage |
 | Opening Blow | **First Breach** | +1.5% Armor Piercing |
-| Giant Slayer | **David's Aim** | +1 Attack |
+| Giant Slayer | **David's Aim** | Attack (+4/+3/+2/+1 across I-IV) |
 | Overwhelm | **Momentum** | +0.5% critical chance |
 | Frenzy | **Blood Heat** | +1% life steal |
-| Discipline | **Battle Order** | +1 Defense |
+| Discipline | **Battle Order** | Defense (+4/+3/+2/+1 across I-IV) |
 | Armor Piercing | **Exposed Weakness** | +1.25% physical damage |
-| Iron Skin | **Iron Formation** | +1 Defense |
+| Iron Skin | **Iron Formation** | Defense (+4/+3/+2/+1 across I-IV) |
 | Arrow Ward | **Deflection** | +0.5% Evasion |
-| Melee Guard | **Counterstance** | +1 Attack |
+| Melee Guard | **Counterstance** | Attack (+4/+3/+2/+1 across I-IV) |
 | Last Stand | **Second Wind** | +0.75% Regeneration |
 | Bulwark | **Hold and Strike** | +1.25% physical damage |
 | Sorcery | **Arcane Pressure** | +1.5% Arcane Piercing |
 | Pyromancy | **Flame Tempering** | +0.75% spell reduction |
-| Cryomancy | **Frozen Guard** | +1 Defense |
+| Cryomancy | **Frozen Guard** | Defense (+4/+3/+2/+1 across I-IV) |
 | Stormcraft | **Static Charge** | +0.5% critical chance |
 | Cataclysm | **Worldbreaker** | +1.5% Arcane Piercing |
 | Spell Ward | **Reflected Insight** | +1.25% damaging-spell power |
 | Fire Ward | **Fire Attunement** | +1.25% damaging-spell power |
-| Cold Ward | **Frost Shell** | +1 Defense |
+| Cold Ward | **Frost Shell** | Defense (+4/+3/+2/+1 across I-IV) |
 | Storm Ward | **Stormstep** | +0.5% Evasion |
 | Chaos Ward | **Chaos Insight** | +1.25% damaging-spell power |
-| Leadership | **Commander's Edge** | +1 Attack |
+| Leadership | **Commander's Edge** | Attack (+4/+3/+2/+1 across I-IV) |
 | Fortune | **Lucky Break** | +2.5% critical bonus damage |
 | Regeneration | **Renewed Guard** | +0.75% physical reduction |
 | Critical Training | **Killing Form** | +2.5% critical bonus damage |
@@ -75,7 +75,7 @@ Each doctrine has its own named evolution and secondary channel:
 | Evasion | **Flowing Guard** | +0.75% physical reduction |
 | Arcane Piercing | **Arcane Feedback** | +1.25% damaging-spell power |
 | Close Quarters | **Point-Blank Mastery** | +1.25% physical damage |
-| Unyielding | **Resolute Counter** | +1 Attack |
+| Unyielding | **Resolute Counter** | Attack (+4/+3/+2/+1 across I-IV) |
 | Ruthless | **Predatory Finish** | +1% life steal |
 
 Hard-capped primary mechanics can still progress toward meaningful Ascension milestones. In particular, **Leadership and Fortune remain capped at +3 Morale/Luck**, but ranks above 3 can be purchased through rank 100 because those ranks advance Commander's Edge/Lucky Break. After Ascension IV, a doctrine whose primary mechanic has no further safe growth stops accepting mechanically empty ranks; doctrines with safe open-ended primary scaling continue normally beyond rank 100.
@@ -110,7 +110,7 @@ The menu supports full keyboard and touch controls:
 - **I**: Inspect the selected doctrine
 - **H**: Open Royal Guild Help, including profile backup/recovery status and autosave information
 - **K**: Open **Build Analytics**, showing the guild-point ledger, investment/combat focus, Steward roadmap, active Doctrine Resonances, and RPG profile snapshot health
-- **V**: Open **Elite Rival Intel**, showing current map archetypes, encounter chance, coordinated-hall limit, observed player combat focus, and rival safety rules
+- **V**: Open **Elite Rival Intel**, showing current map archetypes, mutation count, each active Elite's mutations, encounter chance, coordinated-hall limit, observed player combat focus, and rival safety rules
 - **O**: Open the Royal Guild Overview modal
 - **S** or **A**: Toggle Steward auto-buyer
 - **R**: Respec doctrines with confirmation prompt
@@ -123,7 +123,26 @@ When the kingdom levels up, the completed level threshold is subtracted from cur
 
 The Royal Guild header shows **current-level XP / current level requirement** plus XP remaining, with carried overflow immediately reflected in the new level's bar rather than using lifetime Renown as the active leveling number. The Royal Guild Overview shows both **Current Level XP** and **Lifetime Renown** separately, with algorithmically generated number suffixes. **Guild Prestige** is derived directly from kingdom level at one rank per 10 levels, so it needs no extra save field and cannot be lost independently of the profile. Each Prestige Rank increases battle Renown by +2%, capped at +25%. The Royal Guild Overview shows current Prestige Rank, the next level milestone, the active battle-Renown bonus, Steward planning horizon, Elite Rival chance, and Elite Rival focus-hall limit. Battle activity adds a modest RPG XP bonus that scales with battle experience, outcome, and the opposing profile's level. Victorious castle sieges grant an additional +25% bonus experience, winning defensive stands grant +10%, and defeating a stronger RPG profile earns an additional heroic-underdog bonus without rewarding deliberate losses. Siege and defense bonuses stack when a castle defender wins a siege. Normal hero experience still contributes RPG XP as well, so the battle-specific coefficient is intentionally smaller to avoid excessive double progression. Adventure XP scales with RPG level and is awarded once per map tile for each profile, preventing repeated farming of the same site. Level 1 uses exactly the configured base reward and logarithmic level scaling begins only after the first RPG level. Trivial lore interactions such as Signs/Bottles now award little Renown, character-growth sites pay more, and dangerous/puzzle destinations such as Daemon Caves, Graveyards, Shipwrecks, Sphinxes, and Pyramids are deliberately more rewarding.
 
-Opposing kingdoms receive deterministic temporary RPG profiles derived only from combat ranks the local profile has actually purchased. Ordinary enemy sophistication still scales with the 85–115% kingdom strength roll: weaker rolls coordinate one invested hall, roughly equal opponents coordinate two, and stronger rolls at 105% or above can coordinate up to three. From RPG level 5 onward, each hostile kingdom also has a deterministic chance to become an **Elite Rival** on that map. The chance still starts low, but Guild Prestige now contributes to the late-game rise and the final chance caps at 40% per hostile kingdom. Elite rivals roll only in the 100–115% band and still receive stronger weighting for legitimate purchased doctrine packages. Their hall-selection priority now blends the player's points invested with actual battle-trigger history, so an Elite Rival increasingly recognizes the doctrine halls the player truly uses instead of looking only at the static build sheet. Each Elite Rival also receives a deterministic tactical archetype for the map: **Warlord** favors Army/Command, **Predator** favors Offense/Tactics, **Arcanist** favors Magic/Wards, **Sentinel** favors Defense/Wards, and **Trickster** favors Tactics/Mastery. Archetypes now influence both hall selection and **specific doctrine weighting** inside those halls—for example Predators prefer finishing/outnumbering pressure, Arcanists prefer Sorcery/elemental/piercing ranks, and Sentinels prefer physical and magical guards. These are bounded percentage biases inside the existing generation algorithm; every generated rank is still clamped to the normal 115% maximum and an enemy still cannot receive any doctrine the player has not purchased. Elite rivals begin with up to four coordinated invested halls and can reach five and then six halls at higher Prestige. Every rank remains clamped to the same maximum 115% envelope and no enemy receives a doctrine the player has not purchased. Victories against elite rivals begin at the existing **+35% RPG Renown** premium and gain +1 percentage point per Prestige Rank up to a +50% elite premium, in addition to the general Prestige battle-Renown bonus. Neutral monsters remain deliberately simpler, using one focused hall inside their weaker 60–90% range. The Royal Guild Overview shows how many elite rival kingdoms exist on the current map and breaks them down by archetype. Press **V** in the Royal Guild for a dedicated Elite Rival Intel panel with archetype descriptions and the current encounter/focus limits. Temporary profiles and elite status are discarded when the map ends.
+Opposing kingdoms receive deterministic temporary RPG profiles derived only from combat ranks the local profile has actually purchased. Ordinary enemy sophistication still scales with the 85–115% kingdom strength roll: weaker rolls coordinate one invested hall, roughly equal opponents coordinate two, and stronger rolls at 105% or above can coordinate up to three. From RPG level 5 onward, each hostile kingdom also has a deterministic chance to become an **Elite Rival** on that map.
+
+### Elite Rival Mutations
+
+Every Elite Rival now receives deterministic **combat mutations** for the current map. These are separate encounter affixes—not doctrine ranks—so they can make an Elite mechanically distinctive without violating the rule that temporary rival doctrine ranks only come from doctrines the player has actually purchased. Elites start with **1 mutation**; Guild Prestige adds a second at Prestige 3 and a third at Prestige 6, with no further stacking beyond three.
+
+- **Vampiric:** +8% life steal.
+- **Berserker:** +10% physical damage.
+- **Armored:** +8% physical reduction.
+- **Arcane-Shielded:** +8% spell reduction.
+- **Regenerating:** +5% start-of-turn Regeneration.
+- **Deadly:** +4% critical chance and +10% critical bonus damage.
+- **Elusive:** +6% Evasion chance.
+- **Piercing:** +10% Armor Piercing and +10% Arcane Piercing.
+- **Unstable Magic:** +12% damaging-spell power.
+- **Warforged:** +3 creature Attack and +3 creature Defense.
+
+Mutation effects use the same live combat accessors as doctrines and Ascensions, so they affect actual attacks, damage reduction, spell damage, spell mitigation, crit rolls, Evasion rolls, healing, and unit stats. Existing 70% mitigation, 100% probability, and 100% piercing safety ceilings still apply. Defeating an Elite gains an additional **+5% battle Renown per active mutation** on top of the existing Elite/Prestige reward bonuses. **Elite Rival Intel (V)** lists each active Elite color and its exact mutations plus a full effect legend before you engage them.
+
+ The chance still starts low, but Guild Prestige now contributes to the late-game rise and the final chance caps at 40% per hostile kingdom. Elite rivals roll only in the 100–115% band and still receive stronger weighting for legitimate purchased doctrine packages. Their hall-selection priority now blends the player's points invested with actual battle-trigger history, so an Elite Rival increasingly recognizes the doctrine halls the player truly uses instead of looking only at the static build sheet. Each Elite Rival also receives a deterministic tactical archetype for the map: **Warlord** favors Army/Command, **Predator** favors Offense/Tactics, **Arcanist** favors Magic/Wards, **Sentinel** favors Defense/Wards, and **Trickster** favors Tactics/Mastery. Archetypes now influence both hall selection and **specific doctrine weighting** inside those halls—for example Predators prefer finishing/outnumbering pressure, Arcanists prefer Sorcery/elemental/piercing ranks, and Sentinels prefer physical and magical guards. These are bounded percentage biases inside the existing generation algorithm; every generated rank is still clamped to the normal 115% maximum and an enemy still cannot receive any doctrine the player has not purchased. Elite rivals begin with up to four coordinated invested halls and can reach five and then six halls at higher Prestige. Every rank remains clamped to the same maximum 115% envelope and no enemy receives a doctrine the player has not purchased. Victories against elite rivals begin at the existing **+35% RPG Renown** premium and gain +1 percentage point per Prestige Rank up to a +50% elite premium, in addition to the general Prestige battle-Renown bonus. Neutral monsters remain deliberately simpler, using one focused hall inside their weaker 60–90% range. The Royal Guild Overview shows how many elite rival kingdoms exist on the current map and breaks them down by archetype. Press **V** in the Royal Guild for a dedicated Elite Rival Intel panel with archetype descriptions and the current encounter/focus limits. Temporary profiles and elite status are discarded when the map ends.
 
 Offline progress still grants RPG XP for the full elapsed interval with no duration cap. It does not grant normal game resources or recruit creatures. The game's normal economy, armies, and map rules remain in control of those systems. A guaranteed baseline daily equivalent ensures that even Day-1 profiles and new maps advance persistently while offline. When returning to the game, the offline progress popup is deliberately compact: it shows only how long you were away plus RPG XP and virtual offline rewards as native experience/resource sprites. Streaks, contracts, maps, discoveries, meters, promotions, readiness details, and treasury explanations no longer clutter the popup. The active-map treasury remains unchanged; the resource sprites represent the same virtual offline values used to calculate persistent RPG XP. A qualifying homecoming can advance the streak at most once per **local calendar day**; returning again on the same local date does not farm extra streak days, and missing a local calendar day resets the streak. Day boundaries follow the system's local time instead of UTC.
 
@@ -140,14 +159,14 @@ Adventure and combat AI are fully aware of RPG doctrines and stats:
 
 ## Doctrine live-effect audit
 
-The current 40-doctrine tree maps to these live gameplay channels:
+A fresh post-Ascension audit verifies **40 / 40 doctrines** and **40 / 40 doctrine Ascensions** have direct gameplay effects. The 40 Ascensions map to 13 secondary combat channels, and every one of those channels is consumed by live battle/stat code. The current 40-doctrine tree maps to these live gameplay channels:
 
 - **ARMY:** Arms Training, Armor Training, and Veteran Core feed creature Attack/Defense; Blood Drinker, Reaper, and Regeneration heal surviving stacks through real combat events.
 - **OFFENSE / TACTICS / DEFENSE / MASTERY physical doctrines:** feed the shared physical damage/reduction calculation using ranged/melee, health-state, and outnumbering conditions; Armor Piercing changes actual RPG mitigation.
-- **MAGIC / WARDS:** Sorcery and elemental disciplines change damaging spell output; Spell Ward and elemental wards change incoming damaging spell reduction; Arcane Piercing bypasses that mitigation.
+- **MAGIC / WARDS:** Sorcery and elemental disciplines change damaging spell output; Pyromancy/Cryomancy/Stormcraft/Cataclysm are selected through the live spell-specialization mapping before `spellMultiplier()` applies them. Spell Ward and elemental wards change incoming damaging spell reduction through the matching ward mapping; Arcane Piercing bypasses that mitigation.
 - **COMMAND / remaining MASTERY:** Leadership and Fortune alter combat Morale/Luck, Critical Training and Brutal Criticals alter real attack rolls/damage, Evasion rolls against incoming creature attacks, and Close Quarters changes the actual ranged-melee penalty.
 
-This audit is intentionally about **battle-side effects**, not just AI valuation or tooltips.
+This audit is intentionally about **battle-side effects**, not just AI valuation or tooltips. Ascension Attack/Defense channels use guaranteed +4/+3/+2/+1 integer stage gains so no milestone can disappear into fractional stat rounding; percentage-based Ascension stages remain direct floating-point combat modifiers.
 
 Diminishing-return scaling is also battle-side rather than cosmetic: the same reduced primary values feed creature Attack/Defense, physical/spell multipliers, sustain, mitigation, criticals, Evasion, and piercing. The Royal Guild next-rank preview therefore reports the actual smaller marginal gain rather than displaying a fixed per-rank promise.
 
