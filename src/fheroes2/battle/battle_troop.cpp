@@ -1080,13 +1080,21 @@ void Battle::Unit::PostAttackAction( const Unit & enemy )
     ResetModes( LUCK_GOOD | LUCK_BAD );
 }
 
-uint32_t Battle::Unit::GetAttack() const
+uint32_t Battle::Unit::GetAttackWithoutRPG() const
 {
     uint32_t res = ArmyTroop::GetAttack();
 
     if ( Modes( SP_BLOODLUST ) ) {
-        res += Spell( Spell::BLOODLUST ).ExtraValue();
+        const uint32_t bonus = Spell( Spell::BLOODLUST ).ExtraValue();
+        res = bonus > std::numeric_limits<uint32_t>::max() - res ? std::numeric_limits<uint32_t>::max() : res + bonus;
     }
+
+    return res;
+}
+
+uint32_t Battle::Unit::GetAttack() const
+{
+    uint32_t res = GetAttackWithoutRPG();
 
     if ( !Modes( CAP_TOWER ) ) {
         const uint32_t bonus = fheroes2::RPG::creatureAttackBonus( GetColor() );
@@ -1096,15 +1104,17 @@ uint32_t Battle::Unit::GetAttack() const
     return res;
 }
 
-uint32_t Battle::Unit::GetDefense() const
+uint32_t Battle::Unit::GetDefenseWithoutRPG() const
 {
     uint32_t res = ArmyTroop::GetDefense();
 
     if ( Modes( SP_STONESKIN ) ) {
-        res += Spell( Spell::STONESKIN ).ExtraValue();
+        const uint32_t bonus = Spell( Spell::STONESKIN ).ExtraValue();
+        res = bonus > std::numeric_limits<uint32_t>::max() - res ? std::numeric_limits<uint32_t>::max() : res + bonus;
     }
     else if ( Modes( SP_STEELSKIN ) ) {
-        res += Spell( Spell::STEELSKIN ).ExtraValue();
+        const uint32_t bonus = Spell( Spell::STEELSKIN ).ExtraValue();
+        res = bonus > std::numeric_limits<uint32_t>::max() - res ? std::numeric_limits<uint32_t>::max() : res + bonus;
     }
 
     if ( _disruptingRaysNum ) {
@@ -1130,6 +1140,13 @@ uint32_t Battle::Unit::GetDefense() const
             res -= step;
         }
     }
+
+    return res;
+}
+
+uint32_t Battle::Unit::GetDefense() const
+{
+    uint32_t res = GetDefenseWithoutRPG();
 
     if ( !Modes( CAP_TOWER ) ) {
         const uint32_t bonus = fheroes2::RPG::creatureDefenseBonus( GetColor() );
