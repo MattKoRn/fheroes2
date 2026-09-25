@@ -34,10 +34,12 @@
 #include "army_troop.h"
 #include "battle.h"
 #include "battle_cell.h"
+#include "battle_troop.h"
 #include "cursor.h"
 #include "dialog.h" // IWYU pragma: associated
 #include "game_assets.h"
 #include "game_delays.h"
+#include "game_rpg.h"
 #include "game_hotkeys.h"
 #include "icn.h"
 #include "image.h"
@@ -124,6 +126,37 @@ namespace
         return Spell::NONE;
     }
 
+    std::string formatRpgDoctrineStat( const Troop & troop, const bool attack )
+    {
+        const Monster monster{ troop.GetMonster() };
+        const uint32_t baseValue = attack ? monster.GetAttack() : monster.GetDefense();
+        uint32_t normalModifiedValue = attack ? troop.GetAttack() : troop.GetDefense();
+
+        if ( troop.isBattle() ) {
+            const auto * battleUnit = dynamic_cast<const Battle::Unit *>( &troop );
+            if ( battleUnit != nullptr ) {
+                normalModifiedValue = attack ? battleUnit->GetAttackWithoutRPG() : battleUnit->GetDefenseWithoutRPG();
+            }
+        }
+
+        const bool receivesRpgDoctrineBonus = !troop.isBattle() || !troop.isModes( Battle::CAP_TOWER );
+        const uint64_t doctrineModifier
+            = receivesRpgDoctrineBonus
+                  ? ( attack ? fheroes2::RPG::creatureAttackDoctrineModifier( troop.GetColor() )
+                             : fheroes2::RPG::creatureDefenseDoctrineModifier( troop.GetColor() ) )
+                  : 0;
+
+        std::string output = std::to_string( baseValue );
+        if ( normalModifiedValue != baseValue ) {
+            output += " (" + std::to_string( normalModifiedValue ) + ")";
+        }
+        if ( doctrineModifier > 0 ) {
+            output += " +" + fheroes2::RPG::formatExperience( doctrineModifier );
+        }
+
+        return output;
+    }
+
     void DrawMonsterStats( const fheroes2::Point & dst, const Troop & troop, fheroes2::Display & display )
     {
         const int32_t offsetX{ 6 };
@@ -148,7 +181,7 @@ namespace
         text.fitToOneRow( leftSideLength );
         text.draw( textPos.x, textPos.y, display );
 
-        text.set( troop.GetAttackString(), font );
+        text.set( formatRpgDoctrineStat( troop, true ), font );
         textPos.x = leftSidePosX;
         text.fitToOneRow( leftSideLength );
         text.draw( textPos.x, textPos.y, display );
@@ -163,7 +196,7 @@ namespace
         text.fitToOneRow( leftSideLength );
         text.draw( textPos.x, textPos.y, display );
 
-        text.set( troop.GetDefenseString(), font );
+        text.set( formatRpgDoctrineStat( troop, false ), font );
         textPos.x = leftSidePosX;
         text.fitToOneRow( rightSideLength );
         text.draw( textPos.x, textPos.y, display );
