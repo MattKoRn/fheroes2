@@ -135,11 +135,18 @@ namespace AI
                     const double exchangeMomentum = ( enemyLossFraction - friendlyLossFraction ) * 1.5;
                     state->momentum = std::clamp( state->momentum * 0.60 + exchangeMomentum, -0.35, 0.35 );
 
+                    // A sharply losing trade opens a short recovery window. One merely better exchange is
+                    // not enough to cancel it; the AI must preserve valuable stacks through the next round
+                    // unless ranged or spell pressure makes waiting strategically worse.
+                    if ( friendlyLossFraction >= 0.22 && enemyLossFraction <= 0.08 ) {
+                        state->finishWindowUntilTurn = 0;
+                        state->recoveryUntilTurn = _currentTurnNumber + 1;
+                    }
                     // A clean exchange that removes a meaningful slice of the opposing army creates a
                     // short finish window. However, an exchange that has already erased almost half the
                     // opposing army is treated as a mop-up transition instead: chaining another all-in
                     // push is usually unnecessary and risks wasting premium stacks on cleanup duty.
-                    if ( enemyLossFraction >= 0.45 && friendlyLossFraction <= 0.08 ) {
+                    else if ( enemyLossFraction >= 0.45 && friendlyLossFraction <= 0.08 ) {
                         state->finishWindowUntilTurn = 0;
                     }
                     else if ( enemyLossFraction >= 0.18 && friendlyLossFraction <= 0.08 ) {
@@ -159,10 +166,20 @@ namespace AI
                 const bool enemyHasMeaningfulSpellPressure = _enemySpellStrength > _myArmyStrength * 0.20;
 
                 // Ranged or spell pressure forces tempo: waiting while the opponent can damage us safely is
-                // not preservation, it is simply losing initiative.
+                // not preservation, it is simply losing initiative. It is also the only reason to break a
+                // recovery window early after a badly lost exchange.
                 if ( !enemyHasLimitedRangedPressure || enemyHasMeaningfulSpellPressure ) {
                     state->cautious = false;
                     return *this;
+                }
+
+                if ( state->recoveryUntilTurn != 0 ) {
+                    if ( _currentTurnNumber <= state->recoveryUntilTurn ) {
+                        state->cautious = true;
+                        return *this;
+                    }
+
+                    state->recoveryUntilTurn = 0;
                 }
 
                 const bool finishWindowActive = state->finishWindowUntilTurn != 0 && _currentTurnNumber <= state->finishWindowUntilTurn && !_considerRetreat
@@ -221,6 +238,7 @@ namespace AI
                 double momentum{ 0.0 };
                 uint32_t lastTurnNumber{ 0 };
                 uint32_t finishWindowUntilTurn{ 0 };
+                uint32_t recoveryUntilTurn{ 0 };
                 bool hasHistory{ false };
                 bool cautious{ false };
             };
