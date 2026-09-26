@@ -123,17 +123,35 @@ namespace AI
                 const bool hadHistory = state->hasHistory;
                 double friendlyLossFraction = 0.0;
                 double enemyLossFraction = 0.0;
+                double friendlyGainFraction = 0.0;
+                double enemyGainFraction = 0.0;
 
                 if ( hadHistory ) {
                     friendlyLossFraction
                         = std::max( 0.0, ( state->previousMyArmyStrength - _myArmyStrength ) / std::max( 1.0, state->previousMyArmyStrength ) );
                     enemyLossFraction
                         = std::max( 0.0, ( state->previousEnemyArmyStrength - _enemyArmyStrength ) / std::max( 1.0, state->previousEnemyArmyStrength ) );
+                    friendlyGainFraction
+                        = std::max( 0.0, ( _myArmyStrength - state->previousMyArmyStrength ) / std::max( 1.0, state->previousMyArmyStrength ) );
+                    enemyGainFraction
+                        = std::max( 0.0, ( _enemyArmyStrength - state->previousEnemyArmyStrength ) / std::max( 1.0, state->previousEnemyArmyStrength ) );
 
-                    // Favorable exchanges build momentum, while losing trades push the AI toward preservation.
+                    // Favorable exchanges and meaningful recovery build momentum, while losses and enemy
+                    // recovery push the AI toward preservation. This is important for RPG sustain effects:
+                    // healed strength must matter just as much as strength that was removed by direct damage.
                     // Decay keeps old exchanges from dominating the entire battle.
-                    const double exchangeMomentum = ( enemyLossFraction - friendlyLossFraction ) * 1.5;
+                    const double exchangeMomentum
+                        = ( enemyLossFraction + friendlyGainFraction - friendlyLossFraction - enemyGainFraction ) * 1.5;
                     state->momentum = std::clamp( state->momentum * 0.60 + exchangeMomentum, -0.35, 0.35 );
+
+                    // A sizeable enemy recovery means the battlefield is no longer in the cleanup state that
+                    // generated an earlier finish/discipline window. Drop that stale commitment immediately
+                    // instead of spending another turn behaving as if the recovered force were still crippled.
+                    if ( enemyGainFraction >= 0.10 ) {
+                        state->finishWindowUntilTurn = 0;
+                        state->decisiveDisciplineUntilTurn = 0;
+                        state->decisiveExchangeStreak = 0;
+                    }
 
                     // A sharply losing trade opens a short recovery window. One merely better exchange is
                     // not enough to cancel it; the AI must preserve valuable stacks through the next round
