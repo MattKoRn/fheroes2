@@ -141,20 +141,38 @@ namespace AI
                     if ( friendlyLossFraction >= 0.22 && enemyLossFraction <= 0.08 ) {
                         state->finishWindowUntilTurn = 0;
                         state->suppressionUntilTurn = 0;
+                        state->decisiveDisciplineUntilTurn = 0;
+                        state->decisiveExchangeStreak = 0;
                         state->recoveryUntilTurn = _currentTurnNumber + 1;
                     }
-                    // A clean exchange that removes a meaningful slice of the opposing army creates a
-                    // short finish window. However, an exchange that has already erased almost half the
-                    // opposing army is treated as a mop-up transition instead: chaining another all-in
-                    // push is usually unnecessary and risks wasting premium stacks on cleanup duty.
-                    else if ( enemyLossFraction >= 0.45 && friendlyLossFraction <= 0.08 ) {
-                        state->finishWindowUntilTurn = 0;
-                    }
-                    else if ( enemyLossFraction >= 0.18 && friendlyLossFraction <= 0.08 ) {
-                        state->finishWindowUntilTurn = _currentTurnNumber + 1;
-                    }
-                    else if ( friendlyLossFraction >= 0.18 && enemyLossFraction <= 0.05 ) {
-                        state->finishWindowUntilTurn = 0;
+                    else {
+                        const bool cleanDecisiveExchange = enemyLossFraction >= 0.18 && friendlyLossFraction <= 0.08;
+                        if ( cleanDecisiveExchange ) {
+                            state->decisiveExchangeStreak = static_cast<uint8_t>( std::min<uint32_t>( 3, state->decisiveExchangeStreak + 1 ) );
+
+                            // One clean exchange can justify a brief finishing push. Repeating that success
+                            // twice, or removing nearly half the enemy force at once, means the damage is already
+                            // decisive: stop chaining all-in pushes and preserve premium stacks for cleanup.
+                            const bool damageAlreadyDecisive = enemyLossFraction >= 0.45 || state->decisiveExchangeStreak >= 2;
+                            if ( damageAlreadyDecisive ) {
+                                state->finishWindowUntilTurn = 0;
+                                state->decisiveDisciplineUntilTurn = _currentTurnNumber + 1;
+                            }
+                            else {
+                                state->finishWindowUntilTurn = _currentTurnNumber + 1;
+                            }
+                        }
+                        else {
+                            if ( friendlyLossFraction >= 0.18 && enemyLossFraction <= 0.05 ) {
+                                state->finishWindowUntilTurn = 0;
+                            }
+
+                            // The streak is deliberately sticky but bounded: an uneventful exchange only
+                            // decays one step, while taking meaningful losses breaks the chain quickly.
+                            if ( state->decisiveExchangeStreak > 0 && ( enemyLossFraction < 0.10 || friendlyLossFraction > 0.08 ) ) {
+                                --state->decisiveExchangeStreak;
+                            }
+                        }
                     }
                 }
 
@@ -195,6 +213,16 @@ namespace AI
                     }
 
                     state->suppressionUntilTurn = 0;
+                }
+
+                if ( state->decisiveDisciplineUntilTurn != 0 ) {
+                    const bool disciplinedCleanupIsSafe = !_considerRetreat && relativeArmyStrength >= 1.35 && state->momentum >= 0.02;
+                    if ( _currentTurnNumber <= state->decisiveDisciplineUntilTurn && disciplinedCleanupIsSafe ) {
+                        state->cautious = true;
+                        return *this;
+                    }
+
+                    state->decisiveDisciplineUntilTurn = 0;
                 }
 
                 const bool finishWindowActive = state->finishWindowUntilTurn != 0 && _currentTurnNumber <= state->finishWindowUntilTurn && !_considerRetreat
@@ -255,6 +283,8 @@ namespace AI
                 uint32_t finishWindowUntilTurn{ 0 };
                 uint32_t suppressionUntilTurn{ 0 };
                 uint32_t recoveryUntilTurn{ 0 };
+                uint32_t decisiveDisciplineUntilTurn{ 0 };
+                uint8_t decisiveExchangeStreak{ 0 };
                 bool hasHistory{ false };
                 bool cautious{ false };
             };
