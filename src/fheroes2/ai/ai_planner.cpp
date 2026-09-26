@@ -24,6 +24,7 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <utility>
 #include <vector>
@@ -56,6 +57,44 @@ namespace
             return true;
         default:
             return false;
+        }
+    }
+
+    uint32_t getStrategicResponderRolePenalty( const Heroes::Role role, const MP2::MapObjectType object, const bool criticalDiscovery )
+    {
+        // Combat-capable heroes should answer urgent hero/castle discoveries, while scouts and
+        // hunters are better suited to ordinary economic or exploration opportunities. This is only
+        // a tie-break style penalty: distance remains the dominant assignment signal.
+        if ( criticalDiscovery || object == MP2::OBJ_HERO || object == MP2::OBJ_CASTLE ) {
+            switch ( role ) {
+            case Heroes::Role::CHAMPION:
+                return 0;
+            case Heroes::Role::FIGHTER:
+                return 10;
+            case Heroes::Role::HUNTER:
+                return 25;
+            case Heroes::Role::SCOUT:
+                return 55;
+            case Heroes::Role::COURIER:
+                return 75;
+            default:
+                return 40;
+            }
+        }
+
+        switch ( role ) {
+        case Heroes::Role::SCOUT:
+            return 0;
+        case Heroes::Role::HUNTER:
+            return 10;
+        case Heroes::Role::FIGHTER:
+            return 30;
+        case Heroes::Role::COURIER:
+            return 45;
+        case Heroes::Role::CHAMPION:
+            return 60;
+        default:
+            return 35;
         }
     }
 }
@@ -100,6 +139,9 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
             return;
         }
     }
+
+    Heroes * bestResponder = nullptr;
+    uint64_t bestResponderScore = std::numeric_limits<uint64_t>::max();
 
     for ( Heroes * hero : heroes ) {
         if ( hero == nullptr ) {
@@ -179,17 +221,36 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
             continue;
         }
 
-        memory.lastStrategicInterruptDay = currentDay;
-        memory.lastStrategicInterruptTile = discoveryIndex;
+        const uint64_t approximateDistance = Maps::GetApproximateDistance( hero->GetIndex(), discoveryIndex );
+        const uint64_t rolePenalty = getStrategicResponderRolePenalty( hero->getAIRole(), object, criticalDiscovery );
 
-        if ( !criticalDiscovery ) {
-            memory.opportunityPressure = static_cast<uint8_t>( std::min<uint32_t>( 4, memory.opportunityPressure + 1 ) );
-            memory.opportunityPressureDay = currentDay;
+        // Empty routes are cheap to redirect. Among heroes that already have plans, protect routes
+        // that are close to completion more strongly than long-range plans. Distance still dominates,
+        // and hero ID gives deterministic ordering when two candidates are otherwise equivalent.
+        const uint64_t commitmentPenalty = path.empty() ? 0 : 180 / std::min<size_t>( path.size(), 6 );
+        const uint64_t responderScore = approximateDistance * 100 + commitmentPenalty + rolePenalty;
+
+        if ( bestResponder == nullptr || responderScore < bestResponderScore
+             || ( responderScore == bestResponderScore && hero->GetID() < bestResponder->GetID() ) ) {
+            bestResponder = hero;
+            bestResponderScore = responderScore;
         }
-
-        path.Truncate();
-        break;
     }
+
+    if ( bestResponder == nullptr ) {
+        return;
+    }
+
+    HeroPlanMemory & memory = _heroPlanMemory[bestResponder->GetID()];
+    memory.lastStrategicInterruptDay = currentDay;
+    memory.lastStrategicInterruptTile = discoveryIndex;
+
+    if ( !criticalDiscovery ) {
+        memory.opportunityPressure = static_cast<uint8_t>( std::min<uint32_t>( 4, memory.opportunityPressure + 1 ) );
+        memory.opportunityPressureDay = currentDay;
+    }
+
+    bestResponder->GetPath().Truncate();
 }
 
 double AI::Planner::getTileArmyStrength( const Maps::Tile & tile )
