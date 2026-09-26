@@ -120,10 +120,11 @@ namespace AI
                     *state = {};
                 }
 
+                const bool hadHistory = state->hasHistory;
                 double friendlyLossFraction = 0.0;
                 double enemyLossFraction = 0.0;
 
-                if ( state->hasHistory ) {
+                if ( hadHistory ) {
                     friendlyLossFraction
                         = std::max( 0.0, ( state->previousMyArmyStrength - _myArmyStrength ) / std::max( 1.0, state->previousMyArmyStrength ) );
                     enemyLossFraction
@@ -135,9 +136,13 @@ namespace AI
                     state->momentum = std::clamp( state->momentum * 0.60 + exchangeMomentum, -0.35, 0.35 );
 
                     // A clean exchange that removes a meaningful slice of the opposing army creates a
-                    // short finish window. The latch survives initiative changes and lasts through the
-                    // next battle round so follow-up stacks can capitalize instead of immediately slowing down.
-                    if ( enemyLossFraction >= 0.18 && friendlyLossFraction <= 0.08 ) {
+                    // short finish window. However, an exchange that has already erased almost half the
+                    // opposing army is treated as a mop-up transition instead: chaining another all-in
+                    // push is usually unnecessary and risks wasting premium stacks on cleanup duty.
+                    if ( enemyLossFraction >= 0.45 && friendlyLossFraction <= 0.08 ) {
+                        state->finishWindowUntilTurn = 0;
+                    }
+                    else if ( enemyLossFraction >= 0.18 && friendlyLossFraction <= 0.08 ) {
                         state->finishWindowUntilTurn = _currentTurnNumber + 1;
                     }
                     else if ( friendlyLossFraction >= 0.18 && enemyLossFraction <= 0.05 ) {
@@ -164,6 +169,15 @@ namespace AI
                                                 && relativeArmyStrength >= 0.90 && state->momentum >= -0.02;
                 if ( finishWindowActive ) {
                     state->cautious = false;
+                    return *this;
+                }
+
+                // Once a favorable exchange has created an overwhelming advantage, switch from "finish at
+                // any cost" to controlled cleanup. This reduces unnecessary exposure and makes it less likely
+                // that high-value melee stacks are committed just to erase scraps that can safely come to us.
+                const bool mopUpPreservation = hadHistory && !_considerRetreat && relativeArmyStrength >= 3.0 && state->momentum >= 0.06;
+                if ( mopUpPreservation ) {
+                    state->cautious = true;
                     return *this;
                 }
 
