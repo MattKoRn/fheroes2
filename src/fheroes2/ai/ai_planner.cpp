@@ -20,6 +20,7 @@
 
 #include "ai_planner.h"
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstdint>
@@ -31,6 +32,7 @@
 #include "army.h"
 #include "heroes.h"
 #include "kingdom.h"
+#include "maps.h"
 #include "maps_tiles.h"
 #include "mp2.h"
 #include "profit.h"
@@ -122,6 +124,39 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
         }
 
         HeroPlanMemory & memory = _heroPlanMemory[hero->GetID()];
+
+        if ( !criticalDiscovery ) {
+            // Opportunity pressure is a bounded anti-distraction memory. Every ordinary strategic
+            // reroute makes the next one require a tighter geographic window. Three quiet days remove
+            // one point of pressure, so heroes become curious again instead of staying permanently rigid.
+            if ( memory.opportunityPressureDay == 0 ) {
+                memory.opportunityPressureDay = currentDay;
+            }
+            else if ( currentDay > memory.opportunityPressureDay ) {
+                const uint32_t elapsedDays = currentDay - memory.opportunityPressureDay;
+                const uint32_t decay = elapsedDays / 3;
+                if ( decay > 0 ) {
+                    const uint32_t pressure = memory.opportunityPressure;
+                    memory.opportunityPressure = static_cast<uint8_t>( pressure > decay ? pressure - decay : 0 );
+                    memory.opportunityPressureDay = currentDay;
+                }
+            }
+
+            // Nearby strategic discoveries are genuine opportunity windows; distant ones can wait for
+            // normal target selection. Repeated diversions shrink the window from six tiles down to two.
+            // Enemy heroes/castles get two extra tiles because their vulnerability can disappear quickly.
+            const uint32_t opportunityPressure = std::min<uint32_t>( memory.opportunityPressure, 4 );
+            uint32_t opportunityRadius = 6 - opportunityPressure;
+            if ( object == MP2::OBJ_HERO || object == MP2::OBJ_CASTLE ) {
+                opportunityRadius += 2;
+            }
+
+            const uint32_t approximateDistance = Maps::GetApproximateDistance( hero->GetIndex(), discoveryIndex );
+            if ( committedTarget != -1 && approximateDistance > opportunityRadius ) {
+                continue;
+            }
+        }
+
         const bool alreadyReplannedToday = memory.lastStrategicInterruptTile != -1 && memory.lastStrategicInterruptDay == currentDay;
 
         // Preserve plan stickiness for ordinary strategic discoveries: at most one route interruption
@@ -132,6 +167,12 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
 
         memory.lastStrategicInterruptDay = currentDay;
         memory.lastStrategicInterruptTile = discoveryIndex;
+
+        if ( !criticalDiscovery ) {
+            memory.opportunityPressure = static_cast<uint8_t>( std::min<uint32_t>( 4, memory.opportunityPressure + 1 ) );
+            memory.opportunityPressureDay = currentDay;
+        }
+
         path.Truncate();
         break;
     }
