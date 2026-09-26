@@ -79,6 +79,11 @@ namespace
         }
     }
 
+    uint64_t getStrategicTargetCooldownKey( const PlayerColor color, const int32_t tileIndex )
+    {
+        return ( static_cast<uint64_t>( static_cast<uint8_t>( color ) ) << 32 ) | static_cast<uint32_t>( tileIndex );
+    }
+
     uint32_t getStrategicResponderRolePenalty( const Heroes::Role role, const MP2::MapObjectType object, const bool criticalDiscovery )
     {
         // Combat-capable heroes should answer urgent hero/castle discoveries, while scouts and
@@ -133,6 +138,7 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
 
     const int32_t discoveryIndex = tile.GetIndex();
     const uint32_t currentDay = world.CountDay();
+    const uint64_t cooldownKey = getStrategicTargetCooldownKey( kingdom.GetColor(), discoveryIndex );
 
     updateMapActionObjectCache( kingdom, discoveryIndex );
     updatePriorityAttackTarget( kingdom, tile );
@@ -142,7 +148,7 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
     // A target which has previously caused a failed diversion is temporarily suppressed from normal
     // kingdom planning. A critical task always overrides this memory, while a hero already very close
     // to the target is allowed to retry early because the old failure conditions no longer apply.
-    if ( const auto cooldownIt = _strategicTargetCooldowns.find( discoveryIndex ); cooldownIt != _strategicTargetCooldowns.end() ) {
+    if ( const auto cooldownIt = _strategicTargetCooldowns.find( cooldownKey ); cooldownIt != _strategicTargetCooldowns.end() ) {
         if ( criticalDiscovery ) {
             _strategicTargetCooldowns.erase( cooldownIt );
             updateMapActionObjectCache( kingdom, discoveryIndex );
@@ -296,7 +302,8 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
          && !isCriticalTask( abandonedTarget ) ) {
         const MP2::MapObjectType abandonedObject = world.getTile( abandonedTarget ).getMainObjectType();
         if ( isCooldownEligibleStrategicTarget( abandonedObject ) ) {
-            StrategicTargetCooldown & cooldown = _strategicTargetCooldowns[abandonedTarget];
+            const uint64_t abandonedCooldownKey = getStrategicTargetCooldownKey( kingdom.GetColor(), abandonedTarget );
+            StrategicTargetCooldown & cooldown = _strategicTargetCooldowns[abandonedCooldownKey];
             cooldown.failureCount = static_cast<uint8_t>( std::min<uint32_t>( 3, cooldown.failureCount + 1 ) );
             cooldown.untilDay = currentDay + 1 + cooldown.failureCount;
 
@@ -422,15 +429,16 @@ double AI::Planner::getFundsValueBasedOnPriority( const Funds & funds ) const
 void AI::Planner::updateMapActionObjectCache( const Kingdom & kingdom, const int mapIndex )
 {
     const MP2::MapObjectType objectType = world.getTile( mapIndex ).getMainObjectType();
+    const uint64_t cooldownKey = getStrategicTargetCooldownKey( kingdom.GetColor(), mapIndex );
 
     if ( !isValuableAdventureMapObject( kingdom, objectType, mapIndex ) ) {
         _mapActionObjects.erase( mapIndex );
-        _strategicTargetCooldowns.erase( mapIndex );
+        _strategicTargetCooldowns.erase( cooldownKey );
 
         return;
     }
 
-    if ( auto cooldownIt = _strategicTargetCooldowns.find( mapIndex ); cooldownIt != _strategicTargetCooldowns.end() ) {
+    if ( auto cooldownIt = _strategicTargetCooldowns.find( cooldownKey ); cooldownIt != _strategicTargetCooldowns.end() ) {
         const uint32_t currentDay = world.CountDay();
 
         if ( isCriticalTask( mapIndex ) ) {
