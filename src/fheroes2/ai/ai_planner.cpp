@@ -96,18 +96,43 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
             continue;
         }
 
+        Route::Path & path = hero->GetPath();
+        const int32_t committedTarget = path.GetDestinationIndex();
+
+        // Do not throw away a plan that is already about to complete. This is a small but important
+        // hysteresis band: ordinary strategic discoveries need to be compelling for long enough to
+        // survive until the next planning pass instead of causing oscillation one or two steps from
+        // the current objective.
+        if ( !criticalDiscovery && path.size() <= 2 ) {
+            continue;
+        }
+
+        // Once a hero is already committed to a critical ATTACK/DEFEND objective, ordinary mines,
+        // artifacts and similar opportunities are not allowed to peel it away. A newly critical
+        // discovery can still pre-empt the route immediately, which is how rising threats break
+        // strategic commitment without making the AI indecisive.
+        if ( !criticalDiscovery && committedTarget != -1 && isCriticalTask( committedTarget ) ) {
+            continue;
+        }
+
+        // If the newly revealed strategic object is already the route destination, there is no need
+        // to force another planning pass.
+        if ( committedTarget == discoveryIndex ) {
+            continue;
+        }
+
         HeroPlanMemory & memory = _heroPlanMemory[hero->GetID()];
         const bool alreadyReplannedToday = memory.lastStrategicInterruptTile != -1 && memory.lastStrategicInterruptDay == currentDay;
 
         // Preserve plan stickiness for ordinary strategic discoveries: at most one route interruption
         // per hero per day. Critical defence/attack tasks are allowed to override this guard.
         if ( !criticalDiscovery && alreadyReplannedToday ) {
-            break;
+            continue;
         }
 
         memory.lastStrategicInterruptDay = currentDay;
         memory.lastStrategicInterruptTile = discoveryIndex;
-        hero->GetPath().Truncate();
+        path.Truncate();
         break;
     }
 }
