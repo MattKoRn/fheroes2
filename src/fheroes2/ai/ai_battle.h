@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 
 #include "color.h"
@@ -233,13 +234,13 @@ namespace AI
             SideMomentumState * getCurrentState()
             {
                 const int index = colorIndex( _myColor );
-                return index >= 0 ? &_sideStates[static_cast<size_t>( index )] : nullptr;
+                return index >= 0 ? &_sideStates[static_cast<std::size_t>( index )] : nullptr;
             }
 
             const SideMomentumState * getCurrentState() const
             {
                 const int index = colorIndex( _myColor );
-                return index >= 0 ? &_sideStates[static_cast<size_t>( index )] : nullptr;
+                return index >= 0 ? &_sideStates[static_cast<std::size_t>( index )] : nullptr;
             }
 
             const double & _myArmyStrength;
