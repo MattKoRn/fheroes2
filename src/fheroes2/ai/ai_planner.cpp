@@ -87,6 +87,20 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
 
     const uint32_t currentDay = world.CountDay();
     const VecHeroes & heroes = kingdom.GetHeroes();
+
+    if ( !criticalDiscovery ) {
+        // A live route is also a zero-cost reservation. If another hero is already committed to this
+        // discovery, do not interrupt a second hero just to make it reconsider the same objective.
+        // The reservation disappears automatically when the route changes, is consumed or reset.
+        const bool alreadyReserved = std::any_of( heroes.begin(), heroes.end(), [discoveryIndex]( const Heroes * hero ) {
+            return hero != nullptr && hero->isActive() && hero->GetPath().GetDestinationIndex() == discoveryIndex;
+        } );
+
+        if ( alreadyReserved ) {
+            return;
+        }
+    }
+
     for ( Heroes * hero : heroes ) {
         if ( hero == nullptr ) {
             // How is it even possible?
