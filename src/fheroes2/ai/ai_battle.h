@@ -21,6 +21,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 
 #include "color.h"
@@ -98,37 +99,55 @@ namespace AI
             CautiousOffensiveDecision & operator=( const bool enemyHasLimitedRangedPressure )
             {
                 // analyzeBattleState() first clears its per-turn strength fields and assigns false to this
-                // decision. Ignore that reset marker: the second assignment arrives after the armies have
-                // been measured and is the one that should update momentum and tactical posture.
+                // decision. If this happens before the attacker's first action, the battle turn counter is
+                // still zero, which also gives us a cheap reset signal for the bounded side memories.
                 if ( _myArmyStrength <= 0.0 || _enemyArmyStrength <= 0.0 ) {
+                    if ( _currentTurnNumber == 0 ) {
+                        _sideStates = {};
+                    }
                     return *this;
                 }
 
-                const bool sideChanged = _hasHistory && _myColor != _previousColor;
-                const bool battleTurnRestarted = _hasHistory && _currentTurnNumber < _lastTurnNumber;
-                if ( sideChanged || battleTurnRestarted ) {
-                    _hasHistory = false;
-                    _momentum = 0.0;
-                    _value = false;
+                SideMomentumState * state = getCurrentState();
+                if ( state == nullptr ) {
+                    return *this;
                 }
 
-                if ( _hasHistory ) {
-                    const double friendlyLossFraction
-                        = std::max( 0.0, ( _previousMyArmyStrength - _myArmyStrength ) / std::max( 1.0, _previousMyArmyStrength ) );
-                    const double enemyLossFraction
-                        = std::max( 0.0, ( _previousEnemyArmyStrength - _enemyArmyStrength ) / std::max( 1.0, _previousEnemyArmyStrength ) );
+                // A lower turn number means a new battle has started. Keep momentum strictly local to
+                // one battle even though BattlePlanner itself is a process-lifetime singleton.
+                if ( state->hasHistory && _currentTurnNumber < state->lastTurnNumber ) {
+                    *state = {};
+                }
+
+                double friendlyLossFraction = 0.0;
+                double enemyLossFraction = 0.0;
+
+                if ( state->hasHistory ) {
+                    friendlyLossFraction
+                        = std::max( 0.0, ( state->previousMyArmyStrength - _myArmyStrength ) / std::max( 1.0, state->previousMyArmyStrength ) );
+                    enemyLossFraction
+                        = std::max( 0.0, ( state->previousEnemyArmyStrength - _enemyArmyStrength ) / std::max( 1.0, state->previousEnemyArmyStrength ) );
 
                     // Favorable exchanges build momentum, while losing trades push the AI toward preservation.
                     // Decay keeps old exchanges from dominating the entire battle.
                     const double exchangeMomentum = ( enemyLossFraction - friendlyLossFraction ) * 1.5;
-                    _momentum = std::clamp( _momentum * 0.60 + exchangeMomentum, -0.35, 0.35 );
+                    state->momentum = std::clamp( state->momentum * 0.60 + exchangeMomentum, -0.35, 0.35 );
+
+                    // A clean exchange that removes a meaningful slice of the opposing army creates a
+                    // short finish window. The latch survives initiative changes and lasts through the
+                    // next battle round so follow-up stacks can capitalize instead of immediately slowing down.
+                    if ( enemyLossFraction >= 0.18 && friendlyLossFraction <= 0.08 ) {
+                        state->finishWindowUntilTurn = _currentTurnNumber + 1;
+                    }
+                    else if ( friendlyLossFraction >= 0.18 && enemyLossFraction <= 0.05 ) {
+                        state->finishWindowUntilTurn = 0;
+                    }
                 }
 
-                _previousMyArmyStrength = _myArmyStrength;
-                _previousEnemyArmyStrength = _enemyArmyStrength;
-                _previousColor = _myColor;
-                _lastTurnNumber = _currentTurnNumber;
-                _hasHistory = true;
+                state->previousMyArmyStrength = _myArmyStrength;
+                state->previousEnemyArmyStrength = _enemyArmyStrength;
+                state->lastTurnNumber = _currentTurnNumber;
+                state->hasHistory = true;
 
                 const double relativeArmyStrength = _myArmyStrength / _enemyArmyStrength;
                 const bool enemyHasMeaningfulSpellPressure = _enemySpellStrength > _myArmyStrength * 0.20;
@@ -136,7 +155,14 @@ namespace AI
                 // Ranged or spell pressure forces tempo: waiting while the opponent can damage us safely is
                 // not preservation, it is simply losing initiative.
                 if ( !enemyHasLimitedRangedPressure || enemyHasMeaningfulSpellPressure ) {
-                    _value = false;
+                    state->cautious = false;
+                    return *this;
+                }
+
+                const bool finishWindowActive = state->finishWindowUntilTurn != 0 && _currentTurnNumber <= state->finishWindowUntilTurn && !_considerRetreat
+                                                && relativeArmyStrength >= 0.90 && state->momentum >= -0.02;
+                if ( finishWindowActive ) {
+                    state->cautious = false;
                     return *this;
                 }
 
@@ -145,21 +171,21 @@ namespace AI
                 constexpr double badMomentumThreshold = -0.04;
                 constexpr double goodMomentumThreshold = 0.04;
 
-                if ( _value ) {
+                if ( state->cautious ) {
                     // Once cautious, demand a real improvement before switching back to direct pressure.
                     // This wider exit threshold is the hysteresis band that prevents turn-to-turn thrashing.
                     const bool regainedInitiative = !_considerRetreat
-                                                    && ( ( relativeArmyStrength >= cautiousExitStrength && _momentum >= -0.02 )
-                                                         || ( relativeArmyStrength >= 1.15 && _momentum >= goodMomentumThreshold ) );
+                                                    && ( ( relativeArmyStrength >= cautiousExitStrength && state->momentum >= -0.02 )
+                                                         || ( relativeArmyStrength >= 1.15 && state->momentum >= goodMomentumThreshold ) );
                     if ( regainedInitiative ) {
-                        _value = false;
+                        state->cautious = false;
                     }
                 }
                 else {
                     // Enter preservation mode when materially weaker, after losing exchanges, or after the
                     // existing retreat analysis detects meaningful attrition.
-                    if ( _considerRetreat || relativeArmyStrength < cautiousEntryStrength || _momentum <= badMomentumThreshold ) {
-                        _value = true;
+                    if ( _considerRetreat || relativeArmyStrength < cautiousEntryStrength || state->momentum <= badMomentumThreshold ) {
+                        state->cautious = true;
                     }
                 }
 
@@ -168,10 +194,54 @@ namespace AI
 
             operator bool() const
             {
-                return _value;
+                const SideMomentumState * state = getCurrentState();
+                return state != nullptr && state->cautious;
             }
 
         private:
+            struct SideMomentumState
+            {
+                double previousMyArmyStrength{ 0.0 };
+                double previousEnemyArmyStrength{ 0.0 };
+                double momentum{ 0.0 };
+                uint32_t lastTurnNumber{ 0 };
+                uint32_t finishWindowUntilTurn{ 0 };
+                bool hasHistory{ false };
+                bool cautious{ false };
+            };
+
+            static int colorIndex( const PlayerColor color )
+            {
+                switch ( color ) {
+                case PlayerColor::BLUE:
+                    return 0;
+                case PlayerColor::GREEN:
+                    return 1;
+                case PlayerColor::RED:
+                    return 2;
+                case PlayerColor::YELLOW:
+                    return 3;
+                case PlayerColor::ORANGE:
+                    return 4;
+                case PlayerColor::PURPLE:
+                    return 5;
+                default:
+                    return -1;
+                }
+            }
+
+            SideMomentumState * getCurrentState()
+            {
+                const int index = colorIndex( _myColor );
+                return index >= 0 ? &_sideStates[static_cast<size_t>( index )] : nullptr;
+            }
+
+            const SideMomentumState * getCurrentState() const
+            {
+                const int index = colorIndex( _myColor );
+                return index >= 0 ? &_sideStates[static_cast<size_t>( index )] : nullptr;
+            }
+
             const double & _myArmyStrength;
             const double & _enemyArmyStrength;
             const double & _enemySpellStrength;
@@ -179,13 +249,7 @@ namespace AI
             const PlayerColor & _myColor;
             const uint32_t & _currentTurnNumber;
 
-            double _previousMyArmyStrength{ 0.0 };
-            double _previousEnemyArmyStrength{ 0.0 };
-            double _momentum{ 0.0 };
-            PlayerColor _previousColor{ PlayerColor::NONE };
-            uint32_t _lastTurnNumber{ 0 };
-            bool _hasHistory{ false };
-            bool _value{ false };
+            std::array<SideMomentumState, 6> _sideStates{};
         };
 
         BattlePlanner()
