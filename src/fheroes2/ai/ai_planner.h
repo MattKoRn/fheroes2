@@ -263,8 +263,18 @@ namespace AI
             return iter->second.type == PriorityTaskType::ATTACK || iter->second.type == PriorityTaskType::DEFEND;
         }
 
+        struct HeroPlanMemory
+        {
+            uint32_t lastStrategicInterruptDay{ 0 };
+            int32_t lastStrategicInterruptTile{ -1 };
+        };
+
         // The following member variables should not be saved or serialized
 
+        // Bounded per-hero planning memory. Hero IDs are finite, so this prevents newly discovered
+        // low-priority objects from repeatedly breaking an established multi-turn route while
+        // remaining deterministic and cheap to query.
+        std::unordered_map<int32_t, HeroPlanMemory> _heroPlanMemory;
         std::unordered_map<int32_t, MP2::MapObjectType> _mapActionObjects;
         std::unordered_map<int32_t, PriorityTask> _priorityTargets;
         std::unordered_map<int32_t, EnemyArmy> _enemyArmies;
