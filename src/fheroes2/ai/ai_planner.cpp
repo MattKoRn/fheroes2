@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <map>
@@ -150,18 +151,20 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
             continue;
         }
 
-        if ( !hero->isMoveEnabled() ) {
+        // Critical discoveries must affect the hero who is actually in motion right now so the
+        // emergency is reacted to immediately. Ordinary opportunities are compared against every
+        // hero that can still act this turn: if a better responder exists, the moving hero is not
+        // distracted and the better hero can pick up the newly cached target during normal planning.
+        if ( criticalDiscovery ? !hero->isMoveEnabled() : !hero->MayStillMove( false, false ) ) {
             continue;
         }
 
         Route::Path & path = hero->GetPath();
         const int32_t committedTarget = path.GetDestinationIndex();
 
-        // Do not throw away a plan that is already about to complete. This is a small but important
-        // hysteresis band: ordinary strategic discoveries need to be compelling for long enough to
-        // survive until the next planning pass instead of causing oscillation one or two steps from
-        // the current objective.
-        if ( !criticalDiscovery && path.size() <= 2 ) {
+        // Do not throw away a plan that is already about to complete. Empty routes have no commitment
+        // and are ideal future responders, so only apply the near-completion guard to real paths.
+        if ( !criticalDiscovery && !path.empty() && path.size() <= 2 ) {
             continue;
         }
 
@@ -227,7 +230,7 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
         // Empty routes are cheap to redirect. Among heroes that already have plans, protect routes
         // that are close to completion more strongly than long-range plans. Distance still dominates,
         // and hero ID gives deterministic ordering when two candidates are otherwise equivalent.
-        const uint64_t commitmentPenalty = path.empty() ? 0 : 180 / std::min<size_t>( path.size(), 6 );
+        const uint64_t commitmentPenalty = path.empty() ? 0 : 180 / std::min<std::size_t>( path.size(), 6 );
         const uint64_t responderScore = approximateDistance * 100 + commitmentPenalty + rolePenalty;
 
         if ( bestResponder == nullptr || responderScore < bestResponderScore
@@ -237,7 +240,10 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
         }
     }
 
-    if ( bestResponder == nullptr ) {
+    // For an ordinary opportunity, a non-moving hero can be the best responder. In that case the
+    // current hero deliberately keeps moving; the discovered object is already in the shared cache,
+    // so the better responder can select it normally when its planning slot arrives.
+    if ( bestResponder == nullptr || ( !criticalDiscovery && !bestResponder->isMoveEnabled() ) ) {
         return;
     }
 
