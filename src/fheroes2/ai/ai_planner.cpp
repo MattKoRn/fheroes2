@@ -97,7 +97,7 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
         }
 
         HeroPlanMemory & memory = _heroPlanMemory[hero->GetID()];
-        const bool alreadyReplannedToday = memory.lastStrategicInterruptDay == currentDay;
+        const bool alreadyReplannedToday = memory.lastStrategicInterruptTile != -1 && memory.lastStrategicInterruptDay == currentDay;
 
         // Preserve plan stickiness for ordinary strategic discoveries: at most one route interruption
         // per hero per day. Critical defence/attack tasks are allowed to override this guard.
