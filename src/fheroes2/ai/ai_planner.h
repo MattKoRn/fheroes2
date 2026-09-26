@@ -267,13 +267,16 @@ namespace AI
         {
             uint32_t lastStrategicInterruptDay{ 0 };
             int32_t lastStrategicInterruptTile{ -1 };
+            uint32_t opportunityPressureDay{ 0 };
+            uint8_t opportunityPressure{ 0 };
         };
 
         // The following member variables should not be saved or serialized
 
         // Bounded per-hero planning memory. Hero IDs are finite, so this prevents newly discovered
         // low-priority objects from repeatedly breaking an established multi-turn route while
-        // remaining deterministic and cheap to query.
+        // remaining deterministic and cheap to query. Opportunity pressure is a tiny saturating
+        // counter that makes repeatedly distracted heroes progressively harder to pull off-plan.
         std::unordered_map<int32_t, HeroPlanMemory> _heroPlanMemory;
         std::unordered_map<int32_t, MP2::MapObjectType> _mapActionObjects;
         std::unordered_map<int32_t, PriorityTask> _priorityTargets;
