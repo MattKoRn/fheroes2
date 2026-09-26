@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 
 #include "color.h"
@@ -85,28 +86,83 @@ namespace AI
         {
         public:
             CautiousOffensiveDecision( const double & myArmyStrength, const double & enemyArmyStrength, const double & enemySpellStrength,
-                                       const bool & considerRetreat )
+                                       const bool & considerRetreat, const PlayerColor & myColor, const uint32_t & currentTurnNumber )
                 : _myArmyStrength( myArmyStrength )
                 , _enemyArmyStrength( enemyArmyStrength )
                 , _enemySpellStrength( enemySpellStrength )
                 , _considerRetreat( considerRetreat )
+                , _myColor( myColor )
+                , _currentTurnNumber( currentTurnNumber )
             {}
 
             CautiousOffensiveDecision & operator=( const bool enemyHasLimitedRangedPressure )
             {
-                if ( !enemyHasLimitedRangedPressure || _enemyArmyStrength <= 0.0 ) {
+                // analyzeBattleState() first clears its per-turn strength fields and assigns false to this
+                // decision. Ignore that reset marker: the second assignment arrives after the armies have
+                // been measured and is the one that should update momentum and tactical posture.
+                if ( _myArmyStrength <= 0.0 || _enemyArmyStrength <= 0.0 ) {
+                    return *this;
+                }
+
+                const bool sideChanged = _hasHistory && _myColor != _previousColor;
+                const bool battleTurnRestarted = _hasHistory && _currentTurnNumber < _lastTurnNumber;
+                if ( sideChanged || battleTurnRestarted ) {
+                    _hasHistory = false;
+                    _momentum = 0.0;
+                    _value = false;
+                }
+
+                if ( _hasHistory ) {
+                    const double friendlyLossFraction
+                        = std::max( 0.0, ( _previousMyArmyStrength - _myArmyStrength ) / std::max( 1.0, _previousMyArmyStrength ) );
+                    const double enemyLossFraction
+                        = std::max( 0.0, ( _previousEnemyArmyStrength - _enemyArmyStrength ) / std::max( 1.0, _previousEnemyArmyStrength ) );
+
+                    // Favorable exchanges build momentum, while losing trades push the AI toward preservation.
+                    // Decay keeps old exchanges from dominating the entire battle.
+                    const double exchangeMomentum = ( enemyLossFraction - friendlyLossFraction ) * 1.5;
+                    _momentum = std::clamp( _momentum * 0.60 + exchangeMomentum, -0.35, 0.35 );
+                }
+
+                _previousMyArmyStrength = _myArmyStrength;
+                _previousEnemyArmyStrength = _enemyArmyStrength;
+                _previousColor = _myColor;
+                _lastTurnNumber = _currentTurnNumber;
+                _hasHistory = true;
+
+                const double relativeArmyStrength = _myArmyStrength / _enemyArmyStrength;
+                const bool enemyHasMeaningfulSpellPressure = _enemySpellStrength > _myArmyStrength * 0.20;
+
+                // Ranged or spell pressure forces tempo: waiting while the opponent can damage us safely is
+                // not preservation, it is simply losing initiative.
+                if ( !enemyHasLimitedRangedPressure || enemyHasMeaningfulSpellPressure ) {
                     _value = false;
                     return *this;
                 }
 
-                const double relativeArmyStrength = _myArmyStrength / _enemyArmyStrength;
-                const bool enemyHasMeaningfulSpellPressure = _enemySpellStrength > _myArmyStrength * 0.20;
-                const bool preservationMatters = _considerRetreat || relativeArmyStrength < 1.25;
+                constexpr double cautiousEntryStrength = 1.10;
+                constexpr double cautiousExitStrength = 1.35;
+                constexpr double badMomentumThreshold = -0.04;
+                constexpr double goodMomentumThreshold = 0.04;
 
-                // Limited ranged pressure no longer automatically means "advance cautiously". A healthy army
-                // with a clear strength advantage should close and finish the fight, while an attrited or weaker
-                // army preserves valuable stacks unless enemy spell pressure forces it to act decisively.
-                _value = !enemyHasMeaningfulSpellPressure && preservationMatters;
+                if ( _value ) {
+                    // Once cautious, demand a real improvement before switching back to direct pressure.
+                    // This wider exit threshold is the hysteresis band that prevents turn-to-turn thrashing.
+                    const bool regainedInitiative = !_considerRetreat
+                                                    && ( ( relativeArmyStrength >= cautiousExitStrength && _momentum >= -0.02 )
+                                                         || ( relativeArmyStrength >= 1.15 && _momentum >= goodMomentumThreshold ) );
+                    if ( regainedInitiative ) {
+                        _value = false;
+                    }
+                }
+                else {
+                    // Enter preservation mode when materially weaker, after losing exchanges, or after the
+                    // existing retreat analysis detects meaningful attrition.
+                    if ( _considerRetreat || relativeArmyStrength < cautiousEntryStrength || _momentum <= badMomentumThreshold ) {
+                        _value = true;
+                    }
+                }
+
                 return *this;
             }
 
@@ -120,11 +176,20 @@ namespace AI
             const double & _enemyArmyStrength;
             const double & _enemySpellStrength;
             const bool & _considerRetreat;
+            const PlayerColor & _myColor;
+            const uint32_t & _currentTurnNumber;
+
+            double _previousMyArmyStrength{ 0.0 };
+            double _previousEnemyArmyStrength{ 0.0 };
+            double _momentum{ 0.0 };
+            PlayerColor _previousColor{ PlayerColor::NONE };
+            uint32_t _lastTurnNumber{ 0 };
+            bool _hasHistory{ false };
             bool _value{ false };
         };
 
         BattlePlanner()
-            : _cautiousOffensive( _myArmyStrength, _enemyArmyStrength, _enemySpellStrength, _considerRetreat )
+            : _cautiousOffensive( _myArmyStrength, _enemyArmyStrength, _enemySpellStrength, _considerRetreat, _myColor, _currentTurnNumber )
         {}
 
         // Checks whether the limit of turns is exceeded for the attacking AI-controlled
