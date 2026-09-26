@@ -81,7 +81,51 @@ namespace AI
         void BattleTurn( Battle::Arena & arena, const Battle::Unit & currentUnit, Battle::Actions & actions );
 
     private:
-        BattlePlanner() = default;
+        class CautiousOffensiveDecision
+        {
+        public:
+            CautiousOffensiveDecision( const double & myArmyStrength, const double & enemyArmyStrength, const double & enemySpellStrength,
+                                       const bool & considerRetreat )
+                : _myArmyStrength( myArmyStrength )
+                , _enemyArmyStrength( enemyArmyStrength )
+                , _enemySpellStrength( enemySpellStrength )
+                , _considerRetreat( considerRetreat )
+            {}
+
+            CautiousOffensiveDecision & operator=( const bool enemyHasLimitedRangedPressure )
+            {
+                if ( !enemyHasLimitedRangedPressure || _enemyArmyStrength <= 0.0 ) {
+                    _value = false;
+                    return *this;
+                }
+
+                const double relativeArmyStrength = _myArmyStrength / _enemyArmyStrength;
+                const bool enemyHasMeaningfulSpellPressure = _enemySpellStrength > _myArmyStrength * 0.20;
+                const bool preservationMatters = _considerRetreat || relativeArmyStrength < 1.25;
+
+                // Limited ranged pressure no longer automatically means "advance cautiously". A healthy army
+                // with a clear strength advantage should close and finish the fight, while an attrited or weaker
+                // army preserves valuable stacks unless enemy spell pressure forces it to act decisively.
+                _value = !enemyHasMeaningfulSpellPressure && preservationMatters;
+                return *this;
+            }
+
+            operator bool() const
+            {
+                return _value;
+            }
+
+        private:
+            const double & _myArmyStrength;
+            const double & _enemyArmyStrength;
+            const double & _enemySpellStrength;
+            const bool & _considerRetreat;
+            bool _value{ false };
+        };
+
+        BattlePlanner()
+            : _cautiousOffensive( _myArmyStrength, _enemyArmyStrength, _enemySpellStrength, _considerRetreat )
+        {}
 
         // Checks whether the limit of turns is exceeded for the attacking AI-controlled
         // hero and inserts an appropriate action to the action list if necessary
@@ -146,7 +190,7 @@ namespace AI
         bool _defendingCastle{ false };
         bool _considerRetreat{ false };
         bool _defensiveTactics{ false };
-        bool _cautiousOffensive{ false };
+        CautiousOffensiveDecision _cautiousOffensive;
         bool _avoidStackingUnits{ false };
     };
 }
