@@ -61,6 +61,24 @@ namespace
         }
     }
 
+    bool isCooldownEligibleStrategicTarget( const MP2::MapObjectType object )
+    {
+        // Failed-plan cooldowns are deliberately limited to non-critical economic/exploration
+        // targets. Hero and castle objectives can become urgent between turns and should remain
+        // available to the kingdom-level ATTACK/DEFEND logic at all times.
+        switch ( object ) {
+        case MP2::OBJ_MINE:
+        case MP2::OBJ_SAWMILL:
+        case MP2::OBJ_ALCHEMIST_LAB:
+        case MP2::OBJ_ABANDONED_MINE:
+        case MP2::OBJ_ARTIFACT:
+        case MP2::OBJ_LIGHTHOUSE:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     uint32_t getStrategicResponderRolePenalty( const Heroes::Role role, const MP2::MapObjectType object, const bool criticalDiscovery )
     {
         // Combat-capable heroes should answer urgent hero/castle discoveries, while scouts and
@@ -113,11 +131,36 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
         return;
     }
 
-    updateMapActionObjectCache( kingdom, tile.GetIndex() );
+    const int32_t discoveryIndex = tile.GetIndex();
+    const uint32_t currentDay = world.CountDay();
+
+    updateMapActionObjectCache( kingdom, discoveryIndex );
     updatePriorityAttackTarget( kingdom, tile );
 
-    const int32_t discoveryIndex = tile.GetIndex();
     const bool criticalDiscovery = isCriticalTask( discoveryIndex );
+
+    // A target which has previously caused a failed diversion is temporarily suppressed from normal
+    // kingdom planning. A critical task always overrides this memory, while a hero already very close
+    // to the target is allowed to retry early because the old failure conditions no longer apply.
+    if ( const auto cooldownIt = _strategicTargetCooldowns.find( discoveryIndex ); cooldownIt != _strategicTargetCooldowns.end() ) {
+        if ( criticalDiscovery ) {
+            _strategicTargetCooldowns.erase( cooldownIt );
+            updateMapActionObjectCache( kingdom, discoveryIndex );
+        }
+        else if ( cooldownIt->second.untilDay >= currentDay ) {
+            const VecHeroes & cooldownHeroes = kingdom.GetHeroes();
+            const bool closeEnoughToRetry = std::any_of( cooldownHeroes.begin(), cooldownHeroes.end(), [discoveryIndex]( const Heroes * hero ) {
+                return hero != nullptr && hero->isActive() && Maps::GetApproximateDistance( hero->GetIndex(), discoveryIndex ) <= 2;
+            } );
+
+            if ( !closeEnoughToRetry ) {
+                return;
+            }
+
+            _strategicTargetCooldowns.erase( cooldownIt );
+            updateMapActionObjectCache( kingdom, discoveryIndex );
+        }
+    }
 
     // Routine pickups should not make a hero abandon a good multi-turn plan. Strategic discoveries
     // can interrupt a route, while critical attack/defence tasks always remain immediately reactive.
@@ -125,7 +168,6 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
         return;
     }
 
-    const uint32_t currentDay = world.CountDay();
     const VecHeroes & heroes = kingdom.GetHeroes();
 
     if ( !criticalDiscovery ) {
@@ -248,6 +290,23 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
     }
 
     HeroPlanMemory & memory = _heroPlanMemory[bestResponder->GetID()];
+    const int32_t abandonedTarget = bestResponder->GetPath().GetDestinationIndex();
+
+    if ( !criticalDiscovery && abandonedTarget >= 0 && abandonedTarget != discoveryIndex && abandonedTarget == memory.lastStrategicInterruptTile
+         && !isCriticalTask( abandonedTarget ) ) {
+        const MP2::MapObjectType abandonedObject = world.getTile( abandonedTarget ).getMainObjectType();
+        if ( isCooldownEligibleStrategicTarget( abandonedObject ) ) {
+            StrategicTargetCooldown & cooldown = _strategicTargetCooldowns[abandonedTarget];
+            cooldown.failureCount = static_cast<uint8_t>( std::min<uint32_t>( 3, cooldown.failureCount + 1 ) );
+            cooldown.untilDay = currentDay + 1 + cooldown.failureCount;
+
+            // Remove the failed plan from the current turn's shared candidate set immediately. The
+            // kingdom cache is rebuilt on later turns and updateMapActionObjectCache() will restore it
+            // automatically once the cooldown expires.
+            _mapActionObjects.erase( abandonedTarget );
+        }
+    }
+
     memory.lastStrategicInterruptDay = currentDay;
     memory.lastStrategicInterruptTile = discoveryIndex;
 
@@ -366,8 +425,27 @@ void AI::Planner::updateMapActionObjectCache( const Kingdom & kingdom, const int
 
     if ( !isValuableAdventureMapObject( kingdom, objectType, mapIndex ) ) {
         _mapActionObjects.erase( mapIndex );
+        _strategicTargetCooldowns.erase( mapIndex );
 
         return;
+    }
+
+    if ( auto cooldownIt = _strategicTargetCooldowns.find( mapIndex ); cooldownIt != _strategicTargetCooldowns.end() ) {
+        const uint32_t currentDay = world.CountDay();
+
+        if ( isCriticalTask( mapIndex ) ) {
+            // A newly critical objective invalidates all previous failed-plan assumptions.
+            _strategicTargetCooldowns.erase( cooldownIt );
+        }
+        else if ( cooldownIt->second.untilDay >= currentDay ) {
+            _mapActionObjects.erase( mapIndex );
+            return;
+        }
+        else {
+            // Keep a tiny failure history after expiry so a target which repeatedly causes failed
+            // diversions receives a slightly longer cooldown next time. The counter is capped at 3.
+            cooldownIt->second.untilDay = 0;
+        }
     }
 
     if ( const auto [iter, inserted] = _mapActionObjects.try_emplace( mapIndex, objectType ); !inserted ) {
