@@ -38,6 +38,26 @@
 #include "route.h"
 #include "world.h"
 
+namespace
+{
+    bool isStrategicDiscovery( const MP2::MapObjectType object )
+    {
+        switch ( object ) {
+        case MP2::OBJ_CASTLE:
+        case MP2::OBJ_HERO:
+        case MP2::OBJ_MINE:
+        case MP2::OBJ_SAWMILL:
+        case MP2::OBJ_ALCHEMIST_LAB:
+        case MP2::OBJ_ABANDONED_MINE:
+        case MP2::OBJ_ARTIFACT:
+        case MP2::OBJ_LIGHTHOUSE:
+            return true;
+        default:
+            return false;
+        }
+    }
+}
+
 AI::Planner & AI::Planner::Get()
 {
     static Planner ai;
@@ -54,8 +74,16 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
     updateMapActionObjectCache( kingdom, tile.GetIndex() );
     updatePriorityAttackTarget( kingdom, tile );
 
-    // If this is an action object and one of AI heroes is moving,
-    // we have to stop him because the new object might be more valuable than the current target.
+    const int32_t discoveryIndex = tile.GetIndex();
+    const bool criticalDiscovery = isCriticalTask( discoveryIndex );
+
+    // Routine pickups should not make a hero abandon a good multi-turn plan. Strategic discoveries
+    // can interrupt a route, while critical attack/defence tasks always remain immediately reactive.
+    if ( !criticalDiscovery && !isStrategicDiscovery( object ) ) {
+        return;
+    }
+
+    const uint32_t currentDay = world.CountDay();
     const VecHeroes & heroes = kingdom.GetHeroes();
     for ( Heroes * hero : heroes ) {
         if ( hero == nullptr ) {
@@ -64,10 +92,23 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
             continue;
         }
 
-        if ( hero->isMoveEnabled() ) {
-            hero->GetPath().Truncate();
+        if ( !hero->isMoveEnabled() ) {
+            continue;
+        }
+
+        HeroPlanMemory & memory = _heroPlanMemory[hero->GetID()];
+        const bool alreadyReplannedToday = memory.lastStrategicInterruptDay == currentDay;
+
+        // Preserve plan stickiness for ordinary strategic discoveries: at most one route interruption
+        // per hero per day. Critical defence/attack tasks are allowed to override this guard.
+        if ( !criticalDiscovery && alreadyReplannedToday ) {
             break;
         }
+
+        memory.lastStrategicInterruptDay = currentDay;
+        memory.lastStrategicInterruptTile = discoveryIndex;
+        hero->GetPath().Truncate();
+        break;
     }
 }
 
