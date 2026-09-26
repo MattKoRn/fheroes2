@@ -140,6 +140,7 @@ namespace AI
                     // unless ranged or spell pressure makes waiting strategically worse.
                     if ( friendlyLossFraction >= 0.22 && enemyLossFraction <= 0.08 ) {
                         state->finishWindowUntilTurn = 0;
+                        state->suppressionUntilTurn = 0;
                         state->recoveryUntilTurn = _currentTurnNumber + 1;
                     }
                     // A clean exchange that removes a meaningful slice of the opposing army creates a
@@ -166,9 +167,13 @@ namespace AI
                 const bool enemyHasMeaningfulSpellPressure = _enemySpellStrength > _myArmyStrength * 0.20;
 
                 // Ranged or spell pressure forces tempo: waiting while the opponent can damage us safely is
-                // not preservation, it is simply losing initiative. It is also the only reason to break a
-                // recovery window early after a badly lost exchange.
+                // not preservation, it is simply losing initiative. Once such pressure has forced an attack,
+                // retain that suppression posture through the next round instead of immediately oscillating
+                // back to cautious movement as soon as the pressure barely crosses below its threshold.
                 if ( !enemyHasLimitedRangedPressure || enemyHasMeaningfulSpellPressure ) {
+                    if ( !_considerRetreat ) {
+                        state->suppressionUntilTurn = _currentTurnNumber + 1;
+                    }
                     state->cautious = false;
                     return *this;
                 }
@@ -180,6 +185,16 @@ namespace AI
                     }
 
                     state->recoveryUntilTurn = 0;
+                }
+
+                if ( state->suppressionUntilTurn != 0 ) {
+                    const bool suppressionStillSafe = !_considerRetreat && relativeArmyStrength >= 0.85 && state->momentum >= -0.06;
+                    if ( _currentTurnNumber <= state->suppressionUntilTurn && suppressionStillSafe ) {
+                        state->cautious = false;
+                        return *this;
+                    }
+
+                    state->suppressionUntilTurn = 0;
                 }
 
                 const bool finishWindowActive = state->finishWindowUntilTurn != 0 && _currentTurnNumber <= state->finishWindowUntilTurn && !_considerRetreat
@@ -238,6 +253,7 @@ namespace AI
                 double momentum{ 0.0 };
                 uint32_t lastTurnNumber{ 0 };
                 uint32_t finishWindowUntilTurn{ 0 };
+                uint32_t suppressionUntilTurn{ 0 };
                 uint32_t recoveryUntilTurn{ 0 };
                 bool hasHistory{ false };
                 bool cautious{ false };
