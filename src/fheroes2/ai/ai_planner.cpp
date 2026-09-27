@@ -73,6 +73,14 @@ namespace
         case MP2::OBJ_ABANDONED_MINE:
         case MP2::OBJ_ARTIFACT:
         case MP2::OBJ_LIGHTHOUSE:
+        case MP2::OBJ_SHIPWRECK:
+        case MP2::OBJ_DERELICT_SHIP:
+        case MP2::OBJ_WATER_WHEEL:
+        case MP2::OBJ_WINDMILL:
+        case MP2::OBJ_TREASURE_CHEST:
+        case MP2::OBJ_PYRAMID:
+        case MP2::OBJ_DAEMON_CAVE:
+        case MP2::OBJ_DRAGON_CITY:
             return true;
         default:
             return false;
@@ -273,7 +281,10 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
         // that are close to completion more strongly than long-range plans. Distance still dominates,
         // and hero ID gives deterministic ordering when two candidates are otherwise equivalent.
         const uint64_t commitmentPenalty = path.empty() ? 0 : 180 / std::min<std::size_t>( path.size(), 6 );
-        const uint64_t responderScore = approximateDistance * 100 + commitmentPenalty + rolePenalty;
+        // Heroes with severely depleted movement points should yield to fresher heroes so immediate
+        // discoveries can be addressed today instead of stalling behind an exhausted unit.
+        const uint64_t fatiguePenalty = ( !criticalDiscovery && hero->GetMovePoints() < 300 ) ? 40 : 0;
+        const uint64_t responderScore = approximateDistance * 100 + commitmentPenalty + rolePenalty + fatiguePenalty;
 
         if ( bestResponder == nullptr || responderScore < bestResponderScore
              || ( responderScore == bestResponderScore && hero->GetID() < bestResponder->GetID() ) ) {

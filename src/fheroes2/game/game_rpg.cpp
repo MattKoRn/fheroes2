@@ -112,7 +112,7 @@ namespace
         { "Stormcraft", "Increase lightning damage" }, { "Cataclysm", "Increase wide-area spell damage" },
 
         { "Spell Ward", "Reduce all spell damage" }, { "Fire Ward", "Reduce fire spell damage" }, { "Cold Ward", "Reduce cold spell damage" },
-        { "Storm Ward", "Reduce lightning spell damage" }, { "Chaos Ward", "Reduce wide-area spell damage" },
+        { "Storm Ward", "Reduce lightning spell damage" }, { "Cataclysm Ward", "Reduce wide-area spell damage" },
 
         { "Leadership", "Increase creature Morale" }, { "Fortune", "Increase creature Luck" }, { "Regeneration", "Heal wounded creatures each turn" },
         { "Critical Training", "Chance for a critical attack" }, { "Brutal Criticals", "Critical attacks deal more damage" },
@@ -131,7 +131,7 @@ namespace
         "LD", "FT", "RG", "CR", "BC",
         "EV", "MP", "CQ", "UY", "RT"
     };
-    constexpr std::array<const char *, upgradeCount> upgradeDetails{
+    [[maybe_unused]] constexpr std::array<const char *, upgradeCount> upgradeDetails{
         "Adds open-ended creature Attack with diminishing returns. Rank 1 grants a full +1 Attack; later ranks still improve the underlying curve but each rank contributes less than the previous one.",
         "Adds open-ended creature Defense with diminishing returns. Rank 1 grants a full +1 Defense; later ranks still improve the underlying curve but each rank contributes less than the previous one.",
         "Adds open-ended Attack and Defense with diminishing returns. Rank 1 grants a full +1 to both stats; later ranks add progressively less. Its ranks cost more because both stats grow together.",
@@ -322,7 +322,7 @@ namespace
         return level / 10;
     }
 
-    [[maybe_unused]] uint64_t nextPrestigeLevel( const uint64_t level )
+    uint64_t nextPrestigeLevel( const uint64_t level )
     {
         return saturatedMultiply( saturatedAdd( prestigeRankForLevel( level ), 1 ), 10 );
     }
@@ -610,7 +610,7 @@ namespace
         return text;
     }
 
-    [[maybe_unused]] const char * heroChronicleEpithet( const HeroChronicle & chronicle )
+    const char * heroChronicleEpithet( const HeroChronicle & chronicle )
     {
         if ( chronicle.battleVictories == 0 && chronicle.castleCaptures == 0 && chronicle.eliteVictories == 0 ) {
             return "Unwritten";
@@ -631,10 +631,87 @@ namespace
         return "Veteran";
     }
 
-    [[maybe_unused]] std::string heroChronicleSummary( const HeroChronicle & chronicle )
+    std::string heroChronicleSummary( const HeroChronicle & chronicle )
     {
-        return std::string( heroChronicleEpithet( chronicle ) ) + " | " + formatNumber( chronicle.battleVictories ) + " battle wins, "
-               + formatNumber( chronicle.castleCaptures ) + " castles, " + formatNumber( chronicle.eliteVictories ) + " Elite wins";
+        return std::string( heroChronicleEpithet( chronicle ) ) + " (" + formatNumber( chronicle.battleVictories ) + " Victories, "
+               + formatNumber( chronicle.castleCaptures ) + " Castles, " + formatNumber( chronicle.eliteVictories ) + " Elites)";
+    }
+
+    uint64_t highestHeroRenown()
+    {
+        uint64_t highest = 0;
+        for ( const auto & [heroId, renown] : heroRenownLedger ) {
+            static_cast<void>( heroId );
+            highest = std::max( highest, renown );
+        }
+        return highest;
+    }
+
+    size_t highestHeroLegacyTierIndex()
+    {
+        return heroLegacyTierIndex( highestHeroRenown() );
+    }
+
+    bool hasHeroicHonor( const size_t tierIndex )
+    {
+        return highestHeroLegacyTierIndex() >= tierIndex;
+    }
+
+    const HeroChronicle * topHeroChronicle()
+    {
+        if ( heroRenownLedger.empty() ) {
+            return nullptr;
+        }
+        const auto topHero = std::max_element( heroRenownLedger.begin(), heroRenownLedger.end(), []( const auto & left, const auto & right ) {
+            return left.second < right.second;
+        } );
+        const auto it = heroChronicleLedger.find( topHero->first );
+        return it != heroChronicleLedger.end() ? &it->second : nullptr;
+    }
+
+    bool hasRivalBaneHonor()
+    {
+        const HeroChronicle * chronicle = topHeroChronicle();
+        return chronicle != nullptr && std::string( heroChronicleEpithet( *chronicle ) ) == "Rival-Bane";
+    }
+
+    bool hasCastlebreakerHonor()
+    {
+        const HeroChronicle * chronicle = topHeroChronicle();
+        return chronicle != nullptr && std::string( heroChronicleEpithet( *chronicle ) ) == "Castlebreaker";
+    }
+
+    bool hasVeteranHonor()
+    {
+        const HeroChronicle * chronicle = topHeroChronicle();
+        return chronicle != nullptr && chronicle->battleVictories >= 10;
+    }
+
+    std::vector<std::string> activeHeroicHonors()
+    {
+        std::vector<std::string> honors;
+        if ( hasHeroicHonor( 1 ) ) {
+            honors.push_back( "Proven Honor (+1 Morale)" );
+        }
+        if ( hasHeroicHonor( 2 ) ) {
+            honors.push_back( "Famous Honor (+1% Phys Dmg, +1% Spell Red)" );
+        }
+        if ( hasHeroicHonor( 3 ) ) {
+            honors.push_back( "Legendary Honor (+2% Crit, +2% Evasion)" );
+        }
+        if ( hasHeroicHonor( 4 ) ) {
+            honors.push_back( "Mythic Honor (+1 Atk/Def, +10% Battle Renown)" );
+        }
+        if ( hasRivalBaneHonor() ) {
+            honors.push_back( "Rival-Bane Honor (+5% vs Elite Rivals)" );
+        }
+        if ( hasCastlebreakerHonor() ) {
+            honors.push_back( "Castlebreaker Honor (+2.5% Siege Offense)" );
+        }
+        if ( hasVeteranHonor() ) {
+            honors.push_back( "Veteran Honor (+1.5% Sustain Healing)" );
+        }
+        return honors;
     }
 
     std::string formatCompactDoctrineNumber( long double value )
@@ -726,7 +803,7 @@ namespace
         case BRUTAL_CRITICALS:
             return 8.0L * std::log1p( static_cast<long double>( rank ) );
         case EVASION:
-            return std::min<long double>( 100.0L, 2.5L * std::log1p( static_cast<long double>( rank ) ) );
+            return std::min<long double>( 100.0L, 3.2L * std::log1p( static_cast<long double>( rank ) ) );
         case ARMOR_PIERCING:
         case ARCANE_PIERCING:
             // More than 100% resistance bypass has no useful interpretation.
@@ -842,7 +919,7 @@ namespace
         }
     }
 
-    [[maybe_unused]] const char * ascensionChannelDescription( const AscensionChannel channel )
+    const char * ascensionChannelDescription( const AscensionChannel channel )
     {
         switch ( channel ) {
         case AscensionChannel::ATTACK: return "diminishing +4 / +3 / +2 / +1 creature Attack across Ascension I-IV";
@@ -1023,37 +1100,366 @@ namespace
             cap, std::min( { effect( first, profile.ranks[first] ), effect( second, profile.ranks[second] ), effect( third, profile.ranks[third] ) } ) * scale );
     }
 
-    [[maybe_unused]] const char * doctrineResonanceHint( const size_t id )
+    enum class HarmonicTriadId : size_t
+    {
+        MARTIAL_FOUNDATION = 0,
+        SUSTAIN_TRIAD,
+        DEFENSIVE_BASTION,
+        CRITICAL_PRECISION,
+        ELEMENTAL_CONVERGENCE,
+        WARD_MATRIX,
+        FINISHER_TRIAD,
+        VANGUARD_TRIAD,
+        COUNT
+    };
+
+    struct HarmonicTriadInfo
+    {
+        const char * name;
+        const char * title;
+        const char * description;
+    };
+
+    constexpr std::array<HarmonicTriadInfo, static_cast<size_t>( HarmonicTriadId::COUNT )> harmonicTriads{ {
+        { "Martial Foundation", "Martial Harmony", "+1-5 Attack & Defense from balanced training" },
+        { "Sustain Triad", "Sustain Convergence", "+Life Steal, Kill-Heal, and Regeneration bonus" },
+        { "Defensive Bastion", "Phalanx Aegis", "+Up to 6% Physical Damage Reduction" },
+        { "Critical Precision", "Deadly Alignment", "+Up to 3.5% Crit Chance and +12% Crit Damage" },
+        { "Elemental Convergence", "Prismatic Conflux", "+Up to 8% Elemental Spell Power" },
+        { "Ward Matrix", "Aegis Matrix", "+Up to 6% Ward Spell Reduction" },
+        { "Finisher Triad", "Executioner's Verdict", "+Up to 8% Finisher Damage against wounded stacks" },
+        { "Vanguard Triad", "Vanguard Discipline", "+Up to 6.5% Damage and Resilience at full battle HP" }
+    } };
+
+    uint64_t martialFoundationTriadBonus( const Profile & profile )
+    {
+        if ( profile.ranks[ARMS_TRAINING] == 0 || profile.ranks[ARMOR_TRAINING] == 0 || profile.ranks[VETERAN_CORE] == 0 ) {
+            return 0;
+        }
+        const uint64_t minRank = std::min( { profile.ranks[ARMS_TRAINING], profile.ranks[ARMOR_TRAINING], profile.ranks[VETERAN_CORE] } );
+        return static_cast<uint64_t>( std::min<long double>( 5.0L, 1.0L + std::log2( static_cast<long double>( minRank ) ) ) );
+    }
+
+    long double sustainTriadResonance( const Profile & profile )
+    {
+        if ( profile.ranks[BLOOD_DRINKER] == 0 || profile.ranks[REAPER] == 0 || profile.ranks[REGENERATION] == 0 ) {
+            return 0.0L;
+        }
+        const long double minEff = std::min( { effect( BLOOD_DRINKER, profile.ranks[BLOOD_DRINKER] ),
+                                               effect( REAPER, profile.ranks[REAPER] ),
+                                               effect( REGENERATION, profile.ranks[REGENERATION] ) } );
+        return std::min<long double>( 4.0L, minEff * 0.20L );
+    }
+
+    long double defensiveBastionTriadResonance( const Profile & profile )
+    {
+        if ( profile.ranks[IRON_SKIN] == 0 || profile.ranks[ARROW_WARD] == 0 || profile.ranks[MELEE_GUARD] == 0 ) {
+            return 0.0L;
+        }
+        const long double minEff = std::min( { effect( IRON_SKIN, profile.ranks[IRON_SKIN] ),
+                                               effect( ARROW_WARD, profile.ranks[ARROW_WARD] ),
+                                               effect( MELEE_GUARD, profile.ranks[MELEE_GUARD] ) } );
+        return std::min<long double>( 6.0L, minEff * 0.22L );
+    }
+
+    long double criticalPrecisionTriadResonance( const Profile & profile )
+    {
+        if ( profile.ranks[CRITICAL_TRAINING] == 0 || profile.ranks[BRUTAL_CRITICALS] == 0 || profile.ranks[FORTUNE] == 0 ) {
+            return 0.0L;
+        }
+        const long double minEff = std::min( { effect( CRITICAL_TRAINING, profile.ranks[CRITICAL_TRAINING] ),
+                                               effect( BRUTAL_CRITICALS, profile.ranks[BRUTAL_CRITICALS] ),
+                                               effect( FORTUNE, profile.ranks[FORTUNE] ) * 3.0L } );
+        return std::min<long double>( 3.5L, minEff * 0.18L );
+    }
+
+    long double elementalConvergenceTriadResonance( const Profile & profile )
+    {
+        if ( profile.ranks[SORCERY] == 0 ) {
+            return 0.0L;
+        }
+        std::vector<long double> elementalEffects;
+        for ( const size_t id : { PYROMANCY, CRYOMANCY, STORMCRAFT, CATACLYSM } ) {
+            if ( profile.ranks[id] > 0 ) {
+                elementalEffects.push_back( effect( id, profile.ranks[id] ) );
+            }
+        }
+        if ( elementalEffects.size() < 2 ) {
+            return 0.0L;
+        }
+        std::sort( elementalEffects.rbegin(), elementalEffects.rend() );
+        const long double secondaryEff = elementalEffects[1];
+        const long double sorceryEff = effect( SORCERY, profile.ranks[SORCERY] );
+        return std::min<long double>( 8.0L, std::min( sorceryEff, secondaryEff ) * 0.22L );
+    }
+
+    long double wardMatrixTriadResonance( const Profile & profile )
+    {
+        if ( profile.ranks[SPELL_WARD] == 0 ) {
+            return 0.0L;
+        }
+        std::vector<long double> wardEffects;
+        for ( const size_t id : { FIRE_WARD, COLD_WARD, STORM_WARD, CATACLYSM_WARD } ) {
+            if ( profile.ranks[id] > 0 ) {
+                wardEffects.push_back( effect( id, profile.ranks[id] ) );
+            }
+        }
+        if ( wardEffects.size() < 2 ) {
+            return 0.0L;
+        }
+        std::sort( wardEffects.rbegin(), wardEffects.rend() );
+        const long double secondaryEff = wardEffects[1];
+        const long double wardEff = effect( SPELL_WARD, profile.ranks[SPELL_WARD] );
+        return std::min<long double>( 6.0L, std::min( wardEff, secondaryEff ) * 0.20L );
+    }
+
+    long double finisherTriadResonance( const Profile & profile )
+    {
+        if ( profile.ranks[EXECUTIONER] == 0 || profile.ranks[RUTHLESS] == 0 || profile.ranks[ARMOR_PIERCING] == 0 ) {
+            return 0.0L;
+        }
+        return std::min<long double>(
+            8.0L, std::min( { effect( EXECUTIONER, profile.ranks[EXECUTIONER] ),
+                              effect( RUTHLESS, profile.ranks[RUTHLESS] ),
+                              effect( ARMOR_PIERCING, profile.ranks[ARMOR_PIERCING] ) } ) * 0.25L );
+    }
+
+    long double vanguardTriadResonance( const Profile & profile )
+    {
+        return doctrineTripleResonance( profile, OPENING_BLOW, DISCIPLINE, UNYIELDING, 0.22L, 6.5L );
+    }
+
+    bool isTriadActive( const Profile & profile, const HarmonicTriadId triadId )
+    {
+        switch ( triadId ) {
+        case HarmonicTriadId::MARTIAL_FOUNDATION: return martialFoundationTriadBonus( profile ) > 0;
+        case HarmonicTriadId::SUSTAIN_TRIAD: return sustainTriadResonance( profile ) > 0.0L;
+        case HarmonicTriadId::DEFENSIVE_BASTION: return defensiveBastionTriadResonance( profile ) > 0.0L;
+        case HarmonicTriadId::CRITICAL_PRECISION: return criticalPrecisionTriadResonance( profile ) > 0.0L;
+        case HarmonicTriadId::ELEMENTAL_CONVERGENCE: return elementalConvergenceTriadResonance( profile ) > 0.0L;
+        case HarmonicTriadId::WARD_MATRIX: return wardMatrixTriadResonance( profile ) > 0.0L;
+        case HarmonicTriadId::FINISHER_TRIAD: return finisherTriadResonance( profile ) > 0.0L;
+        case HarmonicTriadId::VANGUARD_TRIAD: return vanguardTriadResonance( profile ) > 0.0L;
+        default: return false;
+        }
+    }
+
+    size_t activeTriadCount( const Profile & profile )
+    {
+        size_t count = 0;
+        for ( size_t i = 0; i < static_cast<size_t>( HarmonicTriadId::COUNT ); ++i ) {
+            if ( isTriadActive( profile, static_cast<HarmonicTriadId>( i ) ) ) {
+                ++count;
+            }
+        }
+        return count;
+    }
+
+    std::string doctrineTriadSummary( const Profile & profile, const size_t id )
     {
         switch ( id ) {
+        case ARMS_TRAINING:
+        case ARMOR_TRAINING:
+        case VETERAN_CORE: {
+            const size_t active = ( profile.ranks[ARMS_TRAINING] > 0 ? 1 : 0 ) + ( profile.ranks[ARMOR_TRAINING] > 0 ? 1 : 0 )
+                                  + ( profile.ranks[VETERAN_CORE] > 0 ? 1 : 0 );
+            return "Triad: Martial (" + std::to_string( active ) + "/3" + ( active == 3 ? " Active)" : ")" );
+        }
+        case BLOOD_DRINKER:
+        case REAPER:
+        case REGENERATION: {
+            const size_t active = ( profile.ranks[BLOOD_DRINKER] > 0 ? 1 : 0 ) + ( profile.ranks[REAPER] > 0 ? 1 : 0 )
+                                  + ( profile.ranks[REGENERATION] > 0 ? 1 : 0 );
+            return "Triad: Sustain (" + std::to_string( active ) + "/3" + ( active == 3 ? " Active)" : ")" );
+        }
+        case IRON_SKIN:
+        case ARROW_WARD:
+        case MELEE_GUARD: {
+            const size_t active = ( profile.ranks[IRON_SKIN] > 0 ? 1 : 0 ) + ( profile.ranks[ARROW_WARD] > 0 ? 1 : 0 )
+                                  + ( profile.ranks[MELEE_GUARD] > 0 ? 1 : 0 );
+            return "Triad: Bastion (" + std::to_string( active ) + "/3" + ( active == 3 ? " Active)" : ")" );
+        }
+        case CRITICAL_TRAINING:
+        case BRUTAL_CRITICALS:
+        case FORTUNE: {
+            const size_t active = ( profile.ranks[CRITICAL_TRAINING] > 0 ? 1 : 0 ) + ( profile.ranks[BRUTAL_CRITICALS] > 0 ? 1 : 0 )
+                                  + ( profile.ranks[FORTUNE] > 0 ? 1 : 0 );
+            return "Triad: Precision (" + std::to_string( active ) + "/3" + ( active == 3 ? " Active)" : ")" );
+        }
+        case SORCERY:
+        case PYROMANCY:
+        case CRYOMANCY:
+        case STORMCRAFT:
+        case CATACLYSM: {
+            size_t elemCount = 0;
+            for ( const size_t elemId : { PYROMANCY, CRYOMANCY, STORMCRAFT, CATACLYSM } ) {
+                if ( profile.ranks[elemId] > 0 ) ++elemCount;
+            }
+            const bool sorc = profile.ranks[SORCERY] > 0;
+            const size_t active = ( sorc ? 1 : 0 ) + std::min<size_t>( 2, elemCount );
+            return "Triad: Conflux (" + std::to_string( active ) + "/3" + ( active == 3 ? " Active)" : ")" );
+        }
+        case SPELL_WARD:
+        case FIRE_WARD:
+        case COLD_WARD:
+        case STORM_WARD:
+        case CATACLYSM_WARD: {
+            size_t wardCount = 0;
+            for ( const size_t wardId : { FIRE_WARD, COLD_WARD, STORM_WARD, CATACLYSM_WARD } ) {
+                if ( profile.ranks[wardId] > 0 ) ++wardCount;
+            }
+            const bool sw = profile.ranks[SPELL_WARD] > 0;
+            const size_t active = ( sw ? 1 : 0 ) + std::min<size_t>( 2, wardCount );
+            return "Triad: Ward Matrix (" + std::to_string( active ) + "/3" + ( active == 3 ? " Active)" : ")" );
+        }
         case EXECUTIONER:
         case RUTHLESS:
-            return "Finisher - both doctrines add a bonus against targets below half health.";
+        case ARMOR_PIERCING: {
+            const size_t active = ( profile.ranks[EXECUTIONER] > 0 ? 1 : 0 ) + ( profile.ranks[RUTHLESS] > 0 ? 1 : 0 )
+                                  + ( profile.ranks[ARMOR_PIERCING] > 0 ? 1 : 0 );
+            return "Triad: Finisher (" + std::to_string( active ) + "/3" + ( active == 3 ? " Active)" : ")" );
+        }
+        case OPENING_BLOW:
+        case DISCIPLINE:
+        case UNYIELDING: {
+            const size_t active = ( profile.ranks[OPENING_BLOW] > 0 ? 1 : 0 ) + ( profile.ranks[DISCIPLINE] > 0 ? 1 : 0 )
+                                  + ( profile.ranks[UNYIELDING] > 0 ? 1 : 0 );
+            return "Triad: Vanguard (" + std::to_string( active ) + "/3" + ( active == 3 ? " Active)" : ")" );
+        }
+        default:
+            return {};
+        }
+    }
+
+    bool completesHarmonicTriad( const Profile & profile, const size_t id )
+    {
+        if ( id >= upgradeCount || profile.ranks[id] > 0 ) {
+            return false;
+        }
+        Profile test = profile;
+        test.ranks[id] = 1;
+        return activeTriadCount( test ) > activeTriadCount( profile );
+    }
+
+    const char * doctrineResonanceHint( const size_t id )
+    {
+        switch ( id ) {
+        case ARMS_TRAINING:
+        case ARMOR_TRAINING:
+        case VETERAN_CORE:
+            return "Veteran Core (Martial)";
+        case BLOOD_DRINKER:
+        case REAPER:
+        case REGENERATION:
+            return "Reaper / Regeneration (Sustain)";
+        case EXECUTIONER:
+        case RUTHLESS:
+            return "Ruthless (Finisher)";
         case GIANT_SLAYER:
         case BULWARK:
-            return "Underdog - the pair reinforces offense and defense while outnumbered.";
+            return "Bulwark (Underdog)";
         case FRENZY:
         case LAST_STAND:
-            return "Last Fury - the pair reinforces offense and defense below half health.";
+            return "Last Stand (Last Fury)";
         case OPENING_BLOW:
         case DISCIPLINE:
         case UNYIELDING:
-            return "Vanguard - the three-doctrine package rewards starting an exchange at full health.";
+            return "Discipline (Vanguard)";
+        case MARKSMAN:
+        case CLOSE_QUARTERS:
+            return "Close Quarters (Archery)";
         case SORCERY:
         case PYROMANCY:
         case CRYOMANCY:
         case STORMCRAFT:
         case CATACLYSM:
-            return "Spell Convergence - Sorcery plus an elemental discipline adds extra matching spell power.";
+            return "Sorcery (Spell Conflux)";
         case SPELL_WARD:
         case FIRE_WARD:
         case COLD_WARD:
         case STORM_WARD:
         case CATACLYSM_WARD:
-            return "Ward Matrix - Spell Ward plus an elemental ward adds extra matching spell resistance.";
+            return "Spell Ward (Aegis Matrix)";
+        case CRITICAL_TRAINING:
+        case BRUTAL_CRITICALS:
+        case FORTUNE:
+            return "Brutal Criticals / Fortune";
+        case ARMOR_PIERCING:
+            return "Marksman (Ranged Pierce)";
+        case ARCANE_PIERCING:
+            return "Sorcery (Arcane Breach)";
+        case EVASION:
+            return "Glancing Blow (Defense)";
+        case FEROCITY:
+        case BRAWLER:
+            return "Brawler (Melee Clashes)";
+        case IRON_SKIN:
+        case ARROW_WARD:
+        case MELEE_GUARD:
+            return "Melee / Arrow Ward (Phalanx)";
+        case LEADERSHIP:
+            return "Inspirational Command";
         default:
             return nullptr;
         }
+    }
+
+    struct RealmCrest
+    {
+        const char * name;
+        const char * req;
+        const char * boon;
+    };
+
+    constexpr std::array<RealmCrest, 5> realmCrests{
+        RealmCrest{ "Sovereign Signet", "Awaken two or more Triads", "+10% Adventure Movement, +500 Gold per week" },
+        RealmCrest{ "Vanguard Banner", "Hero reaches Famous rank", "+1 Combat Speed in Round 1" },
+        RealmCrest{ "Iron Bastion", "Eight or more Ascended Doctrines", "Absorbs 3% friendly damage" },
+        RealmCrest{ "Astral Conflux", "Awaken Conflux Triad", "+2 Mana per day, +10% on victory" },
+        RealmCrest{ "Rival-Bane Sigil", "Defeat an Elite Rival", "-1 Elite Morale, +15% Renown" }
+    };
+
+    bool hasRealmCrest( const Profile & profile, const size_t index )
+    {
+        switch ( index ) {
+        case 0: // Sovereign Signet
+            return activeTriadCount( profile ) >= 2;
+        case 1: // Vanguard Banner
+            return highestHeroLegacyTierIndex() >= 2;
+        case 2: { // Iron Bastion
+            size_t ascCount = 0;
+            for ( size_t id = 0; id < upgradeCount; ++id ) {
+                if ( ascensionTierForRank( profile.ranks[id] ) > 0 ) {
+                    ++ascCount;
+                }
+            }
+            return ascCount >= 8;
+        }
+        case 3: { // Astral Conflux
+            size_t elemCount = 0;
+            for ( const size_t elemId : { PYROMANCY, CRYOMANCY, STORMCRAFT, CATACLYSM } ) {
+                if ( profile.ranks[elemId] > 0 ) {
+                    ++elemCount;
+                }
+            }
+            return profile.ranks[SORCERY] > 0 && elemCount >= 2;
+        }
+        case 4: // Rival-Bane Sigil
+            return hasRivalBaneHonor();
+        default:
+            return false;
+        }
+    }
+
+    size_t activeRealmCrestsCount( const Profile & profile )
+    {
+        size_t count = 0;
+        for ( size_t i = 0; i < realmCrests.size(); ++i ) {
+            if ( hasRealmCrest( profile, i ) ) {
+                ++count;
+            }
+        }
+        return count;
     }
 
     size_t spellSpecializationId( const int spellId )
@@ -1218,8 +1624,6 @@ namespace
             return delta * 0.75L;
         case EXECUTIONER:
         case OPENING_BLOW:
-        case GIANT_SLAYER:
-        case OVERWHELM:
         case FRENZY:
         case DISCIPLINE:
         case LAST_STAND:
@@ -1227,9 +1631,12 @@ namespace
         case UNYIELDING:
         case RUTHLESS:
             return delta * 0.60L;
+        case GIANT_SLAYER:
+        case OVERWHELM:
+            return delta * 0.68L;
         case ARMOR_PIERCING:
         case ARCANE_PIERCING:
-            return delta * 0.50L;
+            return delta * 0.62L;
         case LEADERSHIP:
         case FORTUNE:
             return delta * 4.2L;
@@ -1250,54 +1657,20 @@ namespace
 
     long double autoBuyActivityFactor( const Profile & profile, const size_t id )
     {
-        switch ( id ) {
-        case BLOOD_DRINKER:
-        case REAPER:
-        case MARKSMAN:
-        case BRAWLER:
-        case EXECUTIONER:
-        case OPENING_BLOW:
-        case GIANT_SLAYER:
-        case OVERWHELM:
-        case FRENZY:
-        case DISCIPLINE:
-        case ARMOR_PIERCING:
-        case ARROW_WARD:
-        case MELEE_GUARD:
-        case LAST_STAND:
-        case BULWARK:
-        case PYROMANCY:
-        case CRYOMANCY:
-        case STORMCRAFT:
-        case CATACLYSM:
-        case FIRE_WARD:
-        case COLD_WARD:
-        case STORM_WARD:
-        case CATACLYSM_WARD:
-        case LEADERSHIP:
-        case FORTUNE:
-        case REGENERATION:
-        case CRITICAL_TRAINING:
-        case BRUTAL_CRITICALS:
-        case EVASION:
-        case ARCANE_PIERCING:
-        case CLOSE_QUARTERS:
-        case UNYIELDING:
-        case RUTHLESS: {
-            // Battle-trigger history is intentionally only a modest tiebreaker. It helps the
-            // Steward deepen doctrines that are actually paying off for this profile without
-            // allowing a heavily used niche perk to overwhelm raw mechanical value per point.
-            const long double familiarity = std::log1p( static_cast<long double>( profile.useCounts[id] ) ) / 12.0L;
-            const long double familiarityFactor = 1.0L + std::min( 0.35L, familiarity );
-            const long double breadthBonus = profile.ranks[id] == 0 ? 0.12L : 0.06L / ( 1.0L + std::log1p( static_cast<long double>( profile.ranks[id] ) ) );
-            return familiarityFactor * ( 1.0L + breadthBonus );
-        }
-        default:
+        if ( id >= upgradeCount ) {
             return 1.0L;
         }
+
+        // Battle-trigger history is intentionally only a modest tiebreaker. It helps the
+        // Steward deepen doctrines that are actually paying off for this profile without
+        // allowing a heavily used niche perk to overwhelm raw mechanical value per point.
+        const long double familiarity = std::log1p( static_cast<long double>( profile.useCounts[id] ) ) / 12.0L;
+        const long double familiarityFactor = 1.0L + std::min( 0.35L, familiarity );
+        const long double breadthBonus = profile.ranks[id] == 0 ? 0.12L : 0.06L / ( 1.0L + std::log1p( static_cast<long double>( profile.ranks[id] ) ) );
+        return familiarityFactor * ( 1.0L + breadthBonus );
     }
 
-    long double autoBuySynergyFactor( const Profile & profile, const size_t id )
+    long double baseAutoBuySynergyFactor( const Profile & profile, const size_t id )
     {
         switch ( id ) {
         case BLOOD_DRINKER:
@@ -1385,9 +1758,16 @@ namespace
             return 1.0L + std::min<long double>( 0.22L, effect( BRUTAL_CRITICALS, profile.ranks[BRUTAL_CRITICALS] ) / 250.0L );
         case BRUTAL_CRITICALS:
             return 1.0L + std::min<long double>( 0.22L, effect( CRITICAL_TRAINING, profile.ranks[CRITICAL_TRAINING] ) / 50.0L );
+        case EVASION:
+            return 1.0L + std::min<long double>( 0.15L, effect( IRON_SKIN, profile.ranks[IRON_SKIN] ) / 150.0L );
         default:
             return 1.0L;
         }
+    }
+
+    long double autoBuySynergyFactor( const Profile & profile, const size_t id )
+    {
+        return baseAutoBuySynergyFactor( profile, id ) + ( completesHarmonicTriad( profile, id ) ? 0.25L : 0.0L );
     }
 
     long double autoBuyPlaystyleFactor( const Profile & profile, const size_t id )
@@ -1451,6 +1831,13 @@ namespace
         };
 
         switch ( id ) {
+        case ARMS_TRAINING:
+        case ARMOR_TRAINING:
+        case VETERAN_CORE:
+            addCandidate( ARMS_TRAINING );
+            addCandidate( ARMOR_TRAINING );
+            addCandidate( VETERAN_CORE );
+            break;
         case BLOOD_DRINKER:
         case REAPER:
         case REGENERATION:
@@ -1465,8 +1852,10 @@ namespace
             break;
         case EXECUTIONER:
         case RUTHLESS:
+        case ARMOR_PIERCING:
             addCandidate( EXECUTIONER );
             addCandidate( RUTHLESS );
+            addCandidate( ARMOR_PIERCING );
             break;
         case GIANT_SLAYER:
         case BULWARK:
@@ -1520,11 +1909,18 @@ namespace
         case FORTUNE:
             addCandidate( LEADERSHIP );
             addCandidate( FORTUNE );
+            addCandidate( CRITICAL_TRAINING );
             break;
         case CRITICAL_TRAINING:
         case BRUTAL_CRITICALS:
             addCandidate( CRITICAL_TRAINING );
             addCandidate( BRUTAL_CRITICALS );
+            addCandidate( FORTUNE );
+            break;
+        case EVASION:
+            addCandidate( IRON_SKIN );
+            addCandidate( MELEE_GUARD );
+            addCandidate( ARROW_WARD );
             break;
         default:
             break;
@@ -1946,7 +2342,11 @@ namespace
             const std::string heroName = hero != nullptr ? hero->GetName() : "Hero #" + std::to_string( heroId );
 
             std::string message = heroName + " has earned the " + std::string( heroLegacyTiers[currentTier].title ) + " legacy title.";
-            message += "\n\nHero Renown: " + formatNumber( total );
+            message += "\nHero Renown: " + formatNumber( total );
+            const auto chronicleIt = heroChronicleLedger.find( heroId );
+            if ( chronicleIt != heroChronicleLedger.end() ) {
+                message += "\nChronicle: " + heroChronicleSummary( chronicleIt->second );
+            }
             if ( currentTier + 1 < heroLegacyTiers.size() ) {
                 const HeroLegacyTier & nextTier = heroLegacyTiers[currentTier + 1];
                 message += "\nNext title: " + std::string( nextTier.title ) + " at " + formatNumber( nextTier.threshold ) + " Renown";
@@ -2327,11 +2727,11 @@ namespace
         case MARKSMAN: return "+" + formatEffect( value ) + " ranged damage";
         case BRAWLER: return "+" + formatEffect( value ) + " melee damage";
         case EXECUTIONER: return "+" + formatEffect( value ) + " vs wounded";
-        case OPENING_BLOW: return "+" + formatEffect( value ) + " at full HP";
+        case OPENING_BLOW: return "+" + formatEffect( value ) + " vs full HP target";
         case GIANT_SLAYER: return "+" + formatEffect( value ) + " while outnumbered";
         case OVERWHELM: return "+" + formatEffect( value ) + " while outnumbering";
         case FRENZY: return "+" + formatEffect( value ) + " below half HP";
-        case DISCIPLINE: return "+" + formatEffect( value ) + " at full HP";
+        case DISCIPLINE: return "+" + formatEffect( value ) + " while at full HP";
         case ARMOR_PIERCING: return formatEffect( value ) + " physical resistance ignored";
         case IRON_SKIN: return formatEffect( value ) + " physical reduction";
         case ARROW_WARD: return formatEffect( value ) + " ranged reduction";
@@ -2351,13 +2751,13 @@ namespace
         case LEADERSHIP: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Morale";
         case FORTUNE: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Luck";
         case REGENERATION: return formatEffect( value ) + " turn regeneration";
-        case CRITICAL_TRAINING: return formatEffect( value ) + " crit chance";
-        case BRUTAL_CRITICALS: return "+" + formatEffect( 50.0L + value ) + " crit damage";
-        case EVASION: return formatEffect( value ) + " evade chance";
+        case CRITICAL_TRAINING: return formatEffect( value ) + " critical strike chance";
+        case BRUTAL_CRITICALS: return "+" + formatEffect( 50.0L + value ) + " critical strike damage";
+        case EVASION: return formatEffect( value ) + " evasion chance";
         case ARCANE_PIERCING: return formatEffect( value ) + " spell resistance ignored";
         case CLOSE_QUARTERS: return formatEffect( value ) + " melee penalty recovered";
-        case UNYIELDING: return formatEffect( value ) + " reduction at full HP";
-        case RUTHLESS: return "+" + formatEffect( value ) + " vs targets below half HP";
+        case UNYIELDING: return formatEffect( value ) + " damage reduction at full Health";
+        case RUTHLESS: return "+" + formatEffect( value ) + " against targets below half Health";
         default: return formatEffect( value );
         }
     }
@@ -2400,36 +2800,46 @@ namespace
         const uint8_t ascensionTier = ascensionTierForRank( rank );
         const bool prerequisiteMet = id != BRUTAL_CRITICALS || playerProfile.ranks[CRITICAL_TRAINING] > 0;
 
-        std::string message = upgradeDetails[id];
-        message += "\n\nCurrent: Rank " + formatNumber( rank ) + " (" + shortEffectSummary( id, rank ) + ")";
+        std::string message = upgrades[id].description;
+        message += "\nCurrent: Rank " + formatNumber( rank ) + " (" + shortEffectSummary( id, rank ) + ")";
         if ( ascensionTier > 0 ) {
-            message += "\nAscension: " + std::string( ascensionTierLabel( ascensionTier ) ) + " - " + ascensionNames[id];
-        }
-        const uint64_t nextMilestone = nextAscensionRank( rank );
-        if ( nextMilestone > 0 ) {
-            message += "\nNext Ascension: Rank " + formatNumber( nextMilestone );
-        }
-        else {
-            message += "\nAscension: Mastered";
+            message += " [" + std::string( ascensionTierLabel( ascensionTier ) ) + "]";
         }
 
         if ( !canAdvance ) {
-            message += "\nNext: MAX rank reached";
+            message += "\nNext: Maximum rank reached";
         }
         else if ( !prerequisiteMet ) {
-            message += "\nNext: LOCKED (requires Critical Training)";
+            message += "\nNext: Locked (requires Critical Training)";
         }
         else {
             const uint64_t price = cost( id, rank );
-            message += "\nNext: Rank " + formatNumber( rank + 1 ) + " (" + shortEffectSummary( id, rank + 1 ) + ")";
-            const uint8_t nextAscensionTier = ascensionTierForRank( rank + 1 );
-            if ( nextAscensionTier > ascensionTier ) {
-                message += "\nUnlocks: " + std::string( ascensionTierLabel( nextAscensionTier ) ) + " - " + ascensionNames[id];
-            }
-            message += "\nCost: " + formatNumber( price ) + " points ("
+            message += "\nNext: Rank " + formatNumber( rank + 1 ) + " (" + shortEffectSummary( id, rank + 1 ) + ") | "
+                       + formatNumber( price ) + " points ("
                        + ( playerProfile.points >= price ? "Ready" : "Need " + formatNumber( price - playerProfile.points ) ) + ")";
         }
-        message += "\nAvailable points: " + formatNumber( playerProfile.points );
+
+        const uint64_t nextMilestone = nextAscensionRank( rank );
+        if ( nextMilestone > 0 ) {
+            message += "\nAscension: " + std::string( ascensionNames[id] ) + " at Rank " + formatNumber( nextMilestone );
+        }
+        else {
+            message += "\nAscension: Mastered (Tier IV)";
+        }
+
+        const char * resonance = doctrineResonanceHint( id );
+        const std::string triadSummary = doctrineTriadSummary( playerProfile, id );
+        if ( !triadSummary.empty() && resonance != nullptr ) {
+            message += "\n" + triadSummary + " | " + std::string( resonance );
+        }
+        else if ( !triadSummary.empty() ) {
+            message += "\n" + triadSummary;
+        }
+        else if ( resonance != nullptr ) {
+            message += "\nSynergy: " + std::string( resonance );
+        }
+
+        message += "\nAvailable: " + formatNumber( playerProfile.points ) + " guild points";
 
         fheroes2::showStandardTextMessage( upgrades[id].name, std::move( message ), buttons );
     }
@@ -2442,21 +2852,40 @@ namespace
 
         constexpr std::array<const char *, 8> tabDescriptions{
             "Martial training: Attack, Defense, and life sustain.",
-            "Physical offense: Creature strikes and damage opportunism.",
-            "Battle tactics: Positional advantages and armor penetration.",
+            "Physical offense: Creature strikes and opportunism.",
+            "Battle tactics: Positional advantages and piercing.",
             "Defensive guard: Damage reduction, wards, and bulwarks.",
-            "Arcane spellcasting: Hero spell damage and elemental magic.",
+            "Arcane spellcasting: Hero spell damage and magic.",
             "Arcane warding: Hero and elemental spell resistance.",
-            "Command: Morale, Luck, regeneration, and critical strikes.",
-            "Combat mastery: Evasion, spell piercing, and tactical edge."
+            "Command: Morale, Luck, regeneration, and criticals.",
+            "Combat mastery: Evasion, spell piercing, and edge."
         };
 
+        uint64_t hallInvestment = 0;
+        for ( size_t offset = 0; offset < upgradesPerTab; ++offset ) {
+            const size_t id = tabIndex * upgradesPerTab + offset;
+            hallInvestment = saturatedAdd( hallInvestment, rankInvestment( id, playerProfile.ranks[id] ) );
+        }
+
         std::string message = tabDescriptions[tabIndex];
-        message += "\n\nDoctrines:";
+        message += "\nInvested: " + formatNumber( hallInvestment ) + " points";
         for ( size_t offset = 0; offset < upgradesPerTab; ++offset ) {
             const size_t id = tabIndex * upgradesPerTab + offset;
             const uint64_t rank = playerProfile.ranks[id];
-            message += "\n- " + std::string( upgrades[id].name ) + " (Rank " + formatNumber( rank ) + "): " + shortEffectSummary( id, rank );
+            const uint8_t ascensionTier = ascensionTierForRank( rank );
+            message += "\n" + std::string( upgrades[id].name ) + " Rank " + formatNumber( rank ) + ": " + shortEffectSummary( id, rank );
+            if ( ascensionTier > 0 ) {
+                message += " [" + std::string( ascensionTierLabel( ascensionTier ) ) + "]";
+            }
+            if ( !doctrineCanAdvance( id, rank ) ) {
+                message += " [Maximum]";
+            }
+            else if ( id == BRUTAL_CRITICALS && playerProfile.ranks[CRITICAL_TRAINING] == 0 ) {
+                message += " [Locked]";
+            }
+            else {
+                message += " (" + formatNumber( cost( id, rank ) ) + " points)";
+            }
         }
         fheroes2::showStandardTextMessage( tabNames[tabIndex], std::move( message ), buttons );
     }
@@ -2464,19 +2893,15 @@ namespace
     void showRoyalGuildHelp( const int buttons = Dialog::ZERO )
     {
         std::string message = "Keyboard Controls:\n";
-        message += "1-8: Doctrine halls\n";
-        message += "Up/Down: Select doctrine\n";
-        message += "B / Enter / Space: Buy doctrine\n";
-        message += "I: Inspect doctrine\n";
-        message += "O: Guild Overview\n";
-        message += "K: Build Analytics\n";
-        message += "V: Elite Rival Intel\n";
-        message += "S / A: Steward Auto-Buy\n";
-        message += "R: Respec doctrines\n";
-        message += "Esc / F9: Close menu\n\n";
-        message += "Mouse:\n";
-        message += "Click BUY to purchase.\n";
-        message += "Right-click any item for quick info.";
+        message += "1 to 8 or Tab: Switch Doctrine Halls\n";
+        message += "Up or Down Arrow: Select Doctrine\n";
+        message += "B, Enter, or Space: Purchase Selected Doctrine\n";
+        message += "I: Doctrine Details | O: Overview | C: Realm Crests\n";
+        message += "K: Build Analytics | L: Hall of Legends | V: Rival Intel\n";
+        message += "S or A: Toggle Steward | R: Respec Points | Escape: Exit\n\n";
+        message += "Mouse Controls:\n";
+        message += "Left-Click: Purchase, Select, or Toggle Steward\n";
+        message += "Right-Click: Quick Inspect without closing dialog";
 
         fheroes2::showStandardTextMessage( "Royal Guild Help", std::move( message ), buttons );
     }
@@ -2484,121 +2909,60 @@ namespace
     void showBuildAnalytics( const int buttons = Dialog::ZERO )
     {
         const uint64_t totalInvested = totalSpentPoints( playerProfile );
-        const uint64_t earnedPoints = saturatedMultiply( playerProfile.level - 1, pointsPerLevel );
+        const uint64_t prestigeRank = prestigeRankForLevel( playerProfile.level );
 
-        std::string message = "Earned Points: " + formatNumber( earnedPoints );
-        message += "\nInvested Points: " + formatNumber( totalInvested );
-        message += "\nAvailable Points: " + formatNumber( playerProfile.points );
+        std::string message = "Level " + formatNumber( playerProfile.level );
+        if ( prestigeRank > 0 ) {
+            const int prestigeBonusPct = static_cast<int>( std::round( ( prestigeBattleRenownMultiplier( playerProfile.level ) - 1.0L ) * 100.0L ) );
+            message += " (P" + formatNumber( prestigeRank ) + " +" + std::to_string( prestigeBonusPct ) + "%)";
+        }
+        message += " | Pts: " + formatNumber( playerProfile.points ) + " av / " + formatNumber( totalInvested ) + " inv";
+        message += "\nRenown: Bat " + formatNumber( playerProfile.battleExperience )
+                   + " | Adv " + formatNumber( playerProfile.adventureExperience )
+                   + " | Hero " + formatNumber( playerProfile.heroExperience );
 
         std::array<uint64_t, tabNames.size()> investedByTab{};
         std::array<uint64_t, tabNames.size()> triggersByTab{};
         uint64_t totalTriggers = 0;
+        size_t activeDoctrines = 0;
+        size_t ascendedDoctrines = 0;
         for ( size_t id = 0; id < upgradeCount; ++id ) {
             investedByTab[id / upgradesPerTab] = saturatedAdd( investedByTab[id / upgradesPerTab], rankInvestment( id, playerProfile.ranks[id] ) );
             triggersByTab[id / upgradesPerTab] = saturatedAdd( triggersByTab[id / upgradesPerTab], playerProfile.useCounts[id] );
             totalTriggers = saturatedAdd( totalTriggers, playerProfile.useCounts[id] );
-        }
-
-        const auto investmentFocus = std::max_element( investedByTab.begin(), investedByTab.end() );
-        if ( investmentFocus != investedByTab.end() && *investmentFocus > 0 ) {
-            message += "\nBuild Focus: "
-                       + std::string( tabNames[static_cast<size_t>( std::distance( investedByTab.begin(), investmentFocus ) )] );
-        }
-        const auto activityFocus = std::max_element( triggersByTab.begin(), triggersByTab.end() );
-        if ( activityFocus != triggersByTab.end() && *activityFocus > 0 ) {
-            message += "\nCombat Focus: "
-                       + std::string( tabNames[static_cast<size_t>( std::distance( triggersByTab.begin(), activityFocus ) )] );
-        }
-        message += "\nTotal Battle Triggers: " + formatNumber( totalTriggers );
-
-        size_t ascendedDoctrines = 0;
-        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            if ( playerProfile.ranks[id] > 0 ) {
+                ++activeDoctrines;
+            }
             if ( ascensionTierForRank( playerProfile.ranks[id] ) > 0 ) {
                 ++ascendedDoctrines;
             }
         }
-        message += "\nAscended Doctrines: " + formatNumber( ascendedDoctrines ) + " / " + formatNumber( upgradeCount );
+
+        message += "\nDoctrines: " + formatNumber( activeDoctrines ) + "/" + formatNumber( upgradeCount )
+                   + " (" + formatNumber( ascendedDoctrines ) + " asc) | Triads: " + formatNumber( activeTriadCount( playerProfile ) ) + "/6";
+        message += " | Crests: " + formatNumber( activeRealmCrestsCount( playerProfile ) ) + "/5";
+
+        const auto investmentFocus = std::max_element( investedByTab.begin(), investedByTab.end() );
+        const auto activityFocus = std::max_element( triggersByTab.begin(), triggersByTab.end() );
+        std::string focusSummary;
+        if ( investmentFocus != investedByTab.end() && *investmentFocus > 0 ) {
+            focusSummary += "Build: " + std::string( tabNames[static_cast<size_t>( std::distance( investedByTab.begin(), investmentFocus ) )] );
+        }
+        if ( activityFocus != triggersByTab.end() && *activityFocus > 0 ) {
+            if ( !focusSummary.empty() ) {
+                focusSummary += " | ";
+            }
+            focusSummary += "Combat: " + std::string( tabNames[static_cast<size_t>( std::distance( triggersByTab.begin(), activityFocus ) )] );
+        }
+        if ( !focusSummary.empty() ) {
+            message += "\n" + focusSummary;
+        }
 
         const StewardGoal stewardGoal = findStewardGoal( playerProfile );
+        message += "\nSteward: ";
+        message += playerProfile.autoBuy ? "ON" : "OFF";
         if ( stewardGoal.id < upgradeCount ) {
-            message += "\nSteward Goal: " + std::string( upgrades[stewardGoal.id].name ) + " -> R" + formatNumber( stewardGoal.targetRank );
-        }
-
-        message += "\nProfile Status: ";
-        message += isCurrentProfileStateValid( playerProfile ) ? "Valid" : "Protected";
-
-        fheroes2::showStandardTextMessage( "Build Analytics", std::move( message ), buttons );
-    }
-
-    void showRivalIntel( const int buttons = Dialog::ZERO )
-    {
-        std::array<size_t, rivalArchetypeNames.size()> archetypeCounts{};
-        for ( const auto & [color, archetype] : eliteRivalArchetypes ) {
-            static_cast<void>( color );
-            const size_t index = static_cast<size_t>( archetype );
-            if ( index > 0 && index <= archetypeCounts.size() ) {
-                ++archetypeCounts[index - 1];
-            }
-        }
-
-        std::string message = "Encounter Chance: " + std::to_string( eliteRivalChanceForLevel( playerProfile.level ) ) + "%";
-        message += "\nElite Rivals This Map: " + formatNumber( eliteEnemyColors.size() );
-        message += "\nMax Focus Halls: " + formatNumber( eliteRivalFocusHallLimit( playerProfile.level ) );
-        message += "\nMutations per Elite: " + formatNumber( eliteRivalMutationCount( playerProfile.level ) );
-
-        std::string archetypes;
-        for ( size_t index = 0; index < archetypeCounts.size(); ++index ) {
-            if ( archetypeCounts[index] > 0 ) {
-                if ( !archetypes.empty() ) {
-                    archetypes += ", ";
-                }
-                archetypes += std::string( rivalArchetypeNames[index] ) + " (" + formatNumber( archetypeCounts[index] ) + ")";
-            }
-        }
-        message += "\nArchetypes: " + ( archetypes.empty() ? "None active" : archetypes );
-
-        if ( !eliteRivalMutations.empty() ) {
-            message += "\nMutations: Active";
-        }
-
-        fheroes2::showStandardTextMessage( "Elite Rival Intel", std::move( message ), buttons );
-    }
-
-    void showKingdomOverview( const int buttons = Dialog::ZERO )
-    {
-        const uint64_t remainingXP = xpToNextLevel( playerProfile.level ) > playerProfile.progress
-                                         ? xpToNextLevel( playerProfile.level ) - playerProfile.progress
-                                         : 0;
-        const uint64_t totalInvested = totalSpentPoints( playerProfile );
-        const uint64_t nextLevelCost = xpToNextLevel( playerProfile.level );
-
-        std::string message = "Kingdom Level: " + formatNumber( playerProfile.level );
-        const uint64_t prestigeRank = prestigeRankForLevel( playerProfile.level );
-        if ( prestigeRank > 0 ) {
-            message += " (Prestige " + formatNumber( prestigeRank ) + ")";
-        }
-        message += "\nAvailable Points: " + formatNumber( playerProfile.points );
-        message += "\nInvested Points: " + formatNumber( totalInvested );
-        message += "\nRenown XP: " + formatNumber( playerProfile.progress ) + " / " + formatNumber( nextLevelCost );
-        message += " (" + formatNumber( remainingXP ) + " to next)";
-        message += "\nLifetime Renown: " + formatNumber( playerProfile.experience );
-
-        size_t activeDoctrines = 0;
-        for ( const uint64_t rank : playerProfile.ranks ) {
-            if ( rank > 0 ) {
-                ++activeDoctrines;
-            }
-        }
-        message += "\nActive Doctrines: " + formatNumber( activeDoctrines ) + " / " + formatNumber( upgradeCount );
-
-        std::array<uint64_t, tabNames.size()> investedByTab{};
-        for ( size_t id = 0; id < upgradeCount; ++id ) {
-            investedByTab[id / upgradesPerTab] = saturatedAdd( investedByTab[id / upgradesPerTab], rankInvestment( id, playerProfile.ranks[id] ) );
-        }
-        const auto focusIt = std::max_element( investedByTab.begin(), investedByTab.end() );
-        if ( focusIt != investedByTab.end() && *focusIt > 0 ) {
-            const size_t focusTab = static_cast<size_t>( std::distance( investedByTab.begin(), focusIt ) );
-            message += "\nBuild Focus: " + std::string( tabNames[focusTab] );
+            message += " -> " + std::string( upgrades[stewardGoal.id].name ) + " R" + formatNumber( stewardGoal.targetRank );
         }
 
         if ( !heroRenownLedger.empty() ) {
@@ -2607,13 +2971,199 @@ namespace
             } );
             const Heroes * hero = world.GetHeroes( topHero->first );
             const std::string heroName = hero != nullptr ? hero->GetName() : "Hero #" + std::to_string( topHero->first );
-            message += "\nTop Hero: " + heroName + " (" + heroLegacyProgressText( topHero->second ) + ")";
+            message += "\nChampion: " + heroName + " (" + heroLegacyProgressText( topHero->second ) + ")";
         }
 
-        message += "\nSteward Auto-Buyer: ";
-        message += playerProfile.autoBuy ? "Active (ON)" : "Paused (OFF)";
+        const auto honors = activeHeroicHonors();
+        message += " | Honors: " + formatNumber( honors.size() ) + "/7";
+
+        fheroes2::showStandardTextMessage( "Build Analytics", std::move( message ), buttons );
+    }
+
+    void showRivalIntel( const int buttons = Dialog::ZERO )
+    {
+        std::string message = "Encounter: " + std::to_string( eliteRivalChanceForLevel( playerProfile.level ) ) + "%";
+        message += " | Halls: " + formatNumber( eliteRivalFocusHallLimit( playerProfile.level ) );
+        const long double prestigeEliteBonus
+            = std::min<long double>( 0.15L, static_cast<long double>( prestigeRankForLevel( playerProfile.level ) ) * 0.01L );
+        const int eliteVictoryBonusPct = static_cast<int>( std::round( ( 0.35L + prestigeEliteBonus ) * 100.0L ) );
+        message += " | Victory: +" + std::to_string( eliteVictoryBonusPct ) + "%";
+
+        if ( !eliteEnemyColors.empty() ) {
+            std::string rivalList;
+            for ( const PlayerColor color : eliteEnemyColors ) {
+                if ( !rivalList.empty() ) {
+                    rivalList += ", ";
+                }
+                rivalList += Color::String( color );
+                const auto archIt = eliteRivalArchetypes.find( color );
+                if ( archIt != eliteRivalArchetypes.end() && archIt->second != RivalArchetype::NONE ) {
+                    rivalList += " (" + std::string( rivalArchetypeNames[static_cast<size_t>( archIt->second ) - 1] ) + ")";
+                }
+            }
+            message += "\nRivals: " + rivalList;
+        }
+        else {
+            message += "\nRivals: None active";
+        }
+
+        if ( !eliteRivalMutations.empty() ) {
+            std::set<EliteMutation> uniqueMutations;
+            for ( const auto & [color, mutations] : eliteRivalMutations ) {
+                static_cast<void>( color );
+                for ( const EliteMutation mutation : mutations ) {
+                    uniqueMutations.insert( mutation );
+                }
+            }
+            if ( !uniqueMutations.empty() ) {
+                std::string mutationNames;
+                for ( const EliteMutation mutation : uniqueMutations ) {
+                    if ( !mutationNames.empty() ) {
+                        mutationNames += ", ";
+                    }
+                    mutationNames += eliteMutationName( mutation );
+                }
+                message += "\nMutations (" + std::to_string( uniqueMutations.size() ) + "): " + mutationNames;
+            }
+        }
+        message += "\nBonus: +5% Renown per active mutation.";
+
+        fheroes2::showStandardTextMessage( "Elite Rival Intel", std::move( message ), buttons );
+    }
+
+    void showHallOfLegends( const int buttons = Dialog::ZERO )
+    {
+        const uint64_t topRenown = highestHeroRenown();
+        const size_t topTier = highestHeroLegacyTierIndex();
+        std::string message = "Honors of the Realm | Top: " + std::string( heroLegacyTiers[topTier].title ) + " (" + formatNumber( topRenown ) + ")\n";
+
+        if ( !heroRenownLedger.empty() ) {
+            const auto topHero = std::max_element( heroRenownLedger.begin(), heroRenownLedger.end(), []( const auto & left, const auto & right ) {
+                return left.second < right.second;
+            } );
+            const Heroes * hero = world.GetHeroes( topHero->first );
+            const std::string heroName = hero != nullptr ? hero->GetName() : "Hero #" + std::to_string( topHero->first );
+            message += "Champion: " + heroName;
+            const auto chronicleIt = heroChronicleLedger.find( topHero->first );
+            if ( chronicleIt != heroChronicleLedger.end() ) {
+                message += " (" + heroChronicleSummary( chronicleIt->second ) + ")";
+            }
+            message += "\n";
+        }
+
+        const auto honors = activeHeroicHonors();
+        message += "Active Honors (" + formatNumber( honors.size() ) + "/7):\n";
+        message += std::string( hasHeroicHonor( 1 ) ? "[*] Proven (+1 Mor)  " : "[-] Proven (1k)  " )
+                   + ( hasHeroicHonor( 2 ) ? "[*] Famous (+1% Dmg)\n" : "[-] Famous (5k)\n" );
+        message += std::string( hasHeroicHonor( 3 ) ? "[*] Legend (+2% Crit) " : "[-] Legend (25k) " )
+                   + ( hasHeroicHonor( 4 ) ? "[*] Mythic (+1 All)\n" : "[-] Mythic (100k)\n" );
+        message += std::string( hasRivalBaneHonor() ? "[*] Rival-Bane (+5%)  " : "[-] Rival-Bane (Epithet)  " )
+                   + ( hasCastlebreakerHonor() ? "[*] Breaker (+2.5%)\n" : "[-] Breaker (Siege)\n" );
+        message += hasVeteranHonor() ? "[*] Veteran (+1.5% Sustain)" : "[-] Veteran (10 Wins)";
+
+        fheroes2::showStandardTextMessage( "Hall of Legends", std::move( message ), buttons );
+    }
+
+    void showKingdomOverview( const int buttons = Dialog::ZERO )
+    {
+        const uint64_t remainingXP = xpToNextLevel( playerProfile.level ) > playerProfile.progress
+                                          ? xpToNextLevel( playerProfile.level ) - playerProfile.progress
+                                          : 0;
+        const uint64_t totalInvested = totalSpentPoints( playerProfile );
+        const uint64_t nextLevelCost = xpToNextLevel( playerProfile.level );
+
+        std::string message = "Kingdom Level " + formatNumber( playerProfile.level );
+        const uint64_t prestigeRank = prestigeRankForLevel( playerProfile.level );
+        if ( prestigeRank > 0 ) {
+            const int prestigeBonusPct = static_cast<int>( std::round( ( prestigeBattleRenownMultiplier( playerProfile.level ) - 1.0L ) * 100.0L ) );
+            message += " (P" + formatNumber( prestigeRank ) + " +" + std::to_string( prestigeBonusPct ) + "%)";
+        }
+        message += "\nXP: " + formatNumber( playerProfile.progress ) + "/" + formatNumber( nextLevelCost )
+                   + " (" + formatNumber( remainingXP ) + " to next)";
+        message += "\nPoints: " + formatNumber( playerProfile.points ) + " avail / " + formatNumber( totalInvested ) + " invested";
+
+        size_t activeDoctrines = 0;
+        size_t ascendedDoctrines = 0;
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            if ( playerProfile.ranks[id] > 0 ) {
+                ++activeDoctrines;
+            }
+            if ( ascensionTierForRank( playerProfile.ranks[id] ) > 0 ) {
+                ++ascendedDoctrines;
+            }
+        }
+        message += "\nDoctrines: " + formatNumber( activeDoctrines ) + "/" + formatNumber( upgradeCount )
+                   + " (" + formatNumber( ascendedDoctrines ) + " asc) | Triads: " + formatNumber( activeTriadCount( playerProfile ) ) + "/6";
+        message += " | Crests: " + formatNumber( activeRealmCrestsCount( playerProfile ) ) + "/5";
+
+        std::array<uint64_t, tabNames.size()> investedByTab{};
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            investedByTab[id / upgradesPerTab] = saturatedAdd( investedByTab[id / upgradesPerTab], rankInvestment( id, playerProfile.ranks[id] ) );
+        }
+        const auto focusIt = std::max_element( investedByTab.begin(), investedByTab.end() );
+        if ( focusIt != investedByTab.end() && *focusIt > 0 ) {
+            const size_t focusTab = static_cast<size_t>( std::distance( investedByTab.begin(), focusIt ) );
+            message += "\nFocus: " + std::string( tabNames[focusTab] );
+        }
+
+        if ( !heroRenownLedger.empty() ) {
+            const auto topHero = std::max_element( heroRenownLedger.begin(), heroRenownLedger.end(), []( const auto & left, const auto & right ) {
+                return left.second < right.second;
+            } );
+            const Heroes * hero = world.GetHeroes( topHero->first );
+            const std::string heroName = hero != nullptr ? hero->GetName() : "Hero #" + std::to_string( topHero->first );
+            message += "\nChampion: " + heroName + " (" + heroLegacyProgressText( topHero->second ) + ")";
+        }
+
+        const auto honors = activeHeroicHonors();
+        if ( !honors.empty() ) {
+            message += " | Honors: " + formatNumber( honors.size() ) + "/7";
+        }
+        message += " | Crests: " + formatNumber( activeRealmCrestsCount( playerProfile ) ) + "/5";
+
+        if ( !eliteEnemyColors.empty() ) {
+            std::string rivalList;
+            for ( const PlayerColor color : eliteEnemyColors ) {
+                if ( !rivalList.empty() ) {
+                    rivalList += ", ";
+                }
+                rivalList += Color::String( color );
+            }
+            message += "\nElite Rivals: " + rivalList;
+        }
+
+        message += "\nSteward: ";
+        if ( playerProfile.autoBuy ) {
+            message += "ON";
+            const StewardGoal goal = findStewardGoal( playerProfile );
+            if ( goal.id < upgradeCount ) {
+                message += " -> " + std::string( upgrades[goal.id].name ) + " R" + formatNumber( goal.targetRank );
+            }
+        }
+        else {
+            message += "OFF";
+        }
 
         fheroes2::showStandardTextMessage( "Royal Guild Overview", std::move( message ), buttons );
+    }
+
+    void showRealmCrests( const int buttons = Dialog::ZERO )
+    {
+        const size_t activeCount = activeRealmCrestsCount( playerProfile );
+        std::string message = "Royal Reliquary (" + std::to_string( activeCount ) + "/5 Active)\n";
+        for ( size_t i = 0; i < realmCrests.size(); ++i ) {
+            const bool active = hasRealmCrest( playerProfile, i );
+            message += "\n";
+            message += active ? "[*] " : "[-] ";
+            message += realmCrests[i].name;
+            if ( active ) {
+                message += ": " + std::string( realmCrests[i].boon );
+            }
+            else {
+                message += " (Req: " + std::string( realmCrests[i].req ) + ")";
+            }
+        }
+        fheroes2::showStandardTextMessage( "Realm Crests", std::move( message ), buttons );
     }
 }
 
@@ -3005,6 +3555,12 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
         base *= 1.35L + prestigeEliteBonus;
         // Each active mutation increases the reward for defeating the more dangerous Elite.
         base *= 1.0L + static_cast<long double>( activeEliteMutationCount( opponent ) ) * 0.05L;
+        if ( hasRealmCrest( playerProfile, 4 ) ) {
+            base *= 1.15L;
+        }
+    }
+    if ( won && hasHeroicHonor( 4 ) ) {
+        base *= 1.10L;
     }
     const long double earned = base * challenge;
     const uint64_t reward = static_cast<uint64_t>( std::min( earned, static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) );
@@ -3021,7 +3577,11 @@ void fheroes2::RPG::awardBattle( const PlayerColor color, const PlayerColor oppo
 
 void fheroes2::RPG::awardTownCapture( const PlayerColor color, const int32_t heroId )
 {
-    static_cast<void>( addHeroRenown( color, heroId, heroCaptureRenown ) );
+    const uint64_t captureReward = hasCastlebreakerHonor() ? ( heroCaptureRenown * 3 / 2 ) : heroCaptureRenown;
+    if ( color == activePlayerColor ) {
+        static_cast<void>( addExperience( color, captureReward, ExperienceKind::ADVENTURE ) );
+    }
+    static_cast<void>( addHeroRenown( color, heroId, captureReward ) );
     recordHeroCastleCapture( color, heroId );
 }
 
@@ -3161,7 +3721,14 @@ uint64_t fheroes2::RPG::previewAdventureActionExperience( const PlayerColor colo
         return 0;
     }
 
-    const long double levelScale = 1.0L + std::log1p( static_cast<long double>( playerProfile.level - 1 ) ) / 5.0L;
+    long double honorScale = 1.0L;
+    if ( hasHeroicHonor( 1 ) ) honorScale += 0.05L;
+    if ( hasHeroicHonor( 2 ) ) honorScale += 0.05L;
+    if ( hasHeroicHonor( 3 ) ) honorScale += 0.05L;
+    if ( hasHeroicHonor( 4 ) ) honorScale += 0.10L;
+
+    const long double levelScale = ( 1.0L + std::log1p( static_cast<long double>( playerProfile.level - 1 ) ) / 5.0L )
+                                   * prestigeBattleRenownMultiplier( playerProfile.level ) * honorScale;
     return static_cast<uint64_t>( std::min<long double>( static_cast<long double>( std::numeric_limits<uint64_t>::max() ),
                                                          static_cast<long double>( base ) * levelScale ) );
 }
@@ -3191,8 +3758,10 @@ uint64_t fheroes2::RPG::creatureAttackDoctrineModifier( const PlayerColor color 
     const uint64_t base
         = saturatedAdd( diminishingFlatStatBonus( profile->ranks[ARMS_TRAINING] ), diminishingFlatStatBonus( profile->ranks[VETERAN_CORE] ) );
     const uint64_t ascension = static_cast<uint64_t>( ascensionChannelBonus( *profile, AscensionChannel::ATTACK ) );
+    const uint64_t triad = martialFoundationTriadBonus( *profile );
+    const uint64_t mythicBonus = ( color == activePlayerColor && hasHeroicHonor( 4 ) ) ? 1 : 0;
     const uint64_t mutation = hasEliteMutation( color, EliteMutation::WARFORGED ) ? 3 : 0;
-    return saturatedAdd( saturatedAdd( base, ascension ), mutation );
+    return saturatedAdd( saturatedAdd( saturatedAdd( saturatedAdd( base, ascension ), triad ), mutation ), mythicBonus );
 }
 
 uint64_t fheroes2::RPG::creatureDefenseDoctrineModifier( const PlayerColor color )
@@ -3205,8 +3774,10 @@ uint64_t fheroes2::RPG::creatureDefenseDoctrineModifier( const PlayerColor color
     const uint64_t base
         = saturatedAdd( diminishingFlatStatBonus( profile->ranks[ARMOR_TRAINING] ), diminishingFlatStatBonus( profile->ranks[VETERAN_CORE] ) );
     const uint64_t ascension = static_cast<uint64_t>( ascensionChannelBonus( *profile, AscensionChannel::DEFENSE ) );
+    const uint64_t triad = martialFoundationTriadBonus( *profile );
+    const uint64_t mythicBonus = ( color == activePlayerColor && hasHeroicHonor( 4 ) ) ? 1 : 0;
     const uint64_t mutation = hasEliteMutation( color, EliteMutation::WARFORGED ) ? 3 : 0;
-    return saturatedAdd( saturatedAdd( base, ascension ), mutation );
+    return saturatedAdd( saturatedAdd( saturatedAdd( saturatedAdd( base, ascension ), triad ), mutation ), mythicBonus );
 }
 
 uint32_t fheroes2::RPG::creatureAttackBonus( const PlayerColor color )
@@ -3224,7 +3795,16 @@ uint32_t fheroes2::RPG::creatureDefenseBonus( const PlayerColor color )
 int fheroes2::RPG::moraleBonus( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
-    return profile == nullptr ? 0 : static_cast<int>( effect( LEADERSHIP, profile->ranks[LEADERSHIP] ) );
+    if ( profile == nullptr ) {
+        return 0;
+    }
+    const int base = static_cast<int>( effect( LEADERSHIP, profile->ranks[LEADERSHIP] ) );
+    const int provenBonus = ( color == activePlayerColor && hasHeroicHonor( 1 ) ) ? 1 : 0;
+    int total = base + provenBonus;
+    if ( color != activePlayerColor && eliteEnemyColors.count( color ) > 0 && hasRealmCrest( playerProfile, 4 ) ) {
+        total -= 1;
+    }
+    return std::clamp( total, -3, 3 );
 }
 
 int fheroes2::RPG::luckBonus( const PlayerColor color )
@@ -3236,37 +3816,50 @@ int fheroes2::RPG::luckBonus( const PlayerColor color )
 double fheroes2::RPG::lifeStealPercent( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
+    const double veteranBonus = ( color == activePlayerColor && hasVeteranHonor() ) ? 1.5 : 0.0;
     return profile == nullptr
                ? 0.0
                : static_cast<double>( effect( BLOOD_DRINKER, profile->ranks[BLOOD_DRINKER] )
                                       + ascensionChannelBonus( *profile, AscensionChannel::LIFE_STEAL )
+                                      + sustainTriadResonance( *profile )
+                                      + veteranBonus
                                       + ( hasEliteMutation( color, EliteMutation::VAMPIRIC ) ? 8.0L : 0.0L ) );
 }
 
 double fheroes2::RPG::killHealPercent( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
-    return profile == nullptr ? 0.0 : static_cast<double>( effect( REAPER, profile->ranks[REAPER] ) );
+    const double veteranBonus = ( color == activePlayerColor && hasVeteranHonor() ) ? 1.5 : 0.0;
+    return profile == nullptr ? 0.0 : static_cast<double>( effect( REAPER, profile->ranks[REAPER] )
+                                                          + sustainTriadResonance( *profile ) * 1.25L
+                                                          + veteranBonus );
 }
 
 double fheroes2::RPG::regenerationPercent( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
+    const double veteranBonus = ( color == activePlayerColor && hasVeteranHonor() ) ? 1.5 : 0.0;
     return profile == nullptr
                ? 0.0
                : static_cast<double>( effect( REGENERATION, profile->ranks[REGENERATION] )
                                       + ascensionChannelBonus( *profile, AscensionChannel::REGENERATION )
+                                      + sustainTriadResonance( *profile ) * 0.75L
+                                      + veteranBonus
                                       + ( hasEliteMutation( color, EliteMutation::REGENERATING ) ? 5.0L : 0.0L ) );
 }
 
 double fheroes2::RPG::criticalChance( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
+    const double legendaryBonus = ( color == activePlayerColor && hasHeroicHonor( 3 ) ) ? 2.0 : 0.0;
     return profile == nullptr
                ? 0.0
                : static_cast<double>( std::min<long double>(
                      100.0L, effect( CRITICAL_TRAINING, profile->ranks[CRITICAL_TRAINING] )
                                  + ascensionChannelBonus( *profile, AscensionChannel::CRITICAL_CHANCE )
+                                 + doctrinePairResonance( *profile, CRITICAL_TRAINING, FORTUNE, 0.15L, 3.0L )
+                                 + criticalPrecisionTriadResonance( *profile )
+                                 + legendaryBonus
                                  + ( hasEliteMutation( color, EliteMutation::DEADLY ) ? 4.0L : 0.0L ) ) );
 }
 
@@ -3277,6 +3870,7 @@ double fheroes2::RPG::criticalDamageBonusPercent( const PlayerColor color )
                ? 50.0
                : 50.0 + static_cast<double>( effect( BRUTAL_CRITICALS, profile->ranks[BRUTAL_CRITICALS] )
                                              + ascensionChannelBonus( *profile, AscensionChannel::CRITICAL_DAMAGE )
+                                             + criticalPrecisionTriadResonance( *profile ) * 3.0L
                                              + ( hasEliteMutation( color, EliteMutation::DEADLY ) ? 10.0L : 0.0L ) );
 }
 
@@ -3298,11 +3892,13 @@ double fheroes2::RPG::sustainValuePercent( const PlayerColor color )
 double fheroes2::RPG::evasionChance( const PlayerColor color )
 {
     const Profile * profile = getProfile( color );
+    const double legendaryBonus = ( color == activePlayerColor && hasHeroicHonor( 3 ) ) ? 2.0 : 0.0;
     return profile == nullptr
                ? 0.0
                : static_cast<double>( std::min<long double>(
                      100.0L, effect( EVASION, profile->ranks[EVASION] )
                                  + ascensionChannelBonus( *profile, AscensionChannel::EVASION )
+                                 + legendaryBonus
                                  + ( hasEliteMutation( color, EliteMutation::ELUSIVE ) ? 6.0L : 0.0L ) ) );
 }
 
@@ -3327,6 +3923,12 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
         }
         attackBonus += effect( FEROCITY, attackProfile->ranks[FEROCITY] );
         attackBonus += effect( ranged ? MARKSMAN : BRAWLER, attackProfile->ranks[ranged ? MARKSMAN : BRAWLER] );
+        if ( !ranged ) {
+            attackBonus += doctrinePairResonance( *attackProfile, FEROCITY, BRAWLER, 0.20L, 5.0L );
+        }
+        else {
+            attackBonus += doctrinePairResonance( *attackProfile, MARKSMAN, ARMOR_PIERCING, 0.20L, 5.0L );
+        }
 
         if ( !defenderFullHealth ) {
             attackBonus += effect( EXECUTIONER, attackProfile->ranks[EXECUTIONER] );
@@ -3351,11 +3953,24 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
         if ( attackerFullHealth ) {
             attackBonus += effect( DISCIPLINE, attackProfile->ranks[DISCIPLINE] );
             if ( defenderFullHealth ) {
+                attackBonus += doctrinePairResonance( *attackProfile, OPENING_BLOW, DISCIPLINE, 0.20L, 5.0L );
                 attackBonus += doctrineTripleResonance( *attackProfile, OPENING_BLOW, DISCIPLINE, UNYIELDING, 0.22L, 6.5L );
             }
         }
         if ( defenderBelowHalf ) {
             attackBonus += effect( RUTHLESS, attackProfile->ranks[RUTHLESS] );
+            attackBonus += finisherTriadResonance( *attackProfile );
+        }
+        if ( attacker == activePlayerColor ) {
+            if ( hasHeroicHonor( 2 ) ) {
+                attackBonus += 1.0L;
+            }
+            if ( defender != PlayerColor::NONE && eliteEnemyColors.count( defender ) > 0 && hasRivalBaneHonor() ) {
+                attackBonus += 5.0L;
+            }
+            if ( hasCastlebreakerHonor() ) {
+                attackBonus += 2.5L;
+            }
         }
     }
 
@@ -3367,6 +3982,12 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
         }
         defenseReduction += effect( IRON_SKIN, defenseProfile->ranks[IRON_SKIN] );
         defenseReduction += effect( ranged ? ARROW_WARD : MELEE_GUARD, defenseProfile->ranks[ranged ? ARROW_WARD : MELEE_GUARD] );
+        if ( !ranged ) {
+            defenseReduction += doctrinePairResonance( *defenseProfile, IRON_SKIN, MELEE_GUARD, 0.20L, 5.0L );
+        }
+        else {
+            defenseReduction += doctrinePairResonance( *defenseProfile, IRON_SKIN, ARROW_WARD, 0.20L, 5.0L );
+        }
 
         if ( defenderBelowHalf ) {
             defenseReduction += effect( LAST_STAND, defenseProfile->ranks[LAST_STAND] );
@@ -3379,6 +4000,13 @@ double fheroes2::RPG::damageMultiplier( const PlayerColor attacker, const Player
         if ( defenderFullHealth ) {
             defenseReduction += effect( UNYIELDING, defenseProfile->ranks[UNYIELDING] );
             defenseReduction += doctrinePairResonance( *defenseProfile, DISCIPLINE, UNYIELDING, 0.20L, 5.0L );
+        }
+        defenseReduction += defensiveBastionTriadResonance( *defenseProfile );
+        if ( defender == activePlayerColor && hasHeroicHonor( 2 ) ) {
+            defenseReduction += 1.0L;
+        }
+        if ( defender == activePlayerColor && hasRealmCrest( *defenseProfile, 2 ) ) {
+            defenseReduction += 3.0L;
         }
     }
 
@@ -3407,12 +4035,17 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
               ? 0
               : effect( SORCERY, attackProfile->ranks[SORCERY] )
                     + ascensionChannelBonus( *attackProfile, AscensionChannel::SPELL_DAMAGE )
+                    + elementalConvergenceTriadResonance( *attackProfile )
+                    + ( ( attacker == activePlayerColor && hasRealmCrest( *attackProfile, 3 ) ) ? 5.0L : 0.0L )
                     + ( hasEliteMutation( attacker, EliteMutation::UNSTABLE_MAGIC ) ? 12.0L : 0.0L );
     long double defenseReduction
         = defenseProfile == nullptr
               ? 0
               : effect( SPELL_WARD, defenseProfile->ranks[SPELL_WARD] )
                     + ascensionChannelBonus( *defenseProfile, AscensionChannel::SPELL_REDUCTION )
+                    + wardMatrixTriadResonance( *defenseProfile )
+                    + ( ( defender == activePlayerColor && hasHeroicHonor( 2 ) ) ? 1.0L : 0.0L )
+                    + ( ( defender == activePlayerColor && hasRealmCrest( *defenseProfile, 2 ) ) ? 3.0L : 0.0L )
                     + ( hasEliteMutation( defender, EliteMutation::ARCANE_SHIELDED ) ? 8.0L : 0.0L );
 
     if ( specialization != upgradeCount ) {
@@ -3425,6 +4058,13 @@ double fheroes2::RPG::spellMultiplier( const PlayerColor attacker, const PlayerC
             defenseReduction += effect( ward, defenseProfile->ranks[ward] );
             defenseReduction += doctrinePairResonance( *defenseProfile, SPELL_WARD, ward, 0.25L, 7.5L );
         }
+    }
+
+    if ( attackProfile != nullptr ) {
+        spellBonus += doctrinePairResonance( *attackProfile, SORCERY, ARCANE_PIERCING, 0.20L, 5.0L );
+    }
+    if ( defenseProfile != nullptr ) {
+        defenseReduction += doctrinePairResonance( *defenseProfile, SPELL_WARD, IRON_SKIN, 0.20L, 5.0L );
     }
 
     // Damaging spell doctrine power is open-ended. Spell reduction keeps the same 70% global
@@ -3633,7 +4273,15 @@ double fheroes2::RPG::doctrineEffect( const PlayerColor color, const size_t upgr
     }
 
     const Profile * profile = getProfile( color );
-    return profile == nullptr ? 0.0 : static_cast<double>( effect( upgradeId, profile->ranks[upgradeId] ) );
+    if ( profile == nullptr ) {
+        return 0.0;
+    }
+
+    if ( upgradeId == ARMS_TRAINING || upgradeId == ARMOR_TRAINING || upgradeId == VETERAN_CORE ) {
+        return static_cast<double>( diminishingFlatStatBonus( profile->ranks[upgradeId] ) );
+    }
+
+    return static_cast<double>( effect( upgradeId, profile->ranks[upgradeId] ) );
 }
 
 void fheroes2::RPG::showMenu()
@@ -3747,10 +4395,11 @@ void fheroes2::RPG::showMenu()
                 window.applyTextBackgroundShading( rowArea );
                 drawBeveledPanel( rowArea, false );
 
+                const uint64_t rank = playerProfile.ranks[i];
                 const bool prerequisiteMet = i != BRUTAL_CRITICALS || playerProfile.ranks[CRITICAL_TRAINING] > 0;
-                const bool canBuy = playerProfile.ranks[i] < std::numeric_limits<uint64_t>::max()
-                                    && effect( i, playerProfile.ranks[i] + 1 ) > effect( i, playerProfile.ranks[i] ) && prerequisiteMet
-                                    && playerProfile.points >= cost( i, playerProfile.ranks[i] );
+                const bool rankCanAdvance = doctrineCanAdvance( i, rank );
+                const uint64_t price = rankCanAdvance ? cost( i, rank ) : 0;
+                const bool canBuy = rankCanAdvance && prerequisiteMet && playerProfile.points >= price;
                 if ( canBuy ) {
                     fheroes2::Fill( display, rowArea.x + 3, rowArea.y + 5, 2, rowArea.height - 10, fheroes2::GetColorId( 219, 175, 66 ) );
                 }
@@ -3767,18 +4416,22 @@ void fheroes2::RPG::showMenu()
                 const bool isSelected = selectedOffsets[tab] == scrollOffsets[tab] + row;
                 drawSingleLine( ( isSelected ? "> " : "" ) + std::string( upgrades[i].name ), textX, rowArea.y + 4, rowArea.width - 150,
                                 fheroes2::FontType::normalYellow() );
-                drawSingleLine( "Rank " + formatNumber( playerProfile.ranks[i] ), rowArea.x + rowArea.width - 94, rowArea.y + 7, 84,
+                drawSingleLine( "Rank " + formatNumber( rank ), rowArea.x + rowArea.width - 94, rowArea.y + 7, 84,
                                 fheroes2::FontType::smallWhite() );
                 drawSingleLine( upgrades[i].description, textX, rowArea.y + 21, rowArea.width - 126, fheroes2::FontType::smallWhite() );
 
-                const uint64_t rank = playerProfile.ranks[i];
                 const std::string current = shortEffectSummary( i, rank );
-                const bool rankCanAdvance
-                    = rank < std::numeric_limits<uint64_t>::max() && effect( i, rank + 1 ) > effect( i, rank );
-                const std::string next = rankCanAdvance ? shortEffectSummary( i, rank + 1 ) : "MAX EFFECT";
+                std::string next = "MAX EFFECT";
+                if ( rankCanAdvance ) {
+                    if ( effect( i, rank + 1 ) > effect( i, rank ) ) {
+                        next = shortEffectSummary( i, rank + 1 );
+                    }
+                    else {
+                        next = "Ascension R" + formatNumber( nextAscensionRank( rank ) );
+                    }
+                }
                 drawSingleLine( current + " -> " + next, textX, rowArea.y + 36, rowArea.width - 130,
                                 canBuy ? fheroes2::FontType::smallYellow() : fheroes2::FontType::smallWhite() );
-                const uint64_t price = rankCanAdvance ? cost( i, playerProfile.ranks[i] ) : 0;
                 const std::string buyLabel = !rankCanAdvance ? "MAX"
                                              : !prerequisiteMet ? "LOCKED"
                                              : playerProfile.points < price ? "NEED " + formatNumber( price - playerProfile.points )
@@ -3792,7 +4445,7 @@ void fheroes2::RPG::showMenu()
             drawSingleLine( "Rows " + std::to_string( firstVisibleRow ) + "-" + std::to_string( lastVisibleRow ) + "/"
                                 + std::to_string( upgradesPerTab ) + "   Up/Down Select   B/Enter/Space Buy   I Details",
                             area.x + 12, area.y + 333, area.width - 24, fheroes2::FontType::smallWhite() );
-            drawSingleLine( "1-8 Tabs   O Overview   K Analytics   V Rivals   H Help   S/A Steward   R Respec", area.x + 12, area.y + 344,
+            drawSingleLine( "1-8 Tabs  O Overview  C Crests  K Analytics  L Legends  V Rivals  H Help  S Steward  R Respec", area.x + 12, area.y + 344,
                             area.width - 24, fheroes2::FontType::smallWhite() );
             window.renderTextAdaptedButtonSprite( autoButton, playerProfile.autoBuy ? "Steward ON" : "Steward OFF", { 18, 6 },
                                                   fheroes2::StandardWindow::Padding::BOTTOM_LEFT );
@@ -3809,7 +4462,7 @@ void fheroes2::RPG::showMenu()
         scrollDown.drawOnState( event.isMouseLeftButtonPressedAndHeldInArea( scrollDown.area() ) );
 
         if ( event.isMouseRightButtonPressedInArea( closeButton.area() ) || event.MouseLongPressLeft( closeButton.area() ) ) {
-            fheroes2::showStandardTextMessage( "Close", "Exit the Royal Guild menu.", Dialog::ZERO );
+            fheroes2::showStandardTextMessage( "Close", "Exit the Royal Guild menu (Esc or F9).", Dialog::ZERO );
             redraw = true;
             continue;
         }
@@ -3886,7 +4539,7 @@ void fheroes2::RPG::showMenu()
             continue;
         }
         if ( event.isMouseRightButtonPressedInArea( scrollUp.area() ) || event.MouseLongPressLeft( scrollUp.area() ) ) {
-            fheroes2::showStandardTextMessage( "Scroll Up", "Scroll up one doctrine row.", Dialog::ZERO );
+            fheroes2::showStandardTextMessage( "Scroll Up", "Scroll up one doctrine row (Up Arrow).", Dialog::ZERO );
             redraw = true;
             continue;
         }
@@ -3897,7 +4550,7 @@ void fheroes2::RPG::showMenu()
             continue;
         }
         if ( event.isMouseRightButtonPressedInArea( scrollDown.area() ) || event.MouseLongPressLeft( scrollDown.area() ) ) {
-            fheroes2::showStandardTextMessage( "Scroll Down", "Scroll down one doctrine row.", Dialog::ZERO );
+            fheroes2::showStandardTextMessage( "Scroll Down", "Scroll down one doctrine row (Down Arrow).", Dialog::ZERO );
             redraw = true;
             continue;
         }
@@ -3914,7 +4567,7 @@ void fheroes2::RPG::showMenu()
         const int32_t thumbY = listArea.y + 19 + static_cast<int32_t>( scrollOffsets[tab] * thumbTravel / ( upgradesPerTab - visibleRows ) );
         const fheroes2::Rect scrollTrack( scrollbarX, listArea.y + 16, 16, listArea.height - 32 );
         if ( event.isMouseRightButtonPressedInArea( scrollTrack ) || event.MouseLongPressLeft( scrollTrack ) ) {
-            fheroes2::showStandardTextMessage( "Scrollbar", "Click to scroll through doctrines.", Dialog::ZERO );
+            fheroes2::showStandardTextMessage( "Scrollbar", "Click track above/below slider to page scroll.", Dialog::ZERO );
             redraw = true;
             continue;
         }
@@ -3940,7 +4593,8 @@ void fheroes2::RPG::showMenu()
             continue;
         }
 
-        if ( event.isKeyPressed( fheroes2::Key::KEY_H ) ) {
+        if ( event.isKeyPressed( fheroes2::Key::KEY_H ) || event.isKeyPressed( fheroes2::Key::KEY_F1 )
+             || event.isKeyPressed( fheroes2::Key::KEY_QUESTION ) || event.isKeyPressed( fheroes2::Key::KEY_SLASH ) ) {
             showRoyalGuildHelp( Dialog::OK );
             redraw = true;
             continue;
@@ -3954,6 +4608,18 @@ void fheroes2::RPG::showMenu()
 
         if ( event.isKeyPressed( fheroes2::Key::KEY_K ) ) {
             showBuildAnalytics( Dialog::OK );
+            redraw = true;
+            continue;
+        }
+
+        if ( event.isKeyPressed( fheroes2::Key::KEY_L ) ) {
+            showHallOfLegends( Dialog::OK );
+            redraw = true;
+            continue;
+        }
+
+        if ( event.isKeyPressed( fheroes2::Key::KEY_C ) ) {
+            showRealmCrests( Dialog::OK );
             redraw = true;
             continue;
         }
@@ -3979,8 +4645,15 @@ void fheroes2::RPG::showMenu()
             }
             if ( event.MouseClickLeft( buyAreas[row] ) ) {
                 selectedOffsets[tab] = scrollOffset + row;
+                const uint8_t oldAscension = ascensionTierForRank( playerProfile.ranks[i] );
                 if ( buy( playerProfile, i ) ) {
                     saveProfile();
+                    if ( ascensionTierForRank( playerProfile.ranks[i] ) > oldAscension ) {
+                        AudioManager::PlaySound( M82::GOODMRLE );
+                    }
+                    else {
+                        AudioManager::PlaySound( M82::EXPERNCE );
+                    }
                 }
                 else {
                     showUpgradeDetails( i, Dialog::OK );
@@ -3998,8 +4671,15 @@ void fheroes2::RPG::showMenu()
 
         if ( event.isKeyPressed( fheroes2::Key::KEY_B ) || event.isKeyPressed( fheroes2::Key::KEY_ENTER ) || event.isKeyPressed( fheroes2::Key::KEY_SPACE ) ) {
             const size_t i = tab * upgradesPerTab + selectedOffsets[tab];
+            const uint8_t oldAscension = ascensionTierForRank( playerProfile.ranks[i] );
             if ( buy( playerProfile, i ) ) {
                 saveProfile();
+                if ( ascensionTierForRank( playerProfile.ranks[i] ) > oldAscension ) {
+                    AudioManager::PlaySound( M82::GOODMRLE );
+                }
+                else {
+                    AudioManager::PlaySound( M82::EXPERNCE );
+                }
             }
             else {
                 showUpgradeDetails( i, Dialog::OK );
@@ -4011,7 +4691,7 @@ void fheroes2::RPG::showMenu()
         if ( event.isMouseRightButtonPressedInArea( autoButton.area() ) || event.MouseLongPressLeft( autoButton.area() ) ) {
             fheroes2::showStandardTextMessage(
                 "Steward",
-                "Automatically buys recommended doctrines based on combat focus and available points. Toggle with S, A, or left-click.",
+                "Auto-allocates points based on combat focus.\nToggle: Left-click, S, or A.",
                 Dialog::ZERO );
             redraw = true;
             continue;
@@ -4019,7 +4699,11 @@ void fheroes2::RPG::showMenu()
         if ( event.MouseClickLeft( autoButton.area() ) || event.isKeyPressed( fheroes2::Key::KEY_S ) || event.isKeyPressed( fheroes2::Key::KEY_A ) ) {
             playerProfile.autoBuy = !playerProfile.autoBuy;
             if ( playerProfile.autoBuy ) {
+                AudioManager::PlaySound( M82::BUILDTWN );
                 autoBuy( playerProfile );
+            }
+            else {
+                AudioManager::PlaySound( M82::DISRUPTR );
             }
             saveProfile();
             redraw = true;
@@ -4028,7 +4712,7 @@ void fheroes2::RPG::showMenu()
         if ( event.isMouseRightButtonPressedInArea( respecButton.area() ) || event.MouseLongPressLeft( respecButton.area() ) ) {
             fheroes2::showStandardTextMessage(
                 "Respec Doctrines",
-                "Refund all spent guild points and reset doctrine ranks to zero to freely reallocate your build. Left-click or press R to respec.",
+                "Refund all spent points and reset ranks to reallocate freely. Click or press R.",
                 Dialog::ZERO );
             redraw = true;
             continue;
@@ -4046,6 +4730,7 @@ void fheroes2::RPG::showMenu()
                                            + " available points. Steward auto-buy will be paused and battle-trigger familiarity will be cleared.";
                 if ( fheroes2::showStandardTextMessage( "Respec Doctrines", prompt, Dialog::YES | Dialog::NO ) == Dialog::YES ) {
                     respecProfile( playerProfile );
+                    AudioManager::PlaySound( M82::TREASURE );
                     redraw = true;
                 }
             }

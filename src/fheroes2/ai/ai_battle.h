@@ -198,6 +198,16 @@ namespace AI
                     return *this;
                 }
 
+                // When we hold strong ranged superiority and the enemy cannot retaliate effectively with spells,
+                // hold a cautious offensive posture so our shooters can decimate the approaching enemy without
+                // forcing melee units into early charges.
+                const bool rangedDominance = !enemyHasMeaningfulSpellPressure && _myShootersStrength >= _enemyShootersStrength * 2.0
+                                             && ( _myShootersStrength / std::max( 1.0, _myArmyStrength ) ) >= 0.20;
+                if ( rangedDominance && !_considerRetreat && relativeArmyStrength >= 0.85 ) {
+                    state->cautious = true;
+                    return *this;
+                }
+
                 constexpr double cautiousEntryStrength = 1.10;
                 constexpr double cautiousExitStrength = 1.35;
                 constexpr double badMomentumThreshold = -0.04;
