@@ -2351,13 +2351,13 @@ namespace
         case LEADERSHIP: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Morale";
         case FORTUNE: return "+" + formatNumber( static_cast<uint64_t>( value ) ) + " Luck";
         case REGENERATION: return formatEffect( value ) + " turn regeneration";
-        case CRITICAL_TRAINING: return formatEffect( value ) + " crit chance";
-        case BRUTAL_CRITICALS: return "+" + formatEffect( 50.0L + value ) + " crit damage";
-        case EVASION: return formatEffect( value ) + " evade chance";
+        case CRITICAL_TRAINING: return formatEffect( value ) + " critical strike chance";
+        case BRUTAL_CRITICALS: return "+" + formatEffect( 50.0L + value ) + " critical strike damage";
+        case EVASION: return formatEffect( value ) + " evasion chance";
         case ARCANE_PIERCING: return formatEffect( value ) + " spell resistance ignored";
         case CLOSE_QUARTERS: return formatEffect( value ) + " melee penalty recovered";
-        case UNYIELDING: return formatEffect( value ) + " reduction at full HP";
-        case RUTHLESS: return "+" + formatEffect( value ) + " vs targets below half HP";
+        case UNYIELDING: return formatEffect( value ) + " damage reduction at full Health";
+        case RUTHLESS: return "+" + formatEffect( value ) + " against targets below half Health";
         default: return formatEffect( value );
         }
     }
@@ -2414,10 +2414,10 @@ namespace
         }
 
         if ( !canAdvance ) {
-            message += "\nNext: MAX rank reached";
+            message += "\nNext: Maximum rank reached";
         }
         else if ( !prerequisiteMet ) {
-            message += "\nNext: LOCKED (requires Critical Training)";
+            message += "\nNext: Locked (requires Critical Training)";
         }
         else {
             const uint64_t price = cost( id, rank );
