@@ -115,5 +115,6 @@ namespace fheroes2::RPG
     // Compact formatter for UI doctrine modifiers. It shares the generated, unbounded suffix
     // naming scheme used by RPG counters and preserves decimal percentages.
     [[nodiscard]] std::string formatDoctrineModifier( double value, bool percentage );
+    void showFieldLedger();
     void showMenu();
 }
