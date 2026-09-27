@@ -285,10 +285,10 @@ namespace AI
         // counter that makes repeatedly distracted heroes progressively harder to pull off-plan.
         std::unordered_map<int32_t, HeroPlanMemory> _heroPlanMemory;
 
-        // Shared failed-plan memory for non-critical strategic discoveries. Entries expire after a
-        // small number of days and the action-object cache is rebuilt each AI turn, so cooled targets
-        // return automatically without serialization or unbounded history growth.
-        std::unordered_map<int32_t, StrategicTargetCooldown> _strategicTargetCooldowns;
+        // Shared failed-plan memory for non-critical strategic discoveries. The 64-bit key combines
+        // kingdom color and tile index so one AI kingdom's failed plan never suppresses another's.
+        // Entries expire after a small number of days and require no serialization.
+        std::unordered_map<uint64_t, StrategicTargetCooldown> _strategicTargetCooldowns;
         std::unordered_map<int32_t, MP2::MapObjectType> _mapActionObjects;
         std::unordered_map<int32_t, PriorityTask> _priorityTargets;
         std::unordered_map<int32_t, EnemyArmy> _enemyArmies;

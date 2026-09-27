@@ -123,37 +123,74 @@ namespace AI
                 const bool hadHistory = state->hasHistory;
                 double friendlyLossFraction = 0.0;
                 double enemyLossFraction = 0.0;
+                double friendlyGainFraction = 0.0;
+                double enemyGainFraction = 0.0;
 
                 if ( hadHistory ) {
                     friendlyLossFraction
                         = std::max( 0.0, ( state->previousMyArmyStrength - _myArmyStrength ) / std::max( 1.0, state->previousMyArmyStrength ) );
                     enemyLossFraction
                         = std::max( 0.0, ( state->previousEnemyArmyStrength - _enemyArmyStrength ) / std::max( 1.0, state->previousEnemyArmyStrength ) );
+                    friendlyGainFraction
+                        = std::max( 0.0, ( _myArmyStrength - state->previousMyArmyStrength ) / std::max( 1.0, state->previousMyArmyStrength ) );
+                    enemyGainFraction
+                        = std::max( 0.0, ( _enemyArmyStrength - state->previousEnemyArmyStrength ) / std::max( 1.0, state->previousEnemyArmyStrength ) );
 
-                    // Favorable exchanges build momentum, while losing trades push the AI toward preservation.
+                    // Favorable exchanges and meaningful recovery build momentum, while losses and enemy
+                    // recovery push the AI toward preservation. This is important for RPG sustain effects:
+                    // healed strength must matter just as much as strength that was removed by direct damage.
                     // Decay keeps old exchanges from dominating the entire battle.
-                    const double exchangeMomentum = ( enemyLossFraction - friendlyLossFraction ) * 1.5;
+                    const double exchangeMomentum
+                        = ( enemyLossFraction + friendlyGainFraction - friendlyLossFraction - enemyGainFraction ) * 1.5;
                     state->momentum = std::clamp( state->momentum * 0.60 + exchangeMomentum, -0.35, 0.35 );
+
+                    // A sizeable enemy recovery means the battlefield is no longer in the cleanup state that
+                    // generated an earlier finish/discipline window. Drop that stale commitment immediately
+                    // instead of spending another turn behaving as if the recovered force were still crippled.
+                    if ( enemyGainFraction >= 0.10 ) {
+                        state->finishWindowUntilTurn = 0;
+                        state->decisiveDisciplineUntilTurn = 0;
+                        state->decisiveExchangeStreak = 0;
+                    }
 
                     // A sharply losing trade opens a short recovery window. One merely better exchange is
                     // not enough to cancel it; the AI must preserve valuable stacks through the next round
                     // unless ranged or spell pressure makes waiting strategically worse.
                     if ( friendlyLossFraction >= 0.22 && enemyLossFraction <= 0.08 ) {
                         state->finishWindowUntilTurn = 0;
+                        state->suppressionUntilTurn = 0;
+                        state->decisiveDisciplineUntilTurn = 0;
+                        state->decisiveExchangeStreak = 0;
                         state->recoveryUntilTurn = _currentTurnNumber + 1;
                     }
-                    // A clean exchange that removes a meaningful slice of the opposing army creates a
-                    // short finish window. However, an exchange that has already erased almost half the
-                    // opposing army is treated as a mop-up transition instead: chaining another all-in
-                    // push is usually unnecessary and risks wasting premium stacks on cleanup duty.
-                    else if ( enemyLossFraction >= 0.45 && friendlyLossFraction <= 0.08 ) {
-                        state->finishWindowUntilTurn = 0;
-                    }
-                    else if ( enemyLossFraction >= 0.18 && friendlyLossFraction <= 0.08 ) {
-                        state->finishWindowUntilTurn = _currentTurnNumber + 1;
-                    }
-                    else if ( friendlyLossFraction >= 0.18 && enemyLossFraction <= 0.05 ) {
-                        state->finishWindowUntilTurn = 0;
+                    else {
+                        const bool cleanDecisiveExchange = enemyLossFraction >= 0.18 && friendlyLossFraction <= 0.08;
+                        if ( cleanDecisiveExchange ) {
+                            state->decisiveExchangeStreak = static_cast<uint8_t>( std::min<uint32_t>( 3, state->decisiveExchangeStreak + 1 ) );
+
+                            // One clean exchange can justify a brief finishing push. Repeating that success
+                            // twice, or removing nearly half the enemy force at once, means the damage is already
+                            // decisive: stop chaining all-in pushes and preserve premium stacks for cleanup.
+                            const bool damageAlreadyDecisive = enemyLossFraction >= 0.45 || state->decisiveExchangeStreak >= 2;
+                            if ( damageAlreadyDecisive ) {
+                                state->finishWindowUntilTurn = 0;
+                                state->decisiveDisciplineUntilTurn = _currentTurnNumber + 1;
+                            }
+                            else {
+                                state->finishWindowUntilTurn = _currentTurnNumber + 1;
+                            }
+                        }
+                        else {
+                            if ( friendlyLossFraction >= 0.18 && enemyLossFraction <= 0.05 ) {
+                                state->finishWindowUntilTurn = 0;
+                            }
+
+                            // The streak is deliberately sticky but bounded: an uneventful exchange only
+                            // decays one step, while taking meaningful losses breaks the chain quickly.
+                            if ( state->decisiveExchangeStreak > 0 && ( enemyLossFraction < 0.10 || friendlyLossFraction > 0.08 ) ) {
+                                --state->decisiveExchangeStreak;
+                            }
+                        }
                     }
                 }
 
@@ -166,9 +203,13 @@ namespace AI
                 const bool enemyHasMeaningfulSpellPressure = _enemySpellStrength > _myArmyStrength * 0.20;
 
                 // Ranged or spell pressure forces tempo: waiting while the opponent can damage us safely is
-                // not preservation, it is simply losing initiative. It is also the only reason to break a
-                // recovery window early after a badly lost exchange.
+                // not preservation, it is simply losing initiative. Once such pressure has forced an attack,
+                // retain that suppression posture through the next round instead of immediately oscillating
+                // back to cautious movement as soon as the pressure barely crosses below its threshold.
                 if ( !enemyHasLimitedRangedPressure || enemyHasMeaningfulSpellPressure ) {
+                    if ( !_considerRetreat ) {
+                        state->suppressionUntilTurn = _currentTurnNumber + 1;
+                    }
                     state->cautious = false;
                     return *this;
                 }
@@ -180,6 +221,26 @@ namespace AI
                     }
 
                     state->recoveryUntilTurn = 0;
+                }
+
+                if ( state->suppressionUntilTurn != 0 ) {
+                    const bool suppressionStillSafe = !_considerRetreat && relativeArmyStrength >= 0.85 && state->momentum >= -0.06;
+                    if ( _currentTurnNumber <= state->suppressionUntilTurn && suppressionStillSafe ) {
+                        state->cautious = false;
+                        return *this;
+                    }
+
+                    state->suppressionUntilTurn = 0;
+                }
+
+                if ( state->decisiveDisciplineUntilTurn != 0 ) {
+                    const bool disciplinedCleanupIsSafe = !_considerRetreat && relativeArmyStrength >= 1.35 && state->momentum >= 0.02;
+                    if ( _currentTurnNumber <= state->decisiveDisciplineUntilTurn && disciplinedCleanupIsSafe ) {
+                        state->cautious = true;
+                        return *this;
+                    }
+
+                    state->decisiveDisciplineUntilTurn = 0;
                 }
 
                 const bool finishWindowActive = state->finishWindowUntilTurn != 0 && _currentTurnNumber <= state->finishWindowUntilTurn && !_considerRetreat
@@ -248,7 +309,10 @@ namespace AI
                 double momentum{ 0.0 };
                 uint32_t lastTurnNumber{ 0 };
                 uint32_t finishWindowUntilTurn{ 0 };
+                uint32_t suppressionUntilTurn{ 0 };
                 uint32_t recoveryUntilTurn{ 0 };
+                uint32_t decisiveDisciplineUntilTurn{ 0 };
+                uint8_t decisiveExchangeStreak{ 0 };
                 bool hasHistory{ false };
                 bool cautious{ false };
             };
