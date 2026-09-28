@@ -50,7 +50,6 @@ namespace
         if ( advice.heroId >= 0 ) {
             return advice.heroId;
         }
-
         if ( advice.targetIndex < 0 || ( advice.action != AdviceAction::TOWN_ARMY_MANAGEMENT && advice.action != AdviceAction::RECRUIT_CREATURES ) ) {
             return -1;
         }
@@ -65,14 +64,9 @@ namespace
         CouncilFollowUp best;
         const std::string identity = adviceIdentity( advice );
 
-        // Recruiting into a town with a visiting hero becomes much more useful if the same council state can
-        // immediately transfer those troops onto that hero.
         if ( advice.action == AdviceAction::RECRUIT_CREATURES && advice.targetIndex >= 0 ) {
             for ( const StrategicAdvice & other : candidates ) {
-                if ( other.targetIndex != advice.targetIndex || other.kind != StrategicAdviceKind::TOWN_PULL_STRONGEST ) {
-                    continue;
-                }
-                if ( adviceIdentity( other ) == identity ) {
+                if ( other.targetIndex != advice.targetIndex || other.kind != StrategicAdviceKind::TOWN_PULL_STRONGEST || adviceIdentity( other ) == identity ) {
                     continue;
                 }
                 const double value = other.score * 1.22;
@@ -86,7 +80,6 @@ namespace
         if ( heroId < 0 ) {
             return best;
         }
-
         const Heroes * hero = world.GetHeroes( heroId );
         if ( hero == nullptr || !hero->isActive() ) {
             return best;
@@ -140,28 +133,32 @@ namespace
             return;
         }
 
-        for ( StrategicAdvice & advice : candidates ) {
-            const CouncilFollowUp followUp = findCouncilFollowUp( advice, candidates );
+        // Freeze the board before applying sequence bonuses so candidate iteration order cannot affect the result.
+        const std::vector<StrategicAdvice> snapshot = candidates;
+        for ( size_t index = 0; index < candidates.size(); ++index ) {
+            StrategicAdvice & advice = candidates[index];
+            const StrategicAdvice & source = snapshot[index];
+            const CouncilFollowUp followUp = findCouncilFollowUp( source, snapshot );
+
             if ( followUp.advice != nullptr && followUp.value >= 3200.0 ) {
-                const double sequenceRatio = std::clamp( followUp.value / std::max( 3200.0, advice.score ), 0.0, 1.35 );
+                const double sequenceRatio = std::clamp( followUp.value / std::max( 3200.0, source.score ), 0.0, 1.35 );
                 advice.score *= 1.04 + std::min( 0.16, sequenceRatio * 0.10 );
                 const std::string phrase = councilFollowUpPhrase( *followUp.advice );
                 advice.rationale = std::string( followUp.likelySameTurn ? "Then " : "Sets up " ) + phrase + ". | " + advice.rationale;
                 continue;
             }
 
-            if ( advice.action != AdviceAction::MOVE_HERO ) {
+            if ( source.action != AdviceAction::MOVE_HERO ) {
                 continue;
             }
-
-            const Heroes * hero = world.GetHeroes( advice.heroId );
+            const Heroes * hero = world.GetHeroes( source.heroId );
             if ( hero == nullptr || hero->GetMovePoints() == 0 ) {
                 continue;
             }
 
-            const double movementUse = std::clamp( static_cast<double>( advice.distance ) / hero->GetMovePoints(), 0.0, 1.0 );
-            const bool weakContinuationKind = isErrandMovementKind( advice.kind ) || advice.targetObjectType == MP2::OBJ_NONE;
-            if ( movementUse >= 0.72 && weakContinuationKind && !isPremiumMovementKind( advice.kind ) ) {
+            const double movementUse = std::clamp( static_cast<double>( source.distance ) / hero->GetMovePoints(), 0.0, 1.0 );
+            const bool weakContinuationKind = isErrandMovementKind( source.kind ) || source.targetObjectType == MP2::OBJ_NONE;
+            if ( movementUse >= 0.72 && weakContinuationKind && !isPremiumMovementKind( source.kind ) ) {
                 advice.score *= 0.78;
                 advice.rationale = "Limited continuation after this move. | " + advice.rationale;
             }
@@ -170,35 +167,37 @@ namespace
 
     void applyCouncilResourceReservation( std::vector<StrategicAdvice> & candidates, const CouncilContext & context )
     {
-        const StrategicAdvice * bestSpend = nullptr;
-        for ( const StrategicAdvice & advice : candidates ) {
-            if ( !isCouncilResourceSpend( advice ) ) {
+        size_t bestSpendIndex = candidates.size();
+        for ( size_t index = 0; index < candidates.size(); ++index ) {
+            if ( !isCouncilResourceSpend( candidates[index] ) ) {
                 continue;
             }
-            if ( bestSpend == nullptr || advice.score > bestSpend->score ) {
-                bestSpend = &advice;
+            if ( bestSpendIndex == candidates.size() || candidates[index].score > candidates[bestSpendIndex].score ) {
+                bestSpendIndex = index;
             }
         }
-
-        if ( bestSpend == nullptr || bestSpend->score <= 0.0 ) {
+        if ( bestSpendIndex == candidates.size() || candidates[bestSpendIndex].score <= 0.0 ) {
             return;
         }
 
-        const std::string bestIdentity = adviceIdentity( *bestSpend );
+        const double bestScore = candidates[bestSpendIndex].score;
+        const std::string bestIdentity = adviceIdentity( candidates[bestSpendIndex] );
+        const std::string bestTitle = candidates[bestSpendIndex].title;
         const bool scarce = context.lowGold || context.lowMaterials;
+
         for ( StrategicAdvice & advice : candidates ) {
             if ( !isCouncilResourceSpend( advice ) || adviceIdentity( advice ) == bestIdentity ) {
                 continue;
             }
 
-            const double ratio = std::clamp( advice.score / bestSpend->score, 0.0, 1.0 );
+            const double ratio = std::clamp( advice.score / bestScore, 0.0, 1.0 );
             if ( scarce && ratio < 0.86 ) {
                 advice.score *= 0.54 + ratio * 0.34;
-                advice.rationale = "Save scarce resources for " + bestSpend->title + ". | " + advice.rationale;
+                advice.rationale = "Save scarce resources for " + bestTitle + ". | " + advice.rationale;
             }
             else if ( ratio < 0.62 ) {
                 advice.score *= 0.84;
-                advice.rationale = "Lower-impact spend than " + bestSpend->title + ". | " + advice.rationale;
+                advice.rationale = "Lower-impact spend than " + bestTitle + ". | " + advice.rationale;
             }
         }
     }
@@ -217,8 +216,6 @@ namespace
                               candidates.end() );
         }
 
-        // Sequence value is applied before the same-owner benchmark so the comparison reflects the whole short plan,
-        // not just the first click. Resource reservation is kingdom-wide because all towns share the same treasury.
         applyCouncilSequencePlanning( candidates );
         applyCouncilResourceReservation( candidates, context );
         applyAlternativeComparison( candidates );
@@ -227,7 +224,6 @@ namespace
                               return advice.score < 2500.0 || !std::isfinite( advice.score );
                           } ),
                           candidates.end() );
-
         return chooseCouncilAdvice( std::move( candidates ) );
     }
 
@@ -238,7 +234,6 @@ namespace
         if ( player == nullptr || !player->isControlHuman() || Battle::GetArena() != nullptr ) {
             return;
         }
-
         const PlayerColor color = player->GetColor();
         if ( color == PlayerColor::NONE ) {
             return;
