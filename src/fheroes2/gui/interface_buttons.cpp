@@ -215,7 +215,16 @@ fheroes2::GameMode Interface::ButtonsPanel::queueEventProcessing()
         _interface.EventSystemDialog();
     }
     else if ( le.isMouseRightButtonPressedInArea( _nextHeroRect ) ) {
-        fheroes2::showStandardTextMessage( _( "Next Hero" ), _( "Select the next Hero." ), Dialog::ZERO );
+        std::string message = _( "Select the next Hero." );
+        const Heroes * currentHero = GetFocusHeroes();
+        if ( currentHero != nullptr ) {
+            message += "\n\n" + currentHero->GetName();
+            message += "\nRole: " + fheroes2::RPG::heroRoleText( currentHero->GetColor(), currentHero->GetID() );
+            message += "\nLegacy: " + fheroes2::RPG::heroLegacyText( currentHero->GetID() );
+            message += "\nChronicle: " + fheroes2::RPG::heroChronicleText( currentHero->GetID() );
+        }
+
+        fheroes2::showStandardTextMessage( _( "Next Hero" ), message, Dialog::ZERO );
     }
     else if ( le.isMouseRightButtonPressedInArea( _heroMovementRect ) ) {
         fheroes2::showStandardTextMessage(
