@@ -17,6 +17,7 @@
 
 #include "ai_hero_action.h"
 #include "army.h"
+#include "army_troop.h"
 #include "battle_arena.h"
 #include "castle.h"
 #include "color.h"
@@ -33,6 +34,7 @@
 #include "maps.h"
 #include "maps_tiles.h"
 #include "maps_tiles_helper.h"
+#include "monster.h"
 #include "mp2.h"
 #include "players.h"
 #include "screen.h"
@@ -57,7 +59,7 @@ namespace
         LOGISTICS,
         OPPORTUNITY,
 
-        // Twenty additional executable order types.
+        // First twenty specialized executable order types.
         SIEGE,
         INTERCEPTION,
         MONSTER_HUNT,
@@ -77,15 +79,48 @@ namespace
         ECONOMIC_EXPANSION,
         SUPPLY_SWEEP,
         MAGIC_DEVELOPMENT,
-        TERRITORIAL_PRESSURE
+        TERRITORIAL_PRESSURE,
+
+        // Second twenty: town travel, recruitment and construction.
+        TRAVEL_TO_TOWN,
+        TOWN_RESUPPLY,
+        GARRISON_REINFORCEMENT,
+        RECRUIT_TIER1,
+        RECRUIT_TIER2,
+        RECRUIT_TIER3,
+        RECRUIT_TIER4,
+        RECRUIT_TIER5,
+        RECRUIT_TIER6,
+        BUILD_CASTLE,
+        BUILD_DWELLING,
+        UPGRADE_DWELLING,
+        BUILD_ECONOMY,
+        BUILD_DEFENSE,
+        BUILD_MAGIC_GUILD,
+        BUILD_WELL,
+        BUILD_TAVERN,
+        BUILD_MARKETPLACE,
+        BUILD_SPECIAL,
+        BUILD_SHIPYARD
+    };
+
+    enum class AdviceAction : uint8_t
+    {
+        MOVE_HERO,
+        RECRUIT_CREATURES,
+        BUILD_STRUCTURE
     };
 
     struct StrategicAdvice
     {
         StrategicAdviceKind kind{ StrategicAdviceKind::OPPORTUNITY };
+        AdviceAction action{ AdviceAction::MOVE_HERO };
         int32_t heroId{ -1 };
         int32_t targetIndex{ -1 };
         MP2::MapObjectType targetObjectType{ MP2::OBJ_NONE };
+        uint32_t buildingType{ BUILD_NOTHING };
+        uint32_t dwellingType{ BUILD_NOTHING };
+        uint32_t recruitCount{ 0 };
         double score{ 0.0 };
         uint32_t distance{ 0 };
         bool reachableThisTurn{ false };
@@ -158,6 +193,46 @@ namespace
             return "MAGIC";
         case StrategicAdviceKind::TERRITORIAL_PRESSURE:
             return "PRESSURE";
+        case StrategicAdviceKind::TRAVEL_TO_TOWN:
+            return "TOWN TRAVEL";
+        case StrategicAdviceKind::TOWN_RESUPPLY:
+            return "RESUPPLY";
+        case StrategicAdviceKind::GARRISON_REINFORCEMENT:
+            return "REINFORCE";
+        case StrategicAdviceKind::RECRUIT_TIER1:
+            return "RECRUIT I";
+        case StrategicAdviceKind::RECRUIT_TIER2:
+            return "RECRUIT II";
+        case StrategicAdviceKind::RECRUIT_TIER3:
+            return "RECRUIT III";
+        case StrategicAdviceKind::RECRUIT_TIER4:
+            return "RECRUIT IV";
+        case StrategicAdviceKind::RECRUIT_TIER5:
+            return "RECRUIT V";
+        case StrategicAdviceKind::RECRUIT_TIER6:
+            return "RECRUIT VI";
+        case StrategicAdviceKind::BUILD_CASTLE:
+            return "BUILD CASTLE";
+        case StrategicAdviceKind::BUILD_DWELLING:
+            return "BUILD DWELLING";
+        case StrategicAdviceKind::UPGRADE_DWELLING:
+            return "UPGRADE DWELL";
+        case StrategicAdviceKind::BUILD_ECONOMY:
+            return "BUILD ECON";
+        case StrategicAdviceKind::BUILD_DEFENSE:
+            return "BUILD DEFENSE";
+        case StrategicAdviceKind::BUILD_MAGIC_GUILD:
+            return "BUILD MAGIC";
+        case StrategicAdviceKind::BUILD_WELL:
+            return "BUILD WELL";
+        case StrategicAdviceKind::BUILD_TAVERN:
+            return "BUILD TAVERN";
+        case StrategicAdviceKind::BUILD_MARKETPLACE:
+            return "BUILD MARKET";
+        case StrategicAdviceKind::BUILD_SPECIAL:
+            return "BUILD SPECIAL";
+        case StrategicAdviceKind::BUILD_SHIPYARD:
+            return "BUILD SHIPYARD";
         default:
             return "COUNCIL";
         }
@@ -366,11 +441,6 @@ namespace
         }
     }
 
-    std::string strategicObjectName( const MP2::MapObjectType objectType )
-    {
-        return MP2::StringObject( objectType );
-    }
-
     std::string objectiveVerb( const MP2::MapObjectType objectType, const PlayerColor owner )
     {
         switch ( objectType ) {
@@ -490,7 +560,6 @@ namespace
         const uint32_t distance = pathfinder.getDistance( tile.GetIndex() );
         const uint32_t currentMove = hero.GetMovePoints();
 
-        // Every card shown by the council must be executable now, not merely a long-range aspiration.
         if ( distance == 0 || distance == std::numeric_limits<uint32_t>::max() || currentMove == 0 || distance > currentMove ) {
             return advice;
         }
@@ -546,6 +615,7 @@ namespace
         }
 
         advice.kind = kind;
+        advice.action = AdviceAction::MOVE_HERO;
         advice.heroId = hero.GetID();
         advice.targetIndex = tile.GetIndex();
         advice.targetObjectType = objectType;
@@ -564,7 +634,7 @@ namespace
             owner = Maps::getColorFromTile( tile );
         }
 
-        std::string targetName = strategicObjectName( objectType );
+        std::string targetName = MP2::StringObject( objectType );
         if ( objectType == MP2::OBJ_HERO ) {
             if ( const Heroes * targetHero = tile.getHero() ) {
                 targetName = targetHero->GetName();
@@ -686,15 +756,14 @@ namespace
 
                 const double heroStrength = std::max( 1.0, hero->GetArmy().GetStrength() );
                 const double threatRatio = enemyStrength / garrisonStrength;
-                double score = 18800.0 + threatRatio * 4200.0 + heroStrength / strongestHeroStrength * 1200.0;
-                score *= 1.25;
 
                 StrategicAdvice advice;
                 advice.kind = threatRatio >= 1.0 ? StrategicAdviceKind::CASTLE_RELIEF : StrategicAdviceKind::DEFENSE;
+                advice.action = AdviceAction::MOVE_HERO;
                 advice.heroId = hero->GetID();
                 advice.targetIndex = castle->GetIndex();
                 advice.targetObjectType = MP2::OBJ_CASTLE;
-                advice.score = score;
+                advice.score = ( 18800.0 + threatRatio * 4200.0 + heroStrength / strongestHeroStrength * 1200.0 ) * 1.25;
                 advice.distance = distance;
                 advice.reachableThisTurn = true;
                 advice.title = hero->GetName() + ": Relieve " + castle->GetName();
@@ -727,14 +796,13 @@ namespace
             }
 
             const double strength = std::max( 1.0, hero->GetArmy().GetStrength() );
-            double score = frontier ? 7600.0 : 5900.0;
-            score *= strength < strongestHeroStrength * 0.75 ? 1.30 : 0.80;
 
             StrategicAdvice advice;
             advice.kind = frontier ? StrategicAdviceKind::FRONTIER_BREAKTHROUGH : StrategicAdviceKind::FOG_SWEEP;
+            advice.action = AdviceAction::MOVE_HERO;
             advice.heroId = hero->GetID();
             advice.targetIndex = targetIndex;
-            advice.score = score;
+            advice.score = ( frontier ? 7600.0 : 5900.0 ) * ( strength < strongestHeroStrength * 0.75 ? 1.30 : 0.80 );
             advice.distance = distance;
             advice.reachableThisTurn = true;
             advice.title = hero->GetName() + std::string( frontier ? ": Break the frontier" : ": Sweep the fog" );
@@ -775,8 +843,7 @@ namespace
                 }
 
                 const double castleStrength = castle->GetArmy().GetStrength();
-                const bool better = distance < bestDistance || ( distance == bestDistance && castleStrength > bestCastleStrength );
-                if ( better ) {
+                if ( distance < bestDistance || ( distance == bestDistance && castleStrength > bestCastleStrength ) ) {
                     bestCastle = castle;
                     bestDistance = distance;
                     bestCastleStrength = castleStrength;
@@ -787,21 +854,234 @@ namespace
                 continue;
             }
 
-            const double vulnerability = strongestHeroStrength / heroStrength;
-            double score = 6500.0 + std::min( 4.0, vulnerability ) * 900.0;
-            score += std::min( 2500.0, bestCastleStrength / std::max( 1.0, strongestHeroStrength ) * 1600.0 );
-
             StrategicAdvice advice;
             advice.kind = StrategicAdviceKind::REGROUP;
+            advice.action = AdviceAction::MOVE_HERO;
             advice.heroId = hero->GetID();
             advice.targetIndex = bestCastle->GetIndex();
             advice.targetObjectType = MP2::OBJ_CASTLE;
-            advice.score = score;
+            advice.score = 6500.0 + std::min( 4.0, strongestHeroStrength / heroStrength ) * 900.0
+                           + std::min( 2500.0, bestCastleStrength / std::max( 1.0, strongestHeroStrength ) * 1600.0 );
             advice.distance = bestDistance;
             advice.reachableThisTurn = true;
             advice.title = hero->GetName() + ": Regroup at " + bestCastle->GetName();
             advice.rationale = "Vulnerable field army can reach friendly cover before the turn ends";
             candidates.emplace_back( std::move( advice ) );
+        }
+    }
+
+    void appendTownTravelAdvice( std::vector<StrategicAdvice> & candidates, Kingdom & kingdom, const double strongestHeroStrength )
+    {
+        for ( Heroes * hero : kingdom.GetHeroes() ) {
+            if ( hero == nullptr || !hero->isActive() || !hero->MayStillMove( false, false ) || hero->GetMovePoints() == 0 ) {
+                continue;
+            }
+
+            AIWorldPathfinder pathfinder;
+            pathfinder.setMinimalArmyStrengthAdvantage( 1.10 );
+            pathfinder.reEvaluateIfNeeded( *hero );
+            const double heroStrength = std::max( 1.0, hero->GetArmy().GetStrength() );
+
+            for ( Castle * castle : kingdom.GetCastles() ) {
+                if ( castle == nullptr || castle->GetColor() != kingdom.GetColor() || castle->GetIndex() == hero->GetIndex() ) {
+                    continue;
+                }
+                if ( castle->GetHero() != nullptr && castle->GetHero() != hero ) {
+                    continue;
+                }
+
+                const uint32_t distance = pathfinder.getDistance( castle->GetIndex() );
+                if ( distance == 0 || distance == std::numeric_limits<uint32_t>::max() || distance > hero->GetMovePoints() ) {
+                    continue;
+                }
+
+                StrategicAdvice base;
+                base.kind = StrategicAdviceKind::TRAVEL_TO_TOWN;
+                base.action = AdviceAction::MOVE_HERO;
+                base.heroId = hero->GetID();
+                base.targetIndex = castle->GetIndex();
+                base.targetObjectType = MP2::OBJ_CASTLE;
+                base.score = 7000.0 + ( 1.0 - static_cast<double>( distance ) / std::max<uint32_t>( 1, hero->GetMovePoints() ) ) * 1200.0;
+                base.distance = distance;
+                base.reachableThisTurn = true;
+                base.title = hero->GetName() + ": Travel to " + castle->GetName();
+                base.rationale = "Reach a friendly town this turn for staging, safety and town access";
+                candidates.emplace_back( base );
+
+                if ( castle->GetArmy().GetStrength() > 0.0 || castle->getArmyRecruitmentValue() > 0.0 ) {
+                    StrategicAdvice resupply = base;
+                    resupply.kind = StrategicAdviceKind::TOWN_RESUPPLY;
+                    resupply.score += heroStrength < strongestHeroStrength * 0.72 ? 2600.0 : 800.0;
+                    resupply.title = hero->GetName() + ": Resupply at " + castle->GetName();
+                    resupply.rationale = "Return to a friendly town with troops or recruits available | executable this turn";
+                    candidates.emplace_back( std::move( resupply ) );
+                }
+
+                if ( heroStrength > std::max( 1.0, castle->GetArmy().GetStrength() ) * 1.25 ) {
+                    StrategicAdvice reinforce = base;
+                    reinforce.kind = StrategicAdviceKind::GARRISON_REINFORCEMENT;
+                    reinforce.score += 1700.0;
+                    reinforce.title = hero->GetName() + ": Reinforce " + castle->GetName();
+                    reinforce.rationale = "Bring a strong field army into a weaker friendly garrison before turn end";
+                    candidates.emplace_back( std::move( reinforce ) );
+                }
+            }
+        }
+    }
+
+    StrategicAdviceKind recruitmentKindForTier( const size_t tier )
+    {
+        switch ( tier ) {
+        case 0:
+            return StrategicAdviceKind::RECRUIT_TIER1;
+        case 1:
+            return StrategicAdviceKind::RECRUIT_TIER2;
+        case 2:
+            return StrategicAdviceKind::RECRUIT_TIER3;
+        case 3:
+            return StrategicAdviceKind::RECRUIT_TIER4;
+        case 4:
+            return StrategicAdviceKind::RECRUIT_TIER5;
+        default:
+            return StrategicAdviceKind::RECRUIT_TIER6;
+        }
+    }
+
+    bool hasRecruitmentRoom( const Castle & castle, const Monster & monster )
+    {
+        if ( castle.GetArmy().CanJoinTroop( monster ) ) {
+            return true;
+        }
+        if ( const Heroes * guestHero = castle.GetHero() ) {
+            return guestHero->GetArmy().CanJoinTroop( monster );
+        }
+        return false;
+    }
+
+    void appendRecruitmentAdvice( std::vector<StrategicAdvice> & candidates, Kingdom & kingdom )
+    {
+        static constexpr std::array<uint32_t, 6> baseDwellings{ DWELLING_MONSTER1, DWELLING_MONSTER2, DWELLING_MONSTER3,
+                                                                DWELLING_MONSTER4, DWELLING_MONSTER5, DWELLING_MONSTER6 };
+
+        for ( Castle * castle : kingdom.GetCastles() ) {
+            if ( castle == nullptr || castle->GetColor() != kingdom.GetColor() ) {
+                continue;
+            }
+
+            for ( size_t tier = 0; tier < baseDwellings.size(); ++tier ) {
+                const uint32_t baseDwelling = baseDwellings[tier];
+                const uint32_t actualDwelling = castle->GetActualDwelling( baseDwelling );
+                if ( actualDwelling == BUILD_NOTHING || !castle->isBuild( actualDwelling ) ) {
+                    continue;
+                }
+
+                const Monster monster( castle->GetRace(), actualDwelling );
+                if ( !hasRecruitmentRoom( *castle, monster ) ) {
+                    continue;
+                }
+
+                const uint32_t available = castle->getMonstersInDwelling( actualDwelling );
+                const uint32_t affordable = castle->getRecruitLimit( monster, kingdom.GetFunds() );
+                const uint32_t count = std::min( available, affordable );
+                if ( count == 0 ) {
+                    continue;
+                }
+
+                const Troop troop( monster, count );
+                StrategicAdvice advice;
+                advice.kind = recruitmentKindForTier( tier );
+                advice.action = AdviceAction::RECRUIT_CREATURES;
+                advice.targetIndex = castle->GetIndex();
+                advice.targetObjectType = MP2::OBJ_CASTLE;
+                advice.dwellingType = baseDwelling;
+                advice.recruitCount = count;
+                advice.score = 7600.0 + static_cast<double>( tier + 1 ) * 1450.0 + std::min( 4200.0, troop.GetStrength() * 0.12 );
+                advice.reachableThisTurn = true;
+                advice.title = castle->GetName() + ": Recruit " + std::to_string( count ) + " " + troop.GetPluralName( count );
+                advice.rationale = "Affordable creatures are waiting in this dwelling and there is army space now";
+                candidates.emplace_back( std::move( advice ) );
+            }
+        }
+    }
+
+    struct BuildingPlan
+    {
+        uint32_t building;
+        StrategicAdviceKind kind;
+        double score;
+    };
+
+    void appendBuildingAdvice( std::vector<StrategicAdvice> & candidates, Kingdom & kingdom )
+    {
+        static const std::vector<BuildingPlan> buildingPlans = {
+            { BUILD_CASTLE, StrategicAdviceKind::BUILD_CASTLE, 15800.0 },
+            { BUILD_STATUE, StrategicAdviceKind::BUILD_ECONOMY, 10300.0 },
+            { BUILD_MARKETPLACE, StrategicAdviceKind::BUILD_MARKETPLACE, 9800.0 },
+            { BUILD_THIEVESGUILD, StrategicAdviceKind::BUILD_ECONOMY, 6900.0 },
+            { BUILD_LEFTTURRET, StrategicAdviceKind::BUILD_DEFENSE, 8800.0 },
+            { BUILD_RIGHTTURRET, StrategicAdviceKind::BUILD_DEFENSE, 9000.0 },
+            { BUILD_MOAT, StrategicAdviceKind::BUILD_DEFENSE, 9400.0 },
+            { BUILD_CAPTAIN, StrategicAdviceKind::BUILD_DEFENSE, 9200.0 },
+            { BUILD_MAGEGUILD1, StrategicAdviceKind::BUILD_MAGIC_GUILD, 9000.0 },
+            { BUILD_MAGEGUILD2, StrategicAdviceKind::BUILD_MAGIC_GUILD, 9600.0 },
+            { BUILD_MAGEGUILD3, StrategicAdviceKind::BUILD_MAGIC_GUILD, 10200.0 },
+            { BUILD_MAGEGUILD4, StrategicAdviceKind::BUILD_MAGIC_GUILD, 10800.0 },
+            { BUILD_MAGEGUILD5, StrategicAdviceKind::BUILD_MAGIC_GUILD, 11400.0 },
+            { BUILD_WELL, StrategicAdviceKind::BUILD_WELL, 8600.0 },
+            { BUILD_WEL2, StrategicAdviceKind::BUILD_WELL, 9300.0 },
+            { BUILD_TAVERN, StrategicAdviceKind::BUILD_TAVERN, 7900.0 },
+            { BUILD_SPEC, StrategicAdviceKind::BUILD_SPECIAL, 10100.0 },
+            { BUILD_SHRINE, StrategicAdviceKind::BUILD_SPECIAL, 9000.0 },
+            { BUILD_SHIPYARD, StrategicAdviceKind::BUILD_SHIPYARD, 8300.0 },
+            { DWELLING_MONSTER1, StrategicAdviceKind::BUILD_DWELLING, 9600.0 },
+            { DWELLING_MONSTER2, StrategicAdviceKind::BUILD_DWELLING, 10400.0 },
+            { DWELLING_MONSTER3, StrategicAdviceKind::BUILD_DWELLING, 11200.0 },
+            { DWELLING_MONSTER4, StrategicAdviceKind::BUILD_DWELLING, 12000.0 },
+            { DWELLING_MONSTER5, StrategicAdviceKind::BUILD_DWELLING, 12800.0 },
+            { DWELLING_MONSTER6, StrategicAdviceKind::BUILD_DWELLING, 13600.0 },
+            { DWELLING_UPGRADE2, StrategicAdviceKind::UPGRADE_DWELLING, 10800.0 },
+            { DWELLING_UPGRADE3, StrategicAdviceKind::UPGRADE_DWELLING, 11600.0 },
+            { DWELLING_UPGRADE4, StrategicAdviceKind::UPGRADE_DWELLING, 12400.0 },
+            { DWELLING_UPGRADE5, StrategicAdviceKind::UPGRADE_DWELLING, 13200.0 },
+            { DWELLING_UPGRADE6, StrategicAdviceKind::UPGRADE_DWELLING, 14000.0 },
+            { DWELLING_UPGRADE7, StrategicAdviceKind::UPGRADE_DWELLING, 14800.0 }
+        };
+
+        const double spellInvestment = fheroes2::RPG::spellcastingInvestmentPercent( kingdom.GetColor() );
+
+        for ( Castle * castle : kingdom.GetCastles() ) {
+            if ( castle == nullptr || castle->GetColor() != kingdom.GetColor() ) {
+                continue;
+            }
+
+            for ( const BuildingPlan & plan : buildingPlans ) {
+                if ( !castle->AllowBuyBuilding( plan.building ) ) {
+                    continue;
+                }
+
+                double score = plan.score;
+                if ( plan.kind == StrategicAdviceKind::BUILD_MAGIC_GUILD ) {
+                    score *= 1.0 + std::min( 0.45, spellInvestment / 180.0 );
+                }
+                if ( plan.kind == StrategicAdviceKind::BUILD_ECONOMY || plan.kind == StrategicAdviceKind::BUILD_MARKETPLACE ) {
+                    const Funds & funds = kingdom.GetFunds();
+                    if ( funds.gold < 5000 || funds.wood < 10 || funds.ore < 10 ) {
+                        score *= 1.16;
+                    }
+                }
+
+                StrategicAdvice advice;
+                advice.kind = plan.kind;
+                advice.action = AdviceAction::BUILD_STRUCTURE;
+                advice.targetIndex = castle->GetIndex();
+                advice.targetObjectType = MP2::OBJ_CASTLE;
+                advice.buildingType = plan.building;
+                advice.score = score;
+                advice.reachableThisTurn = true;
+                advice.title = castle->GetName() + ": Build " + castle->GetStringBuilding( plan.building );
+                advice.rationale = "Legal and affordable construction right now | uses the normal town building rules";
+                candidates.emplace_back( std::move( advice ) );
+            }
         }
     }
 
@@ -878,6 +1158,7 @@ namespace
 
                 StrategicAdvice advice;
                 advice.kind = kind;
+                advice.action = AdviceAction::MOVE_HERO;
                 advice.heroId = hero->GetID();
                 advice.targetIndex = index;
                 advice.targetObjectType = MP2::OBJ_NONE;
@@ -889,6 +1170,12 @@ namespace
                 candidates.emplace_back( std::move( advice ) );
             }
         }
+    }
+
+    std::string adviceIdentity( const StrategicAdvice & advice )
+    {
+        return std::to_string( static_cast<int>( advice.action ) ) + ':' + std::to_string( static_cast<int>( advice.kind ) ) + ':' + std::to_string( advice.heroId ) + ':'
+               + std::to_string( advice.targetIndex ) + ':' + std::to_string( advice.buildingType ) + ':' + std::to_string( advice.dwellingType );
     }
 
     std::vector<StrategicAdvice> generateStrategicAdvice( Kingdom & kingdom )
@@ -904,6 +1191,9 @@ namespace
 
         appendDefensiveAdvice( candidates, kingdom, strongestHeroStrength );
         appendLogisticsAdvice( candidates, kingdom, strongestHeroStrength );
+        appendTownTravelAdvice( candidates, kingdom, strongestHeroStrength );
+        appendRecruitmentAdvice( candidates, kingdom );
+        appendBuildingAdvice( candidates, kingdom );
 
         const int mapSize = world.w() * world.h();
         for ( Heroes * hero : kingdom.GetHeroes() ) {
@@ -945,41 +1235,66 @@ namespace
 
         std::vector<StrategicAdvice> chosen;
         chosen.reserve( strategicAdviceCount );
-        std::set<int32_t> usedTargets;
+        std::set<int32_t> usedMovementTargets;
         std::set<StrategicAdviceKind> usedKinds;
+        std::set<std::string> usedIdentities;
         std::map<int32_t, size_t> perHero;
+        std::map<int32_t, size_t> perTown;
 
-        // Pass one: maximum strategic variety, two cards per hero at most.
+        // Pass one: maximum variety. Movement routes stay unique and town management is limited to two
+        // cards per town so one rich castle does not crowd all strategic movement off the council.
         for ( const StrategicAdvice & advice : candidates ) {
             if ( chosen.size() >= strategicAdviceCount ) {
                 break;
             }
-            if ( !advice.reachableThisTurn || usedKinds.count( advice.kind ) > 0 || usedTargets.count( advice.targetIndex ) > 0 || perHero[advice.heroId] >= 2 ) {
+
+            const bool movement = advice.action == AdviceAction::MOVE_HERO;
+            if ( !advice.reachableThisTurn || usedKinds.count( advice.kind ) > 0 || usedIdentities.count( adviceIdentity( advice ) ) > 0 ) {
+                continue;
+            }
+            if ( movement && ( usedMovementTargets.count( advice.targetIndex ) > 0 || perHero[advice.heroId] >= 2 ) ) {
+                continue;
+            }
+            if ( !movement && perTown[advice.targetIndex] >= 2 ) {
                 continue;
             }
 
             chosen.emplace_back( advice );
             usedKinds.insert( advice.kind );
-            usedTargets.insert( advice.targetIndex );
-            ++perHero[advice.heroId];
+            usedIdentities.insert( adviceIdentity( advice ) );
+            if ( movement ) {
+                usedMovementTargets.insert( advice.targetIndex );
+                ++perHero[advice.heroId];
+            }
+            else {
+                ++perTown[advice.targetIndex];
+            }
         }
 
-        // Pass two: keep unique destinations, but allow one hero to provide all five choices if it is the only active hero.
+        // Pass two: any other distinct executable action. Multiple building or recruiting choices from the
+        // same town are valid alternatives because the menu is regenerated immediately after one is chosen.
         for ( const StrategicAdvice & advice : candidates ) {
             if ( chosen.size() >= strategicAdviceCount ) {
                 break;
             }
-            if ( !advice.reachableThisTurn || usedTargets.count( advice.targetIndex ) > 0 ) {
+
+            const std::string identity = adviceIdentity( advice );
+            if ( !advice.reachableThisTurn || usedIdentities.count( identity ) > 0 ) {
+                continue;
+            }
+            if ( advice.action == AdviceAction::MOVE_HERO && usedMovementTargets.count( advice.targetIndex ) > 0 ) {
                 continue;
             }
 
             chosen.emplace_back( advice );
-            usedTargets.insert( advice.targetIndex );
+            usedIdentities.insert( identity );
+            if ( advice.action == AdviceAction::MOVE_HERO ) {
+                usedMovementTargets.insert( advice.targetIndex );
+            }
         }
 
-        // Extreme geometry can expose fewer than five unique reachable destinations. In that case, repeat a real
-        // executable route rather than inventing a Hold/Reserve card. The menu still offers five orders and every
-        // one can actually be issued this turn; after any choice the whole set is regenerated from the new position.
+        // If the kingdom has fewer than five distinct actions, repeat a currently executable action instead
+        // of fabricating a Hold/Reserve order. Only one card is ever executed before the council is regenerated.
         size_t repeatIndex = 0;
         while ( chosen.size() < strategicAdviceCount && !candidates.empty() ) {
             StrategicAdvice repeated = candidates[repeatIndex % candidates.size()];
@@ -988,12 +1303,14 @@ namespace
                 continue;
             }
 
-            if ( repeated.targetObjectType == MP2::OBJ_NONE ) {
+            if ( repeated.action == AdviceAction::MOVE_HERO && repeated.targetObjectType == MP2::OBJ_NONE ) {
                 static constexpr std::array<StrategicAdviceKind, 4> maneuverKinds{ StrategicAdviceKind::SAFE_ADVANCE, StrategicAdviceKind::FLANKING_MARCH,
                                                                                   StrategicAdviceKind::ROAD_MARCH,
                                                                                   StrategicAdviceKind::TERRITORIAL_PRESSURE };
                 repeated.kind = maneuverKinds[chosen.size() % maneuverKinds.size()];
-                repeated.title = world.GetHeroes( repeated.heroId )->GetName() + std::string( ": " ) + adviceKindName( repeated.kind );
+                if ( const Heroes * hero = world.GetHeroes( repeated.heroId ) ) {
+                    repeated.title = hero->GetName() + std::string( ": " ) + adviceKindName( repeated.kind );
+                }
                 repeated.rationale = "Alternative executable maneuver on the same proven-safe route | this turn";
             }
             chosen.emplace_back( std::move( repeated ) );
@@ -1043,7 +1360,7 @@ namespace
                 const fheroes2::Text title( "WAR COUNCIL", fheroes2::FontType::normalYellow() );
                 title.draw( area.x + 10, area.y + 4, area.width - 20, display );
 
-                const fheroes2::Text subtitle( "Five executable orders for this turn - choose one for the AI to carry out.", fheroes2::FontType::smallWhite() );
+                const fheroes2::Text subtitle( "Five executable orders - movement, recruitment and construction.", fheroes2::FontType::smallWhite() );
                 subtitle.draw( area.x + 10, area.y + 23, area.width - 20, display );
 
                 if ( !councilReport.empty() ) {
@@ -1057,12 +1374,13 @@ namespace
                     window.applyTextBackgroundShading( rows[index] );
 
                     const StrategicAdvice & advice = advices[index];
+                    int32_t textX = rows[index].x + 8;
+                    int32_t textWidth = rows[index].width - 18;
                     if ( const Heroes * hero = world.GetHeroes( advice.heroId ) ) {
                         hero->PortraitRedraw( rows[index].x + 6, rows[index].y + 6, PORT_SMALL, display );
+                        textX = rows[index].x + 52;
+                        textWidth = rows[index].width - 62;
                     }
-
-                    const int32_t textX = rows[index].x + 52;
-                    const int32_t textWidth = rows[index].width - 62;
 
                     std::string headingText = ( hoverIndex == index ? "> " : "" );
                     headingText += std::to_string( index + 1 ) + ". [" + adviceKindName( advice.kind ) + "] " + advice.title;
@@ -1128,7 +1446,77 @@ namespace
         const int _originalControl;
     };
 
-    AdviceExecutionResult executeStrategicAdvice( Kingdom & kingdom, Player & player, const StrategicAdvice & advice )
+    Castle * getOwnedAdviceCastle( Kingdom & kingdom, const int32_t targetIndex )
+    {
+        if ( targetIndex < 0 || targetIndex >= world.w() * world.h() ) {
+            return nullptr;
+        }
+
+        Castle * castle = world.getCastleEntrance( Maps::GetPoint( targetIndex ) );
+        return castle != nullptr && castle->GetColor() == kingdom.GetColor() ? castle : nullptr;
+    }
+
+    void redrawAfterTownAction()
+    {
+        Interface::AdventureMap & adventureMap = Interface::AdventureMap::Get();
+        adventureMap.redraw( Interface::REDRAW_GAMEAREA | Interface::REDRAW_RADAR | Interface::REDRAW_HEROES | Interface::REDRAW_STATUS | Interface::REDRAW_BUTTONS );
+        fheroes2::Display::instance().render();
+    }
+
+    AdviceExecutionResult executeRecruitmentAdvice( Kingdom & kingdom, const StrategicAdvice & advice )
+    {
+        Castle * castle = getOwnedAdviceCastle( kingdom, advice.targetIndex );
+        if ( castle == nullptr ) {
+            return { false, "Order expired: the town is no longer under your control." };
+        }
+
+        const uint32_t actualDwelling = castle->GetActualDwelling( advice.dwellingType );
+        if ( actualDwelling == BUILD_NOTHING || !castle->isBuild( actualDwelling ) ) {
+            return { false, "Order expired: the required dwelling is no longer available." };
+        }
+
+        const Monster monster( castle->GetRace(), actualDwelling );
+        if ( !hasRecruitmentRoom( *castle, monster ) ) {
+            return { false, "Order expired: the town and visiting hero no longer have room for this creature." };
+        }
+
+        const uint32_t available = castle->getMonstersInDwelling( actualDwelling );
+        const uint32_t affordable = castle->getRecruitLimit( monster, kingdom.GetFunds() );
+        const uint32_t count = std::min( advice.recruitCount, std::min( available, affordable ) );
+        if ( count == 0 ) {
+            return { false, "Order expired: those creatures are no longer affordable or available." };
+        }
+
+        const Troop troop( monster, count );
+        if ( !castle->RecruitMonster( troop, false ) ) {
+            return { false, "Order failed: the normal town recruitment system rejected the purchase." };
+        }
+
+        redrawAfterTownAction();
+        return { true, "Executed [" + std::string( adviceKindName( advice.kind ) ) + "]: recruited " + std::to_string( count ) + " "
+                           + troop.GetPluralName( count ) + " at " + castle->GetName() };
+    }
+
+    AdviceExecutionResult executeBuildingAdvice( Kingdom & kingdom, const StrategicAdvice & advice )
+    {
+        Castle * castle = getOwnedAdviceCastle( kingdom, advice.targetIndex );
+        if ( castle == nullptr ) {
+            return { false, "Order expired: the town is no longer under your control." };
+        }
+        if ( advice.buildingType == BUILD_NOTHING || !castle->AllowBuyBuilding( advice.buildingType ) ) {
+            return { false, "Order expired: that structure can no longer be built this turn." };
+        }
+
+        const std::string buildingName = castle->GetStringBuilding( advice.buildingType );
+        if ( !castle->BuyBuilding( advice.buildingType ) ) {
+            return { false, "Order failed: the normal town construction system rejected the build." };
+        }
+
+        redrawAfterTownAction();
+        return { true, "Executed [" + std::string( adviceKindName( advice.kind ) ) + "]: built " + buildingName + " in " + castle->GetName() };
+    }
+
+    AdviceExecutionResult executeMovementAdvice( Kingdom & kingdom, Player & player, const StrategicAdvice & advice )
     {
         Heroes * hero = world.GetHeroes( advice.heroId );
         if ( hero == nullptr || !hero->isActive() || hero->GetColor() != kingdom.GetColor() ) {
@@ -1181,8 +1569,7 @@ namespace
             adventureMap.RedrawFocus();
         }
 
-        adventureMap.redraw( Interface::REDRAW_GAMEAREA | Interface::REDRAW_RADAR | Interface::REDRAW_HEROES | Interface::REDRAW_STATUS | Interface::REDRAW_BUTTONS );
-        fheroes2::Display::instance().render();
+        redrawAfterTownAction();
 
         const bool positionChanged = !hero->isActive() || hero->GetIndex() != startingIndex;
         const bool targetReached = hero->isActive() && hero->GetIndex() == advice.targetIndex;
@@ -1210,6 +1597,19 @@ namespace
         return { true, std::move( message ) };
     }
 
+    AdviceExecutionResult executeStrategicAdvice( Kingdom & kingdom, Player & player, const StrategicAdvice & advice )
+    {
+        switch ( advice.action ) {
+        case AdviceAction::RECRUIT_CREATURES:
+            return executeRecruitmentAdvice( kingdom, advice );
+        case AdviceAction::BUILD_STRUCTURE:
+            return executeBuildingAdvice( kingdom, advice );
+        case AdviceAction::MOVE_HERO:
+        default:
+            return executeMovementAdvice( kingdom, player, advice );
+        }
+    }
+
     void showRpgStrategicAdvisor()
     {
         Settings & settings = Settings::Get();
@@ -1229,7 +1629,7 @@ namespace
         for ( size_t refresh = 0; refresh < 64; ++refresh ) {
             const std::vector<StrategicAdvice> advices = generateStrategicAdvice( kingdom );
             if ( advices.size() < strategicAdviceCount ) {
-                fheroes2::showStandardTextMessage( "War Council", "No hero has enough remaining movement for five executable orders this turn.", Dialog::OK );
+                fheroes2::showStandardTextMessage( "War Council", "Fewer than five executable orders remain this turn.", Dialog::OK );
                 return;
             }
 
