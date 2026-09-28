@@ -220,6 +220,7 @@ fheroes2::GameMode Interface::ButtonsPanel::queueEventProcessing()
         if ( currentHero != nullptr ) {
             message += "\n\n" + currentHero->GetName();
             message += "\nRole: " + fheroes2::RPG::heroRoleText( currentHero->GetColor(), currentHero->GetID() );
+            message += "\nMastery: " + fheroes2::RPG::heroMasteryText( currentHero->GetColor(), currentHero->GetID() );
             message += "\nLegacy: " + fheroes2::RPG::heroLegacyText( currentHero->GetID() );
             message += "\nChronicle: " + fheroes2::RPG::heroChronicleText( currentHero->GetID() );
         }
