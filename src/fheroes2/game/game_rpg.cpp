@@ -77,9 +77,14 @@ namespace fheroes2
 }
 
 // Intercept only calls originating from the RPG implementation in this translation unit.
-// The real shared dialog API is not modified.
+// The real shared dialog API is not modified. Battle and town-capture awards are wrapped below
+// so Hero Mastery can feed milestone rewards back into the existing RPG XP progression loop.
 #define showStandardTextMessage rpgShowStandardTextMessage
+#define awardBattle rpgAwardBattleImpl
+#define awardTownCapture rpgAwardTownCaptureImpl
 #include "game_rpg_impl.inc"
+#undef awardTownCapture
+#undef awardBattle
 #undef showStandardTextMessage
 
 namespace
@@ -89,6 +94,7 @@ namespace
     };
 
     constexpr std::array<uint64_t, 5> heroMasteryThresholds{ 0, 2500, 10000, 40000, 150000 };
+    constexpr std::array<uint64_t, 5> heroMasteryRewardExperience{ 0, 1000, 2500, 6000, 12500 };
     constexpr std::array<const char *, 5> adventurerMasteryTitles{ "Wanderer", "Pathfinder", "Trailblazer", "Hero", "Living Legend" };
     constexpr std::array<std::array<const char *, 5>, 8> heroMasteryTitles{ {
         std::array<const char *, 5>{ "Line Recruit", "Shieldbearer", "Vanguard", "War Captain", "Iron Legend" },
@@ -107,11 +113,16 @@ namespace
     constexpr std::array<uint64_t, 6> heroStreakThresholds{ 0, 5, 15, 40, 100, 250 };
     constexpr std::array<const char *, 6> heroStreakLabels{ "Quiet", "Gathering", "Hot", "Dominant", "Relentless", "Legendary Run" };
 
+    static_assert( heroMasteryThresholds.size() == heroMasteryRewardExperience.size() );
     static_assert( heroMasteryThresholds[0] == 0 );
+    static_assert( heroMasteryRewardExperience[0] == 0 );
     static_assert( heroMasteryThresholds[0] < heroMasteryThresholds[1] );
     static_assert( heroMasteryThresholds[1] < heroMasteryThresholds[2] );
     static_assert( heroMasteryThresholds[2] < heroMasteryThresholds[3] );
     static_assert( heroMasteryThresholds[3] < heroMasteryThresholds[4] );
+    static_assert( heroMasteryRewardExperience[1] < heroMasteryRewardExperience[2] );
+    static_assert( heroMasteryRewardExperience[2] < heroMasteryRewardExperience[3] );
+    static_assert( heroMasteryRewardExperience[3] < heroMasteryRewardExperience[4] );
     static_assert( heroStreakThresholds[0] == 0 );
     static_assert( heroStreakThresholds[0] < heroStreakThresholds[1] );
     static_assert( heroStreakThresholds[1] < heroStreakThresholds[2] );
@@ -187,6 +198,27 @@ namespace
         return 0;
     }
 
+    uint64_t heroMasteryMilestoneReward( const uint64_t before, const uint64_t after )
+    {
+        if ( after <= before ) {
+            return 0;
+        }
+
+        uint64_t reward = 0;
+        for ( size_t tier = 1; tier < heroMasteryThresholds.size(); ++tier ) {
+            if ( before < heroMasteryThresholds[tier] && after >= heroMasteryThresholds[tier] ) {
+                reward = saturatedAdd( reward, heroMasteryRewardExperience[tier] );
+            }
+        }
+        return reward;
+    }
+
+    uint64_t nextHeroMasteryReward( const uint64_t score )
+    {
+        const size_t tier = heroMasteryTierIndex( score );
+        return tier + 1 < heroMasteryRewardExperience.size() ? heroMasteryRewardExperience[tier + 1] : 0;
+    }
+
     size_t heroStreakTierIndex( const uint64_t score )
     {
         for ( size_t i = heroStreakThresholds.size(); i > 0; --i ) {
@@ -203,6 +235,30 @@ namespace
             return adventurerMasteryTitles[tier];
         }
         return heroMasteryTitles[hall][tier];
+    }
+}
+
+namespace fheroes2::RPG
+{
+    void awardBattle( const PlayerColor color, const PlayerColor opponent, const uint32_t battleExperience, const bool won, const bool defending,
+                      const bool siege, const int32_t heroId )
+    {
+        const uint64_t masteryBefore = heroMasteryScore( heroId );
+        rpgAwardBattleImpl( color, opponent, battleExperience, won, defending, siege, heroId );
+        const uint64_t milestoneReward = heroMasteryMilestoneReward( masteryBefore, heroMasteryScore( heroId ) );
+        if ( milestoneReward > 0 ) {
+            static_cast<void>( addExperience( color, milestoneReward, ExperienceKind::HERO ) );
+        }
+    }
+
+    void awardTownCapture( const PlayerColor color, const int32_t heroId )
+    {
+        const uint64_t masteryBefore = heroMasteryScore( heroId );
+        rpgAwardTownCaptureImpl( color, heroId );
+        const uint64_t milestoneReward = heroMasteryMilestoneReward( masteryBefore, heroMasteryScore( heroId ) );
+        if ( milestoneReward > 0 ) {
+            static_cast<void>( addExperience( color, milestoneReward, ExperienceKind::HERO ) );
+        }
     }
 }
 
@@ -246,10 +302,11 @@ std::string fheroes2::RPG::heroMasteryText( const PlayerColor color, const int32
         const uint64_t nextThreshold = heroMasteryThresholds[tier + 1];
         const uint64_t remaining = nextThreshold > score ? nextThreshold - score : 0;
         text += " / " + formatNumber( nextThreshold );
-        text += " (" + formatNumber( remaining ) + " to " + heroMasteryTitle( hall, hallRanks, tier + 1 ) + ")";
+        text += " (" + formatNumber( remaining ) + " to " + heroMasteryTitle( hall, hallRanks, tier + 1 );
+        text += "; +" + formatExperience( nextHeroMasteryReward( score ) ) + " RPG XP)";
     }
     else {
-        text += " (maximum mastery tier)";
+        text += " (maximum mastery tier; all mastery rewards earned)";
     }
 
     return text;
@@ -340,6 +397,10 @@ std::string fheroes2::RPG::heroInspectionSummary( const PlayerColor color, const
     summary += " - " + formatNumber( score );
     if ( tier + 1 < heroMasteryThresholds.size() ) {
         summary += " / " + formatNumber( heroMasteryThresholds[tier + 1] );
+        summary += "; next reward +" + formatExperience( nextHeroMasteryReward( score ) ) + " RPG XP";
+    }
+    else {
+        summary += "; all mastery rewards earned";
     }
 
     summary += "\nMomentum: " + heroStreakText( heroId );
