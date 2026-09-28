@@ -553,7 +553,7 @@ namespace
                     reason.draw( textX, rows[index].y + 25, display );
                 }
 
-                const fheroes2::Text hint( "Choose the counsel that fits your plan. Esc returns control; the council never ends the turn.", fheroes2::FontType::smallWhite() );
+                fheroes2::Text hint( "Choose the counsel that fits your plan. Esc returns control; the council never ends the turn.", fheroes2::FontType::smallWhite() );
                 hint.fitToOneRow( area.width - 132 );
                 hint.draw( area.x + 12, area.y + area.height - 21, display );
                 closeButton.draw();
