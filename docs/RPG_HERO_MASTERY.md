@@ -25,6 +25,23 @@ The calculation uses saturation-safe 64-bit arithmetic. Existing saves gain mast
 
 The strongest doctrine hall supplies the hero's current calling. If no doctrine ranks have been purchased, the hero follows the generic Adventurer title track. Respeccing or changing the kingdom doctrine emphasis can therefore change the calling while the hero's earned mastery score remains derived from their persistent accomplishments.
 
+## Mastery milestone rewards
+
+Hero Mastery now feeds successful expedition deeds back into the existing kingdom progression loop. When a battle victory or enemy castle capture pushes a hero across a new Mastery tier, the kingdom receives a one-time RPG XP reward:
+
+| Newly reached tier | RPG XP reward |
+| --- | ---: |
+| II | 1,000 |
+| III | 2,500 |
+| IV | 6,000 |
+| V | 12,500 |
+
+These rewards do not add a new currency, skill screen, save field, or hidden combat modifier. The XP goes through the normal RPG experience path, so it contributes to kingdom levels and therefore to the existing Guild Points that the player spends on doctrine choices.
+
+Reward eligibility is derived at the moment a qualifying deed is recorded by comparing the hero's Mastery score immediately before and after that deed. A single exceptional deed can legitimately cross more than one threshold and earns every newly crossed reward. Heroes already beyond a threshold do not repeatedly earn it, and old saves do not receive a retroactive lump sum simply for loading.
+
+The compact Mastery readouts show the next threshold and the RPG XP attached to it. At Tier V they state that all Mastery rewards have been earned.
+
 ## Role title tracks
 
 | Calling | I | II | III | IV | V |
@@ -80,7 +97,7 @@ The Momentum line shows the current score, current label, next threshold, and re
 
 ## UI & Field Ledger
 
-- **Adventure Map Next Hero Button**: Right-click or hold the **Next Hero** button while a hero is focused. The compact hero inspection panel shows Role, Mastery, Campaign Momentum, Legacy, Chronicle deeds, and earned Accolade together. Every word is fully unabbreviated, and the card is formatted compactly so it never overflows screen bounds.
+- **Adventure Map Next Hero Button**: Right-click or hold the **Next Hero** button while a hero is focused. The compact hero inspection panel shows Role, Mastery, the next Mastery XP reward, Campaign Momentum, Legacy, Chronicle deeds, and earned Accolade together. Every word is fully unabbreviated, and the card is formatted compactly so it never overflows screen bounds.
 - **Royal Guild Field Ledger**: Press **F** inside the Royal Guild menu to open the **RPG Field Ledger**. The ledger provides a complete expedition roster of all active heroes in the realm, their current Calling, Mastery Standing, Campaign Momentum, Accolades, and military triumphs.
 
-Mastery, Accolades, and Campaign Momentum are intentionally identity/progression layers rather than additional hidden combat multipliers. Kingdom-wide doctrine mechanics continue to own combat scaling, so hero identity does not silently stack duplicate bonuses onto existing RPG combat systems.
+Mastery milestone XP deliberately feeds the existing kingdom-level doctrine progression rather than adding hero-only combat scaling. Kingdom-wide doctrine mechanics continue to own combat modifiers, so hero identity does not silently stack duplicate bonuses onto existing RPG combat systems.
