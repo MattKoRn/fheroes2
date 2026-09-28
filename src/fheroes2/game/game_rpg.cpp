@@ -5,7 +5,9 @@
 // smaller resolutions while leaving every non-RPG dialog untouched.
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -105,3 +107,70 @@ namespace fheroes2
 #define showStandardTextMessage rpgShowStandardTextMessage
 #include "game_rpg_impl.inc"
 #undef showStandardTextMessage
+
+namespace
+{
+    constexpr std::array<const char *, 8> heroRoleCallings{
+        "Vanguard", "Reaver", "Strategist", "Sentinel", "Arcanist", "Warden", "Marshal", "Paragon"
+    };
+
+    std::pair<size_t, uint64_t> strongestDoctrineHall( const PlayerColor color )
+    {
+        constexpr size_t doctrineHalls = heroRoleCallings.size();
+        constexpr size_t doctrinesPerHall = static_cast<size_t>( fheroes2::RPG::UPGRADE_COUNT ) / doctrineHalls;
+        static_assert( doctrinesPerHall * doctrineHalls == static_cast<size_t>( fheroes2::RPG::UPGRADE_COUNT ) );
+
+        size_t strongestHall = 0;
+        uint64_t strongestScore = 0;
+
+        for ( size_t hall = 0; hall < doctrineHalls; ++hall ) {
+            uint64_t score = 0;
+            for ( size_t offset = 0; offset < doctrinesPerHall; ++offset ) {
+                const uint64_t rank = fheroes2::RPG::doctrineRank( color, hall * doctrinesPerHall + offset );
+                score = rank > std::numeric_limits<uint64_t>::max() - score ? std::numeric_limits<uint64_t>::max() : score + rank;
+            }
+
+            // Strict comparison intentionally gives ties a deterministic hall-order priority.
+            if ( score > strongestScore ) {
+                strongestScore = score;
+                strongestHall = hall;
+            }
+        }
+
+        return { strongestHall, strongestScore };
+    }
+}
+
+std::string fheroes2::RPG::heroLegacyText( const int32_t heroId )
+{
+    return heroLegacyProgressText( heroRenown( heroId ) );
+}
+
+std::string fheroes2::RPG::heroChronicleText( const int32_t heroId )
+{
+    const auto entry = heroChronicleLedger.find( heroId );
+    if ( entry == heroChronicleLedger.end() ) {
+        return heroChronicleSummary( HeroChronicle{} );
+    }
+
+    return heroChronicleSummary( entry->second );
+}
+
+std::string fheroes2::RPG::heroRoleText( const PlayerColor color, const int32_t heroId )
+{
+    const auto chronicleEntry = heroChronicleLedger.find( heroId );
+    const HeroChronicle emptyChronicle{};
+    const HeroChronicle & chronicle = chronicleEntry == heroChronicleLedger.end() ? emptyChronicle : chronicleEntry->second;
+
+    std::string role = heroChronicleEpithet( chronicle );
+    const auto [hall, hallRanks] = strongestDoctrineHall( color );
+    if ( hallRanks == 0 ) {
+        role += " Adventurer";
+        return role;
+    }
+
+    role += ' ';
+    role += heroRoleCallings[hall];
+    role += " (" + formatNumber( hallRanks ) + " hall ranks)";
+    return role;
+}
