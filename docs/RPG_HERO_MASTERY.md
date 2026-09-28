@@ -40,9 +40,9 @@ The strongest doctrine hall supplies the hero's current calling. If no doctrine 
 | Paragon | Aspirant | Champion | Paragon | Exemplar | Living Myth |
 
 ## Campaign Accolades
- 
+
 Heroes also earn persistent Campaign Accolades derived dynamically from their recorded battle victories, castle captures, elite rival triumphs, and personal renown:
- 
+
 - **Nemesis of Elite Rivals**: 5+ Elite Rival victories
 - **Vanquisher of the Elite**: 1+ Elite Rival victory
 - **Conqueror of Realms**: 10+ Castle captures
@@ -54,10 +54,33 @@ Heroes also earn persistent Campaign Accolades derived dynamically from their re
 - **Paragon of Renown**: 50,000+ Renown
 - **Hero of the Realm**: 10,000+ Renown
 - **Initiate of the Expedition**: Standard starting honorific
- 
+
+## Campaign Momentum
+
+Campaign Momentum is a streak-style identity track reconstructed from the same persistent Hero Chronicle, so it requires no new save field and works immediately with existing saves. It measures sustained expedition success rather than claiming to be an undefeated or consecutive battle-win counter; the Chronicle stores aggregate accomplishments, not a complete chronological win/loss history.
+
+Momentum scoring is deliberately simple and visible:
+
+- Each recorded battle victory contributes **1 momentum**.
+- Each recorded enemy castle capture contributes **3 momentum**.
+- Each recorded Elite Rival victory contributes **6 additional momentum**.
+
+Elite victories are already included in battle-victory totals; their additional six points intentionally reflect the greater achievement. All arithmetic uses the same saturation-safe 64-bit helpers as the rest of the RPG progression layer.
+
+| Momentum | Streak label |
+| ---: | --- |
+| 0 | Quiet |
+| 5 | Gathering |
+| 15 | Hot |
+| 40 | Dominant |
+| 100 | Relentless |
+| 250 | Legendary Run |
+
+The Momentum line shows the current score, current label, next threshold, and remaining momentum. It is an identity/progression display only and does not add a hidden combat multiplier.
+
 ## UI & Field Ledger
- 
-- **Adventure Map Next Hero Button**: Right-click or hold the **Next Hero** button while a hero is focused. The compact hero inspection panel shows Role, Mastery, Legacy, Chronicle deeds, and earned Accolade together. Every word is fully unabbreviated, and the card is formatted compactly so it never overflows screen bounds.
-- **Royal Guild Field Ledger**: Press **F** inside the Royal Guild menu to open the **RPG Field Ledger**. The ledger provides a complete expedition roster of all active heroes in the realm, their current Calling, Mastery Standing, Accolades, and military triumphs.
- 
-Mastery is intentionally an identity/progression layer rather than another hidden combat multiplier. Kingdom-wide doctrine mechanics continue to own combat scaling, so hero identity does not silently stack duplicate bonuses onto existing RPG combat systems.
+
+- **Adventure Map Next Hero Button**: Right-click or hold the **Next Hero** button while a hero is focused. The compact hero inspection panel shows Role, Mastery, Campaign Momentum, Legacy, Chronicle deeds, and earned Accolade together. Every word is fully unabbreviated, and the card is formatted compactly so it never overflows screen bounds.
+- **Royal Guild Field Ledger**: Press **F** inside the Royal Guild menu to open the **RPG Field Ledger**. The ledger provides a complete expedition roster of all active heroes in the realm, their current Calling, Mastery Standing, Campaign Momentum, Accolades, and military triumphs.
+
+Mastery, Accolades, and Campaign Momentum are intentionally identity/progression layers rather than additional hidden combat multipliers. Kingdom-wide doctrine mechanics continue to own combat scaling, so hero identity does not silently stack duplicate bonuses onto existing RPG combat systems.
