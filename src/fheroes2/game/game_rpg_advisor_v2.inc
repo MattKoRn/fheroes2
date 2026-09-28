@@ -86,7 +86,7 @@ namespace
         }
     }
 
-    double councilBenefitScore( const StrategicAdvice & advice, const double strongestHeroStrength )
+    double councilBenefitScoreV2( const StrategicAdvice & advice, const double strongestHeroStrength )
     {
         double score = advice.score;
         switch ( advice.kind ) {
@@ -376,7 +376,7 @@ namespace
         return chosen;
     }
 
-    std::vector<StrategicAdvice> generateStrategicAdvice( Kingdom & kingdom )
+    std::vector<StrategicAdvice> generateStrategicAdviceV2( Kingdom & kingdom )
     {
         std::vector<StrategicAdvice> candidates;
         double strongestHeroStrength = 1.0;
@@ -427,7 +427,7 @@ namespace
             if ( isRepeatableLowValueCouncilAdvice( advice.kind ) ) {
                 continue;
             }
-            advice.score = councilBenefitScore( advice, strongestHeroStrength );
+            advice.score = councilBenefitScoreV2( advice, strongestHeroStrength );
             if ( advice.score >= 2500.0 && std::isfinite( advice.score ) ) {
                 filtered.emplace_back( std::move( advice ) );
             }
@@ -441,7 +441,7 @@ namespace
         return chosen;
     }
 
-    const char * councilPriorityLabel( const double score )
+    const char * councilPriorityLabelV2( const double score )
     {
         if ( score >= 14000.0 ) return "DECISIVE";
         if ( score >= 9500.0 ) return "STRONG";
@@ -449,7 +449,7 @@ namespace
         return "USEFUL";
     }
 
-    int selectStrategicAdvice( const std::vector<StrategicAdvice> & advices, const std::string & councilReport, Kingdom & kingdom )
+    int selectStrategicAdviceV2( const std::vector<StrategicAdvice> & advices, const std::string & councilReport, Kingdom & kingdom )
     {
         if ( advices.empty() ) return -1;
         const CursorRestorer cursorRestorer( true, ::Cursor::POINTER );
@@ -504,7 +504,7 @@ namespace
                         textWidth = rows[index].width - 61;
                     }
                     std::string headingText = ( hoverIndex == index ? "> " : "" );
-                    headingText += std::to_string( index + 1 ) + ". " + councilPriorityLabel( advice.score ) + "  [" + adviceKindName( advice.kind ) + "]  " + advice.title;
+                    headingText += std::to_string( index + 1 ) + ". " + councilPriorityLabelV2( advice.score ) + "  [" + adviceKindName( advice.kind ) + "]  " + advice.title;
                     fheroes2::Text heading( headingText, fheroes2::FontType::smallYellow() );
                     heading.fitToOneRow( textWidth );
                     heading.draw( textX, rows[index].y + 5, display );
@@ -530,7 +530,7 @@ namespace
         return -1;
     }
 
-    void showRpgStrategicAdvisor()
+    void showRpgStrategicAdvisorV2()
     {
         Settings & settings = Settings::Get();
         Player * player = settings.GetPlayers().GetCurrent();
@@ -541,7 +541,7 @@ namespace
         std::string councilReport;
         std::set<std::string> failedOrders;
         while ( hasMovableCouncilHeroes( kingdom ) ) {
-            std::vector<StrategicAdvice> advices = generateStrategicAdvice( kingdom );
+            std::vector<StrategicAdvice> advices = generateStrategicAdviceV2( kingdom );
             if ( !failedOrders.empty() ) {
                 advices.erase( std::remove_if( advices.begin(), advices.end(), [&]( const StrategicAdvice & advice ) { return failedOrders.count( adviceIdentity( advice ) ) > 0; } ), advices.end() );
             }
@@ -549,7 +549,7 @@ namespace
                 fheroes2::showStandardTextMessage( "War Council", "No beneficial executable order remains in the current position. Your turn is still active and the council has not ended it.", Dialog::OK );
                 return;
             }
-            const int selection = selectStrategicAdvice( advices, councilReport, kingdom );
+            const int selection = selectStrategicAdviceV2( advices, councilReport, kingdom );
             if ( selection < 0 || static_cast<size_t>( selection ) >= advices.size() ) return;
             const StrategicAdvice selected = advices[selection];
             const AdviceExecutionResult execution = executeStrategicAdvice( kingdom, *player, selected );
