@@ -44,6 +44,7 @@ namespace fheroes2::RPG
     [[nodiscard]] std::string heroRoleText( PlayerColor color, int32_t heroId );
     [[nodiscard]] std::string heroMasteryText( PlayerColor color, int32_t heroId );
     [[nodiscard]] std::string heroAccoladeText( int32_t heroId );
+    [[nodiscard]] std::string heroStreakText( int32_t heroId );
     [[nodiscard]] std::string heroInspectionSummary( PlayerColor color, int32_t heroId );
 
     // Persistent RPG combat affixes used by battle stacks. These accessors are intentionally
