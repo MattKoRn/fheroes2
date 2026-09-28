@@ -636,7 +636,7 @@ namespace
             }
         }
         else if ( objectType == MP2::OBJ_CASTLE ) {
-            if ( const Castle * castle = world.getCastleEntrance( Maps::GetPoint( tile.GetIndex() ) ) {
+            if ( const Castle * castle = world.getCastleEntrance( Maps::GetPoint( tile.GetIndex() ) ) ) {
                 targetName = castle->GetName();
             }
         }
