@@ -8,6 +8,7 @@
 #include <array>
 #include <cstddef>
 #include <limits>
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
@@ -79,12 +80,16 @@ namespace fheroes2
 // Intercept only calls originating from the RPG implementation in this translation unit.
 // The real shared dialog API is not modified. Battle and town-capture awards are wrapped below
 // so Hero Mastery can feed milestone rewards back into the existing RPG XP progression loop.
+// addExperience is also wrapped so external offline awards can make their rare doctrine-drop roll
+// without changing any of the implementation's ordinary field XP paths.
 #define showStandardTextMessage rpgShowStandardTextMessage
+#define addExperience rpgAddExperienceImpl
 #define awardBattle rpgAwardBattleImpl
 #define awardTownCapture rpgAwardTownCaptureImpl
 #include "game_rpg_impl.inc"
 #undef awardTownCapture
 #undef awardBattle
+#undef addExperience
 #undef showStandardTextMessage
 
 namespace
@@ -113,6 +118,11 @@ namespace
     constexpr std::array<uint64_t, 6> heroStreakThresholds{ 0, 5, 15, 40, 100, 250 };
     constexpr std::array<const char *, 6> heroStreakLabels{ "Quiet", "Gathering", "Hot", "Dominant", "Relentless", "Legendary Run" };
 
+    constexpr uint64_t battleDoctrineDropDenominator = 500;
+    constexpr uint64_t offlineDoctrineDropDenominator = 5000;
+    constexpr uint64_t offlineDoctrineXpPerRoll = 2500;
+    constexpr uint64_t maximumOfflineDoctrineRolls = 10;
+
     static_assert( heroMasteryThresholds.size() == heroMasteryRewardExperience.size() );
     static_assert( heroMasteryThresholds[0] == 0 );
     static_assert( heroMasteryRewardExperience[0] == 0 );
@@ -129,6 +139,92 @@ namespace
     static_assert( heroStreakThresholds[2] < heroStreakThresholds[3] );
     static_assert( heroStreakThresholds[3] < heroStreakThresholds[4] );
     static_assert( heroStreakThresholds[4] < heroStreakThresholds[5] );
+    static_assert( battleDoctrineDropDenominator > 1 );
+    static_assert( offlineDoctrineDropDenominator > battleDoctrineDropDenominator );
+    static_assert( offlineDoctrineXpPerRoll > 0 );
+    static_assert( maximumOfflineDoctrineRolls > 0 );
+
+    std::mt19937_64 & doctrineDropRng()
+    {
+        static std::mt19937_64 rng = []() {
+            std::random_device randomDevice;
+            std::seed_seq seed{ randomDevice(), randomDevice(), randomDevice(), randomDevice() };
+            return std::mt19937_64( seed );
+        }();
+        return rng;
+    }
+
+    bool rollOneIn( const uint64_t denominator )
+    {
+        if ( denominator <= 1 ) {
+            return true;
+        }
+
+        std::uniform_int_distribution<uint64_t> distribution( 1, denominator );
+        return distribution( doctrineDropRng() ) == 1;
+    }
+
+    size_t grantRandomDoctrineDrop( const PlayerColor color )
+    {
+        if ( color == PlayerColor::NONE || color != activePlayerColor ) {
+            return upgradeCount;
+        }
+
+        std::vector<size_t> eligible;
+        eligible.reserve( upgradeCount );
+        for ( size_t id = 0; id < upgradeCount; ++id ) {
+            const uint64_t rank = playerProfile.ranks[id];
+            if ( !doctrineCanAdvance( id, rank ) ) {
+                continue;
+            }
+            if ( id == BRUTAL_CRITICALS && playerProfile.ranks[CRITICAL_TRAINING] == 0 ) {
+                continue;
+            }
+            eligible.emplace_back( id );
+        }
+
+        if ( eligible.empty() ) {
+            return upgradeCount;
+        }
+
+        std::uniform_int_distribution<size_t> distribution( 0, eligible.size() - 1 );
+        const size_t id = eligible[distribution( doctrineDropRng() )];
+        ++playerProfile.ranks[id];
+        saveProfile();
+        return id;
+    }
+
+    void showDoctrineDropPopup( const size_t id, const bool offline )
+    {
+        if ( id >= upgradeCount ) {
+            return;
+        }
+
+        std::string message = offline ? "Offline progress uncovered a rare doctrine: " : "A defeated enemy dropped a rare doctrine: ";
+        message += upgrades[id].name;
+        message += ".\nRank increased to " + formatNumber( playerProfile.ranks[id] ) + ".";
+
+        // Reuse the engine's existing timed popup path. Dialog::ZERO keeps this compact and the
+        // scoped timeout dismisses it automatically instead of blocking until the player clicks.
+        const fheroes2::AutoPlayPopupTimeoutScope timeoutScope( true );
+        fheroes2::showStandardTextMessage( "Doctrine Drop", std::move( message ), Dialog::ZERO );
+    }
+
+    void rollOfflineDoctrineDrop( const PlayerColor color, const uint64_t creditedExperience )
+    {
+        const uint64_t rolls = std::min<uint64_t>( maximumOfflineDoctrineRolls, creditedExperience / offlineDoctrineXpPerRoll );
+        for ( uint64_t roll = 0; roll < rolls; ++roll ) {
+            if ( !rollOneIn( offlineDoctrineDropDenominator ) ) {
+                continue;
+            }
+
+            const size_t doctrine = grantRandomDoctrineDrop( color );
+            if ( doctrine < upgradeCount ) {
+                showDoctrineDropPopup( doctrine, true );
+            }
+            break;
+        }
+    }
 
     std::pair<size_t, uint64_t> strongestDoctrineHall( const PlayerColor color )
     {
@@ -240,6 +336,15 @@ namespace
 
 namespace fheroes2::RPG
 {
+    uint64_t addExperience( const PlayerColor color, const uint64_t amount, const ExperienceKind kind )
+    {
+        const uint64_t credited = rpgAddExperienceImpl( color, amount, kind );
+        if ( kind == ExperienceKind::OFFLINE && credited > 0 ) {
+            rollOfflineDoctrineDrop( color, credited );
+        }
+        return credited;
+    }
+
     void awardBattle( const PlayerColor color, const PlayerColor opponent, const uint32_t battleExperience, const bool won, const bool defending,
                       const bool siege, const int32_t heroId )
     {
@@ -248,6 +353,13 @@ namespace fheroes2::RPG
         const uint64_t milestoneReward = heroMasteryMilestoneReward( masteryBefore, heroMasteryScore( heroId ) );
         if ( milestoneReward > 0 ) {
             static_cast<void>( addExperience( color, milestoneReward, ExperienceKind::HERO ) );
+        }
+
+        if ( won && color == activePlayerColor && rollOneIn( battleDoctrineDropDenominator ) ) {
+            const size_t doctrine = grantRandomDoctrineDrop( color );
+            if ( doctrine < upgradeCount ) {
+                showDoctrineDropPopup( doctrine, false );
+            }
         }
     }
 
