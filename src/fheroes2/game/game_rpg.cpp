@@ -101,11 +101,23 @@ namespace
         std::array<const char *, 5>{ "Aspirant", "Champion", "Paragon", "Exemplar", "Living Myth" },
     } };
 
+    // Campaign Momentum is a transparent streak-style identity layer derived from persistent
+    // Chronicle deeds. It intentionally does not claim to be an undefeated battle counter because
+    // the Chronicle stores aggregate victories rather than a full chronological win/loss history.
+    constexpr std::array<uint64_t, 6> heroStreakThresholds{ 0, 5, 15, 40, 100, 250 };
+    constexpr std::array<const char *, 6> heroStreakLabels{ "Quiet", "Gathering", "Hot", "Dominant", "Relentless", "Legendary Run" };
+
     static_assert( heroMasteryThresholds[0] == 0 );
     static_assert( heroMasteryThresholds[0] < heroMasteryThresholds[1] );
     static_assert( heroMasteryThresholds[1] < heroMasteryThresholds[2] );
     static_assert( heroMasteryThresholds[2] < heroMasteryThresholds[3] );
     static_assert( heroMasteryThresholds[3] < heroMasteryThresholds[4] );
+    static_assert( heroStreakThresholds[0] == 0 );
+    static_assert( heroStreakThresholds[0] < heroStreakThresholds[1] );
+    static_assert( heroStreakThresholds[1] < heroStreakThresholds[2] );
+    static_assert( heroStreakThresholds[2] < heroStreakThresholds[3] );
+    static_assert( heroStreakThresholds[3] < heroStreakThresholds[4] );
+    static_assert( heroStreakThresholds[4] < heroStreakThresholds[5] );
 
     std::pair<size_t, uint64_t> strongestDoctrineHall( const PlayerColor color )
     {
@@ -152,10 +164,33 @@ namespace
         return score;
     }
 
+    uint64_t heroStreakScore( const int32_t heroId )
+    {
+        const HeroChronicle chronicle = heroChronicleFor( heroId );
+
+        // Ordinary victories establish momentum, while major strategic victories accelerate it.
+        // Elite victories are already battle victories; the additional weight is deliberate because
+        // they represent a much more significant expedition achievement.
+        uint64_t score = chronicle.battleVictories;
+        score = saturatedAdd( score, saturatedMultiply( chronicle.castleCaptures, 3 ) );
+        score = saturatedAdd( score, saturatedMultiply( chronicle.eliteVictories, 6 ) );
+        return score;
+    }
+
     size_t heroMasteryTierIndex( const uint64_t score )
     {
         for ( size_t i = heroMasteryThresholds.size(); i > 0; --i ) {
             if ( score >= heroMasteryThresholds[i - 1] ) {
+                return i - 1;
+            }
+        }
+        return 0;
+    }
+
+    size_t heroStreakTierIndex( const uint64_t score )
+    {
+        for ( size_t i = heroStreakThresholds.size(); i > 0; --i ) {
+            if ( score >= heroStreakThresholds[i - 1] ) {
                 return i - 1;
             }
         }
@@ -259,6 +294,27 @@ std::string fheroes2::RPG::heroAccoladeText( const int32_t heroId )
     return "Initiate of the Expedition";
 }
 
+std::string fheroes2::RPG::heroStreakText( const int32_t heroId )
+{
+    const uint64_t score = heroStreakScore( heroId );
+    const size_t tier = heroStreakTierIndex( score );
+
+    std::string text = heroStreakLabels[tier];
+    text += " - " + formatNumber( score ) + " momentum";
+
+    if ( tier + 1 < heroStreakThresholds.size() ) {
+        const uint64_t nextThreshold = heroStreakThresholds[tier + 1];
+        const uint64_t remaining = nextThreshold > score ? nextThreshold - score : 0;
+        text += " / " + formatNumber( nextThreshold );
+        text += " (" + formatNumber( remaining ) + " to " + heroStreakLabels[tier + 1] + ")";
+    }
+    else {
+        text += " (maximum momentum tier)";
+    }
+
+    return text;
+}
+
 std::string fheroes2::RPG::heroInspectionSummary( const PlayerColor color, const int32_t heroId )
 {
     const HeroChronicle chronicle = heroChronicleFor( heroId );
@@ -285,6 +341,8 @@ std::string fheroes2::RPG::heroInspectionSummary( const PlayerColor color, const
     if ( tier + 1 < heroMasteryThresholds.size() ) {
         summary += " / " + formatNumber( heroMasteryThresholds[tier + 1] );
     }
+
+    summary += "\nMomentum: " + heroStreakText( heroId );
 
     summary += "\nLegacy: ";
     summary += heroLegacyTiers[legacyTier].title;
@@ -335,6 +393,7 @@ void fheroes2::RPG::showFieldLedger()
 
             message += "\n- " + hero->GetName() + ": " + heroMasteryTitle( focusHall, focusRanks, tier );
             message += " [" + heroAccoladeText( heroId ) + "]";
+            message += "\n  Momentum: " + heroStreakText( heroId );
             message += "\n  " + formatNumber( chronicle.battleVictories ) + " battle victories, "
                        + formatNumber( chronicle.castleCaptures ) + " castle captures";
             if ( chronicle.eliteVictories > 0 ) {
