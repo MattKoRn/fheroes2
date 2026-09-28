@@ -1,17 +1,7 @@
 // War Council v3: context-aware strategic advice.
 // The v2 advisor keeps all executable action generation and UI helpers; this layer replaces
 // recommendation quality, wording, ranking history and the persistent council presentation.
-#define councilBenefitScore councilBenefitScoreV2
-#define generateStrategicAdvice generateStrategicAdviceV2
-#define councilPriorityLabel councilPriorityLabelV2
-#define selectStrategicAdvice selectStrategicAdviceV2
-#define showRpgStrategicAdvisor showRpgStrategicAdvisorV2
 #include "game_rpg_advisor_v2.inc"
-#undef showRpgStrategicAdvisor
-#undef selectStrategicAdvice
-#undef councilPriorityLabel
-#undef generateStrategicAdvice
-#undef councilBenefitScore
 
 namespace
 {
@@ -263,7 +253,7 @@ namespace
         return score;
     }
 
-    std::string councilAdvisorNarrative( const StrategicAdvice & advice, Kingdom & kingdom, const CouncilContext & context )
+    std::string councilAdvisorNarrative( const StrategicAdvice & advice, const CouncilContext & context )
     {
         const Heroes * hero = world.GetHeroes( advice.heroId );
         const bool mainHero = hero != nullptr && hero->GetID() == context.mainHeroId;
@@ -439,7 +429,7 @@ namespace
                 continue;
             }
 
-            advice.rationale = councilAdvisorNarrative( advice, kingdom, context );
+            advice.rationale = councilAdvisorNarrative( advice, context );
             filtered.emplace_back( std::move( advice ) );
         }
 
@@ -459,7 +449,7 @@ namespace
             for ( size_t index = oldSize; index < filtered.size(); ++index ) {
                 StrategicAdvice & advice = filtered[index];
                 advice.score = councilBenefitScore( advice, kingdom, context );
-                advice.rationale = councilAdvisorNarrative( advice, kingdom, context );
+                advice.rationale = councilAdvisorNarrative( advice, context );
             }
             chosen = chooseCouncilAdvice( std::move( filtered ) );
         }
