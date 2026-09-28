@@ -126,7 +126,6 @@ namespace
     constexpr uint64_t offlineDoctrineDropDenominator = 5000;
     constexpr uint64_t offlineDoctrineXpPerRoll = 2500;
     constexpr uint64_t maximumOfflineDoctrineRolls = 10;
-    constexpr int64_t minimumOfflineRecoverySeconds = 5 * 60;
     constexpr int64_t offlineSecondsPerDayForRecovery = 24 * 60 * 60;
 
     static_assert( heroMasteryThresholds.size() == heroMasteryRewardExperience.size() );
@@ -149,18 +148,13 @@ namespace
     static_assert( offlineDoctrineDropDenominator > battleDoctrineDropDenominator );
     static_assert( offlineDoctrineXpPerRoll > 0 );
     static_assert( maximumOfflineDoctrineRolls > 0 );
-    static_assert( minimumOfflineRecoverySeconds > 0 );
-    static_assert( offlineSecondsPerDayForRecovery > minimumOfflineRecoverySeconds );
+    static_assert( offlineSecondsPerDayForRecovery > 0 );
 
-    uint64_t recoverStalledOfflineExperience( const uint64_t requestedAmount )
+    std::pair<int64_t, uint64_t> recoverStalledOfflineExperience()
     {
-        if ( requestedAmount > 0 ) {
-            return requestedAmount;
-        }
-
         std::ifstream input( System::concatPath( fheroes2::RPG::dataDirectory(), "offline_progress.dat" ) );
         if ( !input ) {
-            return 0;
+            return { 0, 0 };
         }
 
         int64_t lastSeenUnix = 0;
@@ -192,29 +186,20 @@ namespace
         }
 
         if ( !hasLastSeen || !hasDailyIncome || lastSeenUnix <= 0 ) {
-            return 0;
+            return { 0, 0 };
         }
 
         const int64_t now
             = std::chrono::duration_cast<std::chrono::seconds>( std::chrono::system_clock::now().time_since_epoch() ).count();
         if ( now <= lastSeenUnix ) {
-            return 0;
+            return { 0, 0 };
         }
 
         const int64_t elapsedSeconds = now - lastSeenUnix;
-        if ( elapsedSeconds < minimumOfflineRecoverySeconds ) {
-            return 0;
-        }
 
-        // A zero incoming award can happen when the focus-resume interval was lost before the
-        // adventure loop consumed it. Use the same persisted timestamp and baseline economy that
-        // already drive offline progression, but only as a zero-award fallback so normal rewards
-        // can never be doubled or inflated.
-        static int64_t recoveredSnapshotUnix = 0;
-        if ( recoveredSnapshotUnix == lastSeenUnix ) {
-            return 0;
-        }
-
+        // Reconstruct the baseline award from the persisted timestamp whenever the normal
+        // handoff under-reports it. There is deliberately no minimum-duration gate: the core
+        // offline system supports short intervals too, and recovery should follow the same rule.
         const long double commonIncome = static_cast<long double>( dailyIncome[0] + dailyIncome[2] ) * 100.0L;
         const long double rareIncome
             = static_cast<long double>( dailyIncome[1] + dailyIncome[3] + dailyIncome[4] + dailyIncome[5] ) * 500.0L;
@@ -226,14 +211,12 @@ namespace
               * static_cast<long double>( elapsedSeconds ) / static_cast<long double>( offlineSecondsPerDayForRecovery );
 
         if ( recovered < 1.0L ) {
-            return 0;
+            return { lastSeenUnix, 0 };
         }
-
-        recoveredSnapshotUnix = lastSeenUnix;
         if ( recovered >= static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) {
-            return std::numeric_limits<uint64_t>::max();
+            return { lastSeenUnix, std::numeric_limits<uint64_t>::max() };
         }
-        return static_cast<uint64_t>( recovered );
+        return { lastSeenUnix, static_cast<uint64_t>( recovered ) };
     }
 
     void showOfflineRecoveryPopup( const uint64_t creditedExperience )
@@ -442,11 +425,25 @@ namespace fheroes2::RPG
 {
     uint64_t addExperience( const PlayerColor color, const uint64_t amount, const ExperienceKind kind )
     {
-        const bool attemptedRecovery = kind == ExperienceKind::OFFLINE && amount == 0;
-        const uint64_t effectiveAmount = attemptedRecovery ? recoverStalledOfflineExperience( amount ) : amount;
+        static int64_t recoveredSnapshotUnix = 0;
+
+        int64_t recoverySnapshotUnix = 0;
+        uint64_t recoveredAmount = 0;
+        if ( kind == ExperienceKind::OFFLINE ) {
+            std::tie( recoverySnapshotUnix, recoveredAmount ) = recoverStalledOfflineExperience();
+            if ( recoverySnapshotUnix == recoveredSnapshotUnix ) {
+                recoveredAmount = 0;
+            }
+        }
+
+        const uint64_t effectiveAmount = kind == ExperienceKind::OFFLINE ? std::max( amount, recoveredAmount ) : amount;
+        const bool usedRecovery = kind == ExperienceKind::OFFLINE && recoveredAmount > amount;
         const uint64_t credited = rpgAddExperienceImpl( color, effectiveAmount, kind );
 
-        if ( attemptedRecovery && effectiveAmount > 0 && credited > 0 ) {
+        if ( kind == ExperienceKind::OFFLINE && recoverySnapshotUnix > 0 && credited > 0 ) {
+            recoveredSnapshotUnix = recoverySnapshotUnix;
+        }
+        if ( usedRecovery && credited > 0 ) {
             showOfflineRecoveryPopup( credited );
         }
         if ( kind == ExperienceKind::OFFLINE && credited > 0 ) {
