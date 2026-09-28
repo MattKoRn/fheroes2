@@ -50,6 +50,8 @@
 #include "ui_dialog.h"
 #include "version.h"
 
+#include "game_rpg_advisor.inc"
+
 namespace
 {
     struct HotKeyEventInfo
@@ -511,6 +513,34 @@ void Game::globalKeyDownEvent( const fheroes2::Key key, const int32_t modifier )
         Logging::setDebugLevel( DBG_DEVEL ^ Logging::getDebugLevel() );
     }
 #endif
+    else if ( key == fheroes2::Key::KEY_F7 ) {
+        static bool advisorOpen = false;
+        if ( !advisorOpen ) {
+            class AdvisorGuard
+            {
+            public:
+                explicit AdvisorGuard( bool & open )
+                    : _open( open )
+                {
+                    _open = true;
+                }
+
+                AdvisorGuard( const AdvisorGuard & ) = delete;
+                AdvisorGuard & operator=( const AdvisorGuard & ) = delete;
+
+                ~AdvisorGuard()
+                {
+                    _open = false;
+                }
+
+            private:
+                bool & _open;
+            };
+
+            const AdvisorGuard advisorGuard( advisorOpen );
+            showRpgStrategicAdvisor();
+        }
+    }
     else if ( key == hotKeyEventInfo[hotKeyEventToInt( HotKeyEvent::WORLD_TRANSFER_CONTROL_TO_AI )].key ) {
         static bool recursiveCall = false;
 
