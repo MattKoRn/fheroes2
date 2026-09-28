@@ -545,7 +545,7 @@ namespace
                     reason.draw( textX, rows[index].y + 24, display );
                 }
 
-                const fheroes2::Text hint( "Choose 1-5 or click an order. Esc returns control; the council never ends your turn.", fheroes2::FontType::smallWhite() );
+                fheroes2::Text hint( "Choose 1-5 or click an order. Esc returns control; the council never ends your turn.", fheroes2::FontType::smallWhite() );
                 hint.fitToOneRow( area.width - 132 );
                 hint.draw( area.x + 12, area.y + area.height - 21, display );
                 closeButton.draw();
