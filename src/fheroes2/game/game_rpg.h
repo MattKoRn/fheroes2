@@ -36,6 +36,13 @@ namespace fheroes2::RPG
     void awardTownCapture( PlayerColor color, int32_t heroId );
     [[nodiscard]] uint64_t heroRenown( int32_t heroId );
 
+    // Persistent hero identity is derived from existing RPG ledgers and doctrine investment.
+    // These helpers do not introduce new save fields: Chronicle deeds remain hero-specific while
+    // the role calling reflects the kingdom doctrine path currently training that hero.
+    [[nodiscard]] std::string heroLegacyText( int32_t heroId );
+    [[nodiscard]] std::string heroChronicleText( int32_t heroId );
+    [[nodiscard]] std::string heroRoleText( PlayerColor color, int32_t heroId );
+
     // Persistent RPG combat affixes used by battle stacks. These accessors are intentionally
     // nodiscard: silently dropping a modifier is almost always a gameplay integration bug.
     // Exact persistent doctrine contribution used by UI/analytics. These stay 64-bit so the
