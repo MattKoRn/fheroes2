@@ -39,8 +39,25 @@ The strongest doctrine hall supplies the hero's current calling. If no doctrine 
 | Marshal | Officer | Commander | Marshal | High Marshal | Crown General |
 | Paragon | Aspirant | Champion | Paragon | Exemplar | Living Myth |
 
-## UI
-
-Right-click or hold the adventure-map **Next Hero** button while a hero is focused. The compact hero identity panel now shows Role, Mastery, Legacy and Chronicle information together. Mastery displays the current title, score, next threshold and points remaining to the next role-specific title.
-
+## Campaign Accolades
+ 
+Heroes also earn persistent Campaign Accolades derived dynamically from their recorded battle victories, castle captures, elite rival triumphs, and personal renown:
+ 
+- **Nemesis of Elite Rivals**: 5+ Elite Rival victories
+- **Vanquisher of the Elite**: 1+ Elite Rival victory
+- **Conqueror of Realms**: 10+ Castle captures
+- **Master Siege Commander**: 5+ Castle captures
+- **Castle Breaker**: 1+ Castle capture
+- **Grand Centurion**: 50+ Battle victories
+- **Veteran of Twenty Battles**: 20+ Battle victories
+- **Seasoned Campaigner**: 5+ Battle victories
+- **Paragon of Renown**: 50,000+ Renown
+- **Hero of the Realm**: 10,000+ Renown
+- **Initiate of the Expedition**: Standard starting honorific
+ 
+## UI & Field Ledger
+ 
+- **Adventure Map Next Hero Button**: Right-click or hold the **Next Hero** button while a hero is focused. The compact hero inspection panel shows Role, Mastery, Legacy, Chronicle deeds, and earned Accolade together. Every word is fully unabbreviated, and the card is formatted compactly so it never overflows screen bounds.
+- **Royal Guild Field Ledger**: Press **F** inside the Royal Guild menu to open the **RPG Field Ledger**. The ledger provides a complete expedition roster of all active heroes in the realm, their current Calling, Mastery Standing, Accolades, and military triumphs.
+ 
 Mastery is intentionally an identity/progression layer rather than another hidden combat multiplier. Kingdom-wide doctrine mechanics continue to own combat scaling, so hero identity does not silently stack duplicate bonuses onto existing RPG combat systems.

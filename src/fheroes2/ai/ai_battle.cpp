@@ -241,6 +241,23 @@ namespace
             value *= 1.10;
         }
 
+        // Targets that have already exhausted their retaliation this round (or cannot retaliate)
+        // are substantially safer to engage because they inflict zero counter-attack damage.
+        if ( !target.isRetaliationAllowed() || attacker.isIgnoringRetaliation() ) {
+            value *= 1.12;
+        }
+        else if ( potentialDamage < target.GetHitPoints() ) {
+            // When an enemy stack will retaliate and survive, check estimated counter-damage severity
+            // to avoid recklessly throwing fragile units into devastating counter-attacks.
+            const uint32_t counterDamage = target.EstimateRetaliatoryDamage( potentialDamage );
+            if ( counterDamage > 0 && attacker.GetHitPoints() > 0 ) {
+                const double counterRatio = static_cast<double>( counterDamage ) / static_cast<double>( attacker.GetHitPoints() );
+                if ( counterRatio >= 0.40 ) {
+                    value *= 0.85;
+                }
+            }
+        }
+
         return value;
     }
 

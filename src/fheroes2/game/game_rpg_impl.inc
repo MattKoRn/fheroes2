@@ -2471,6 +2471,7 @@ namespace
         message += "O: Guild Overview\n";
         message += "K: Build Analytics\n";
         message += "V: Elite Rival Intel\n";
+        message += "F: Field Ledger\n";
         message += "S / A: Steward Auto-Buy\n";
         message += "R: Respec doctrines\n";
         message += "Esc / F9: Close menu\n\n";
@@ -3954,6 +3955,12 @@ void fheroes2::RPG::showMenu()
 
         if ( event.isKeyPressed( fheroes2::Key::KEY_K ) ) {
             showBuildAnalytics( Dialog::OK );
+            redraw = true;
+            continue;
+        }
+
+        if ( event.isKeyPressed( fheroes2::Key::KEY_F ) ) {
+            fheroes2::RPG::showFieldLedger();
             redraw = true;
             continue;
         }

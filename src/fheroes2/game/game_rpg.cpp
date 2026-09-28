@@ -26,62 +26,36 @@ namespace fheroes2
                 line.pop_back();
             }
 
-            constexpr size_t maxLineLength = 96;
-            if ( line.size() > maxLineLength ) {
-                line.resize( maxLineLength - 3 );
-                line += "...";
-            }
-
             return line;
         }
 
         std::string compactRpgPopupBody( std::string body )
         {
-            // Doctrine inspectors begin with an explanatory paragraph. For right-click
-            // inspection cards (Dialog::ZERO), keeping it concise ensures zero vertical
-            // overflow while keeping all information intact and unabbreviated.
-            const size_t detailsEnd = body.find( "\n\n" );
-            if ( detailsEnd != std::string::npos ) {
-                const size_t firstPeriod = body.find( '.' );
-                if ( firstPeriod != std::string::npos && firstPeriod < detailsEnd ) {
-                    body.erase( firstPeriod + 1, detailsEnd - firstPeriod - 1 );
-                }
-            }
-
+            // For right-click inspection cards (Dialog::ZERO), keeping layout compact
+            // ensures zero vertical overflow while keeping all information intact and unabbreviated.
             std::string compact;
-            compact.reserve( std::min<size_t>( body.size(), 720 ) );
+            compact.reserve( body.size() );
 
             size_t cursor = 0;
-            size_t lineCount = 0;
-            constexpr size_t maxLines = 12;
-            while ( cursor <= body.size() && lineCount < maxLines ) {
+            while ( cursor < body.size() ) {
                 const size_t end = body.find( '\n', cursor );
                 std::string line = body.substr( cursor, end == std::string::npos ? std::string::npos : end - cursor );
 
+                line = compactRpgPopupLine( std::move( line ) );
+
                 // Collapse repeated blank lines. Dense right-click help is easier to scan
                 // and consumes much less vertical space without overflow.
-                if ( !line.empty() || compact.empty() || compact.back() != '\n' ) {
+                if ( !line.empty() || ( !compact.empty() && compact.back() != '\n' ) ) {
                     if ( !compact.empty() ) {
                         compact += '\n';
                     }
-                    compact += compactRpgPopupLine( std::move( line ) );
-                    ++lineCount;
+                    compact += std::move( line );
                 }
 
                 if ( end == std::string::npos ) {
                     break;
                 }
                 cursor = end + 1;
-            }
-
-            if ( cursor < body.size() ) {
-                compact += "\n...";
-            }
-
-            constexpr size_t maxBodyLength = 720;
-            if ( compact.size() > maxBodyLength ) {
-                compact.resize( maxBodyLength - 3 );
-                compact += "...";
             }
 
             return compact;
@@ -244,4 +218,134 @@ std::string fheroes2::RPG::heroMasteryText( const PlayerColor color, const int32
     }
 
     return text;
+}
+
+std::string fheroes2::RPG::heroAccoladeText( const int32_t heroId )
+{
+    const HeroChronicle chronicle = heroChronicleFor( heroId );
+    const uint64_t renown = heroRenown( heroId );
+
+    if ( chronicle.eliteVictories >= 5 ) {
+        return "Nemesis of Elite Rivals";
+    }
+    if ( chronicle.eliteVictories >= 1 ) {
+        return "Vanquisher of the Elite";
+    }
+    if ( chronicle.castleCaptures >= 10 ) {
+        return "Conqueror of Realms";
+    }
+    if ( chronicle.castleCaptures >= 5 ) {
+        return "Master Siege Commander";
+    }
+    if ( chronicle.castleCaptures >= 1 ) {
+        return "Castle Breaker";
+    }
+    if ( chronicle.battleVictories >= 50 ) {
+        return "Grand Centurion";
+    }
+    if ( chronicle.battleVictories >= 20 ) {
+        return "Veteran of Twenty Battles";
+    }
+    if ( chronicle.battleVictories >= 5 ) {
+        return "Seasoned Campaigner";
+    }
+    if ( renown >= 50000 ) {
+        return "Paragon of Renown";
+    }
+    if ( renown >= 10000 ) {
+        return "Hero of the Realm";
+    }
+
+    return "Initiate of the Expedition";
+}
+
+std::string fheroes2::RPG::heroInspectionSummary( const PlayerColor color, const int32_t heroId )
+{
+    const HeroChronicle chronicle = heroChronicleFor( heroId );
+    const auto [hall, hallRanks] = strongestDoctrineHall( color );
+    const uint64_t score = heroMasteryScore( heroId );
+    const size_t tier = heroMasteryTierIndex( score );
+    const uint64_t renown = heroRenown( heroId );
+    const size_t legacyTier = heroLegacyTierIndex( renown );
+
+    std::string summary = "Role: ";
+    summary += heroChronicleEpithet( chronicle );
+    if ( hallRanks == 0 ) {
+        summary += " Adventurer";
+    }
+    else {
+        summary += ' ';
+        summary += heroRoleCallings[hall];
+        summary += " (" + formatNumber( hallRanks ) + " hall ranks)";
+    }
+
+    summary += "\nMastery: ";
+    summary += heroMasteryTitle( hall, hallRanks, tier );
+    summary += " - " + formatNumber( score );
+    if ( tier + 1 < heroMasteryThresholds.size() ) {
+        summary += " / " + formatNumber( heroMasteryThresholds[tier + 1] );
+    }
+
+    summary += "\nLegacy: ";
+    summary += heroLegacyTiers[legacyTier].title;
+    summary += " - " + formatNumber( renown );
+    if ( legacyTier + 1 < heroLegacyTiers.size() ) {
+        summary += " / " + formatNumber( heroLegacyTiers[legacyTier + 1].threshold );
+    }
+    summary += " Renown";
+
+    summary += "\nChronicle: " + formatNumber( chronicle.battleVictories ) + " battle victories, "
+               + formatNumber( chronicle.castleCaptures ) + " castle captures, "
+               + formatNumber( chronicle.eliteVictories ) + " Elite victories";
+
+    summary += "\nAccolade: " + heroAccoladeText( heroId );
+
+    return summary;
+}
+
+void fheroes2::RPG::showFieldLedger()
+{
+    const PlayerColor color = activePlayerColor != PlayerColor::NONE ? activePlayerColor : PlayerColor::BLUE;
+    std::string message = "Kingdom Level: " + formatNumber( playerProfile.level );
+    const uint64_t prestige = prestigeRankForLevel( playerProfile.level );
+    if ( prestige > 0 ) {
+        message += " (Prestige " + formatNumber( prestige ) + ")";
+    }
+    message += "\nAvailable Points: " + formatNumber( playerProfile.points );
+
+    const auto [focusHall, focusRanks] = strongestDoctrineHall( color );
+    if ( focusRanks > 0 ) {
+        message += "\nKingdom Calling: " + std::string( heroRoleCallings[focusHall] ) + " (" + formatNumber( focusRanks ) + " hall ranks)";
+    }
+
+    message += "\n\nExpedition Heroes:";
+
+    size_t heroCount = 0;
+    if ( color != PlayerColor::NONE ) {
+        const VecHeroes & heroes = world.GetKingdom( color ).GetHeroes();
+        for ( const Heroes * hero : heroes ) {
+            if ( hero == nullptr ) {
+                continue;
+            }
+            ++heroCount;
+            const int32_t heroId = hero->GetID();
+            const uint64_t score = heroMasteryScore( heroId );
+            const size_t tier = heroMasteryTierIndex( score );
+            const HeroChronicle chronicle = heroChronicleFor( heroId );
+
+            message += "\n- " + hero->GetName() + ": " + heroMasteryTitle( focusHall, focusRanks, tier );
+            message += " [" + heroAccoladeText( heroId ) + "]";
+            message += "\n  " + formatNumber( chronicle.battleVictories ) + " battle victories, "
+                       + formatNumber( chronicle.castleCaptures ) + " castle captures";
+            if ( chronicle.eliteVictories > 0 ) {
+                message += ", " + formatNumber( chronicle.eliteVictories ) + " Elite victories";
+            }
+        }
+    }
+
+    if ( heroCount == 0 ) {
+        message += "\nNo active heroes in the field.";
+    }
+
+    fheroes2::showStandardTextMessage( "RPG Field Ledger", std::move( message ), Dialog::OK );
 }

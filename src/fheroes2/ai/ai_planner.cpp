@@ -215,6 +215,12 @@ void AI::Planner::revealFog( const Maps::Tile & tile, const Kingdom & kingdom )
             continue;
         }
 
+        // Ensure the hero matches the travel domain of the discovery. Heroes at sea should not be diverted
+        // toward inland objectives, and heroes on foot cannot directly reach sea discoveries.
+        if ( !criticalDiscovery && hero->isShipMaster() != tile.isWater() ) {
+            continue;
+        }
+
         Route::Path & path = hero->GetPath();
         const int32_t committedTarget = path.GetDestinationIndex();
 

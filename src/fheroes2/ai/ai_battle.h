@@ -87,10 +87,13 @@ namespace AI
         class CautiousOffensiveDecision
         {
         public:
-            CautiousOffensiveDecision( const double & myArmyStrength, const double & enemyArmyStrength, const double & enemySpellStrength,
+            CautiousOffensiveDecision( const double & myArmyStrength, const double & enemyArmyStrength, const double & myShootersStrength,
+                                       const double & enemyShootersStrength, const double & enemySpellStrength,
                                        const bool & considerRetreat, const PlayerColor & myColor, const uint32_t & currentTurnNumber )
                 : _myArmyStrength( myArmyStrength )
                 , _enemyArmyStrength( enemyArmyStrength )
+                , _myShootersStrength( myShootersStrength )
+                , _enemyShootersStrength( enemyShootersStrength )
                 , _enemySpellStrength( enemySpellStrength )
                 , _considerRetreat( considerRetreat )
                 , _myColor( myColor )
@@ -351,6 +354,8 @@ namespace AI
 
             const double & _myArmyStrength;
             const double & _enemyArmyStrength;
+            const double & _myShootersStrength;
+            const double & _enemyShootersStrength;
             const double & _enemySpellStrength;
             const bool & _considerRetreat;
             const PlayerColor & _myColor;
@@ -360,7 +365,7 @@ namespace AI
         };
 
         BattlePlanner()
-            : _cautiousOffensive( _myArmyStrength, _enemyArmyStrength, _enemySpellStrength, _considerRetreat, _myColor, _currentTurnNumber )
+            : _cautiousOffensive( _myArmyStrength, _enemyArmyStrength, _myShootersStrength, _enemyShootersStrength, _enemySpellStrength, _considerRetreat, _myColor, _currentTurnNumber )
         {}
 
         // Checks whether the limit of turns is exceeded for the attacking AI-controlled
