@@ -114,6 +114,25 @@ namespace
         "Vanguard", "Reaver", "Strategist", "Sentinel", "Arcanist", "Warden", "Marshal", "Paragon"
     };
 
+    constexpr std::array<uint64_t, 5> heroMasteryThresholds{ 0, 2500, 10000, 40000, 150000 };
+    constexpr std::array<const char *, 5> adventurerMasteryTitles{ "Wanderer", "Pathfinder", "Trailblazer", "Hero", "Living Legend" };
+    constexpr std::array<std::array<const char *, 5>, 8> heroMasteryTitles{ {
+        std::array<const char *, 5>{ "Line Recruit", "Shieldbearer", "Vanguard", "War Captain", "Iron Legend" },
+        std::array<const char *, 5>{ "Skirmisher", "Ravager", "Reaver", "Bloodlord", "Doom Herald" },
+        std::array<const char *, 5>{ "Scout", "Tactician", "Strategist", "Battle Sage", "Fatewright" },
+        std::array<const char *, 5>{ "Guard", "Shieldbearer", "Sentinel", "High Sentinel", "Living Fortress" },
+        std::array<const char *, 5>{ "Apprentice", "Spellbinder", "Magus", "Archmage", "Arcane Sovereign" },
+        std::array<const char *, 5>{ "Watcher", "Runeguard", "Warden", "High Warden", "Eternal Aegis" },
+        std::array<const char *, 5>{ "Officer", "Commander", "Marshal", "High Marshal", "Crown General" },
+        std::array<const char *, 5>{ "Aspirant", "Champion", "Paragon", "Exemplar", "Living Myth" },
+    } };
+
+    static_assert( heroMasteryThresholds[0] == 0 );
+    static_assert( heroMasteryThresholds[0] < heroMasteryThresholds[1] );
+    static_assert( heroMasteryThresholds[1] < heroMasteryThresholds[2] );
+    static_assert( heroMasteryThresholds[2] < heroMasteryThresholds[3] );
+    static_assert( heroMasteryThresholds[3] < heroMasteryThresholds[4] );
+
     std::pair<size_t, uint64_t> strongestDoctrineHall( const PlayerColor color )
     {
         constexpr size_t doctrineHalls = heroRoleCallings.size();
@@ -139,6 +158,43 @@ namespace
 
         return { strongestHall, strongestScore };
     }
+
+    HeroChronicle heroChronicleFor( const int32_t heroId )
+    {
+        const auto entry = heroChronicleLedger.find( heroId );
+        return entry == heroChronicleLedger.end() ? HeroChronicle{} : entry->second;
+    }
+
+    uint64_t heroMasteryScore( const int32_t heroId )
+    {
+        const HeroChronicle chronicle = heroChronicleFor( heroId );
+
+        // Renown remains the backbone of mastery. Chronicle deeds then add explicit achievement
+        // weight so two heroes with similar Renown can still develop visibly different standing.
+        uint64_t score = fheroes2::RPG::heroRenown( heroId );
+        score = saturatedAdd( score, saturatedMultiply( chronicle.battleVictories, 250 ) );
+        score = saturatedAdd( score, saturatedMultiply( chronicle.castleCaptures, 1000 ) );
+        score = saturatedAdd( score, saturatedMultiply( chronicle.eliteVictories, 3000 ) );
+        return score;
+    }
+
+    size_t heroMasteryTierIndex( const uint64_t score )
+    {
+        for ( size_t i = heroMasteryThresholds.size(); i > 0; --i ) {
+            if ( score >= heroMasteryThresholds[i - 1] ) {
+                return i - 1;
+            }
+        }
+        return 0;
+    }
+
+    const char * heroMasteryTitle( const size_t hall, const uint64_t hallRanks, const size_t tier )
+    {
+        if ( hallRanks == 0 ) {
+            return adventurerMasteryTitles[tier];
+        }
+        return heroMasteryTitles[hall][tier];
+    }
 }
 
 std::string fheroes2::RPG::heroLegacyText( const int32_t heroId )
@@ -148,19 +204,12 @@ std::string fheroes2::RPG::heroLegacyText( const int32_t heroId )
 
 std::string fheroes2::RPG::heroChronicleText( const int32_t heroId )
 {
-    const auto entry = heroChronicleLedger.find( heroId );
-    if ( entry == heroChronicleLedger.end() ) {
-        return heroChronicleSummary( HeroChronicle{} );
-    }
-
-    return heroChronicleSummary( entry->second );
+    return heroChronicleSummary( heroChronicleFor( heroId ) );
 }
 
 std::string fheroes2::RPG::heroRoleText( const PlayerColor color, const int32_t heroId )
 {
-    const auto chronicleEntry = heroChronicleLedger.find( heroId );
-    const HeroChronicle emptyChronicle{};
-    const HeroChronicle & chronicle = chronicleEntry == heroChronicleLedger.end() ? emptyChronicle : chronicleEntry->second;
+    const HeroChronicle chronicle = heroChronicleFor( heroId );
 
     std::string role = heroChronicleEpithet( chronicle );
     const auto [hall, hallRanks] = strongestDoctrineHall( color );
@@ -173,4 +222,26 @@ std::string fheroes2::RPG::heroRoleText( const PlayerColor color, const int32_t 
     role += heroRoleCallings[hall];
     role += " (" + formatNumber( hallRanks ) + " hall ranks)";
     return role;
+}
+
+std::string fheroes2::RPG::heroMasteryText( const PlayerColor color, const int32_t heroId )
+{
+    const auto [hall, hallRanks] = strongestDoctrineHall( color );
+    const uint64_t score = heroMasteryScore( heroId );
+    const size_t tier = heroMasteryTierIndex( score );
+
+    std::string text = heroMasteryTitle( hall, hallRanks, tier );
+    text += " - " + formatNumber( score );
+
+    if ( tier + 1 < heroMasteryThresholds.size() ) {
+        const uint64_t nextThreshold = heroMasteryThresholds[tier + 1];
+        const uint64_t remaining = nextThreshold > score ? nextThreshold - score : 0;
+        text += " / " + formatNumber( nextThreshold );
+        text += " (" + formatNumber( remaining ) + " to " + heroMasteryTitle( hall, hallRanks, tier + 1 ) + ")";
+    }
+    else {
+        text += " (maximum mastery tier)";
+    }
+
+    return text;
 }
