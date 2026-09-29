@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "dialog.h"
+#include "game_rpg_events.h"
 #include "ui_dialog.h"
 
 namespace fheroes2
@@ -84,8 +85,7 @@ namespace fheroes2
 // Intercept only calls originating from the RPG implementation in this translation unit.
 // The real shared dialog API is not modified. Battle and town-capture awards are wrapped below
 // so Hero Mastery can feed milestone rewards back into the existing RPG XP progression loop.
-// addExperience is also wrapped so external offline awards can recover a stalled timestamp handoff
-// and make their rare doctrine-drop roll without changing any ordinary field XP paths.
+// addExperience is wrapped so call sites can be directed to the implementation unit.
 #define showStandardTextMessage rpgShowStandardTextMessage
 #define addExperience rpgAddExperienceImpl
 #define awardBattle rpgAwardBattleImpl
@@ -123,10 +123,6 @@ namespace
     constexpr std::array<const char *, 6> heroStreakLabels{ "Quiet", "Gathering", "Hot", "Dominant", "Relentless", "Legendary Run" };
 
     constexpr uint64_t battleDoctrineDropDenominator = 500;
-    constexpr uint64_t offlineDoctrineDropDenominator = 5000;
-    constexpr uint64_t offlineDoctrineXpPerRoll = 2500;
-    constexpr uint64_t maximumOfflineDoctrineRolls = 10;
-    constexpr int64_t offlineSecondsPerDayForRecovery = 24 * 60 * 60;
 
     static_assert( heroMasteryThresholds.size() == heroMasteryRewardExperience.size() );
     static_assert( heroMasteryThresholds[0] == 0 );
@@ -145,91 +141,6 @@ namespace
     static_assert( heroStreakThresholds[3] < heroStreakThresholds[4] );
     static_assert( heroStreakThresholds[4] < heroStreakThresholds[5] );
     static_assert( battleDoctrineDropDenominator > 1 );
-    static_assert( offlineDoctrineDropDenominator > battleDoctrineDropDenominator );
-    static_assert( offlineDoctrineXpPerRoll > 0 );
-    static_assert( maximumOfflineDoctrineRolls > 0 );
-    static_assert( offlineSecondsPerDayForRecovery > 0 );
-
-    std::pair<int64_t, uint64_t> recoverStalledOfflineExperience()
-    {
-        std::ifstream input( System::concatPath( fheroes2::RPG::dataDirectory(), "offline_progress.dat" ) );
-        if ( !input ) {
-            return { 0, 0 };
-        }
-
-        int64_t lastSeenUnix = 0;
-        std::array<int64_t, 7> dailyIncome{};
-        uint32_t efficiencyPercent = 100;
-        bool hasLastSeen = false;
-        bool hasDailyIncome = false;
-
-        std::string line;
-        while ( std::getline( input, line ) ) {
-            std::istringstream row( line );
-            std::string key;
-            row >> key;
-            if ( key == "last_seen_unix" ) {
-                hasLastSeen = static_cast<bool>( row >> lastSeenUnix );
-            }
-            else if ( key == "daily_income" ) {
-                hasDailyIncome = true;
-                for ( int64_t & value : dailyIncome ) {
-                    if ( !( row >> value ) || value < 0 || value > std::numeric_limits<int32_t>::max() ) {
-                        hasDailyIncome = false;
-                        break;
-                    }
-                }
-            }
-            else if ( key == "state_efficiency_percent" ) {
-                row >> efficiencyPercent;
-            }
-        }
-
-        if ( !hasLastSeen || !hasDailyIncome || lastSeenUnix <= 0 ) {
-            return { 0, 0 };
-        }
-
-        const int64_t now
-            = std::chrono::duration_cast<std::chrono::seconds>( std::chrono::system_clock::now().time_since_epoch() ).count();
-        if ( now <= lastSeenUnix ) {
-            return { 0, 0 };
-        }
-
-        const int64_t elapsedSeconds = now - lastSeenUnix;
-
-        // Reconstruct the baseline award from the persisted timestamp whenever the normal
-        // handoff under-reports it. There is deliberately no minimum-duration gate: the core
-        // offline system supports short intervals too, and recovery should follow the same rule.
-        const long double commonIncome = static_cast<long double>( dailyIncome[0] + dailyIncome[2] ) * 100.0L;
-        const long double rareIncome
-            = static_cast<long double>( dailyIncome[1] + dailyIncome[3] + dailyIncome[4] + dailyIncome[5] ) * 500.0L;
-        const long double goldIncome = static_cast<long double>( dailyIncome[6] ) * 15.0L;
-        const long double baselineDailyEquivalent = std::max<long double>( 2500.0L, commonIncome + rareIncome + goldIncome );
-        const uint32_t clampedEfficiency = std::clamp<uint32_t>( efficiencyPercent, 100, 150 );
-        const long double recovered
-            = baselineDailyEquivalent * static_cast<long double>( clampedEfficiency ) / 100.0L
-              * static_cast<long double>( elapsedSeconds ) / static_cast<long double>( offlineSecondsPerDayForRecovery );
-
-        if ( recovered < 1.0L ) {
-            return { lastSeenUnix, 0 };
-        }
-        if ( recovered >= static_cast<long double>( std::numeric_limits<uint64_t>::max() ) ) {
-            return { lastSeenUnix, std::numeric_limits<uint64_t>::max() };
-        }
-        return { lastSeenUnix, static_cast<uint64_t>( recovered ) };
-    }
-
-    void showOfflineRecoveryPopup( const uint64_t creditedExperience )
-    {
-        if ( creditedExperience == 0 ) {
-            return;
-        }
-
-        std::string message = "Recovered +" + fheroes2::RPG::formatExperience( creditedExperience );
-        message += " RPG XP from the saved offline timestamp.";
-        const fheroes2::AutoPlayPopupTimeoutScope timeoutScope( true );
-        fheroes2::showStandardTextMessage( "Offline Progress Recovered", std::move( message ), Dialog::ZERO );
-    }
 
     std::mt19937_64 & doctrineDropRng()
     {
@@ -281,13 +192,13 @@ namespace
         return id;
     }
 
-    void showDoctrineDropPopup( const size_t id, const bool offline )
+    void showDoctrineDropPopup( const size_t id )
     {
         if ( id >= upgradeCount ) {
             return;
         }
 
-        std::string message = offline ? "Offline progress uncovered a rare doctrine: " : "A defeated enemy dropped a rare doctrine: ";
+        std::string message = "A defeated enemy dropped a rare doctrine: ";
         message += upgrades[id].name;
         message += ".\nRank increased to " + formatNumber( playerProfile.ranks[id] ) + ".";
 
@@ -295,22 +206,6 @@ namespace
         // scoped timeout dismisses it automatically instead of blocking until the player clicks.
         const fheroes2::AutoPlayPopupTimeoutScope timeoutScope( true );
         fheroes2::showStandardTextMessage( "Doctrine Drop", std::move( message ), Dialog::ZERO );
-    }
-
-    void rollOfflineDoctrineDrop( const PlayerColor color, const uint64_t creditedExperience )
-    {
-        const uint64_t rolls = std::min<uint64_t>( maximumOfflineDoctrineRolls, creditedExperience / offlineDoctrineXpPerRoll );
-        for ( uint64_t roll = 0; roll < rolls; ++roll ) {
-            if ( !rollOneIn( offlineDoctrineDropDenominator ) ) {
-                continue;
-            }
-
-            const size_t doctrine = grantRandomDoctrineDrop( color );
-            if ( doctrine < upgradeCount ) {
-                showDoctrineDropPopup( doctrine, true );
-            }
-            break;
-        }
     }
 
     std::pair<size_t, uint64_t> strongestDoctrineHall( const PlayerColor color )
@@ -425,31 +320,7 @@ namespace fheroes2::RPG
 {
     uint64_t addExperience( const PlayerColor color, const uint64_t amount, const ExperienceKind kind )
     {
-        static int64_t recoveredSnapshotUnix = 0;
-
-        int64_t recoverySnapshotUnix = 0;
-        uint64_t recoveredAmount = 0;
-        if ( kind == ExperienceKind::OFFLINE ) {
-            std::tie( recoverySnapshotUnix, recoveredAmount ) = recoverStalledOfflineExperience();
-            if ( recoverySnapshotUnix == recoveredSnapshotUnix ) {
-                recoveredAmount = 0;
-            }
-        }
-
-        const uint64_t effectiveAmount = kind == ExperienceKind::OFFLINE ? std::max( amount, recoveredAmount ) : amount;
-        const bool usedRecovery = kind == ExperienceKind::OFFLINE && recoveredAmount > amount;
-        const uint64_t credited = rpgAddExperienceImpl( color, effectiveAmount, kind );
-
-        if ( kind == ExperienceKind::OFFLINE && recoverySnapshotUnix > 0 && credited > 0 ) {
-            recoveredSnapshotUnix = recoverySnapshotUnix;
-        }
-        if ( usedRecovery && credited > 0 ) {
-            showOfflineRecoveryPopup( credited );
-        }
-        if ( kind == ExperienceKind::OFFLINE && credited > 0 ) {
-            rollOfflineDoctrineDrop( color, credited );
-        }
-        return credited;
+        return rpgAddExperienceImpl( color, amount, kind );
     }
 
     void awardBattle( const PlayerColor color, const PlayerColor opponent, const uint32_t battleExperience, const bool won, const bool defending,
@@ -465,8 +336,12 @@ namespace fheroes2::RPG
         if ( won && color == activePlayerColor && rollOneIn( battleDoctrineDropDenominator ) ) {
             const size_t doctrine = grantRandomDoctrineDrop( color );
             if ( doctrine < upgradeCount ) {
-                showDoctrineDropPopup( doctrine, false );
+                showDoctrineDropPopup( doctrine );
             }
+        }
+
+        if ( won && color == activePlayerColor ) {
+            fheroes2::RPG::onBattleVictory( color, heroId );
         }
     }
 
@@ -477,6 +352,10 @@ namespace fheroes2::RPG
         const uint64_t milestoneReward = heroMasteryMilestoneReward( masteryBefore, heroMasteryScore( heroId ) );
         if ( milestoneReward > 0 ) {
             static_cast<void>( addExperience( color, milestoneReward, ExperienceKind::HERO ) );
+        }
+
+        if ( color == activePlayerColor ) {
+            fheroes2::RPG::onCastleCapture( color, heroId );
         }
     }
 }

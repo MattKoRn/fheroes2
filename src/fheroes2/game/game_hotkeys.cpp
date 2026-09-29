@@ -259,6 +259,8 @@ namespace
             = { Game::HotKeyCategory::WORLD_MAP, gettext_noop( "hotkey|kingdom summary" ), fheroes2::Key::KEY_K };
         hotKeyEventInfo[hotKeyEventToInt( Game::HotKeyEvent::WORLD_RPG_MENU )]
             = { Game::HotKeyCategory::WORLD_MAP, gettext_noop( "hotkey|kingdom RPG menu" ), fheroes2::Key::KEY_F9 };
+        hotKeyEventInfo[hotKeyEventToInt( Game::HotKeyEvent::WORLD_RPG_EVENT )]
+            = { Game::HotKeyCategory::WORLD_MAP, gettext_noop( "hotkey|trigger RPG random event" ), fheroes2::Key::KEY_F7 };
         hotKeyEventInfo[hotKeyEventToInt( Game::HotKeyEvent::WORLD_DEFAULT_ACTION )]
             = { Game::HotKeyCategory::WORLD_MAP, gettext_noop( "hotkey|default action" ), fheroes2::Key::KEY_SPACE };
         hotKeyEventInfo[hotKeyEventToInt( Game::HotKeyEvent::WORLD_OPEN_FOCUS )]

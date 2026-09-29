@@ -76,6 +76,7 @@ namespace
 
     std::vector<AutoPlayDialogDecision> autoPlayDialogDecisionStack;
     uint32_t autoPlayPopupTimeoutOverrideDepth = 0;
+    uint32_t autoPlayForceManualOverrideDepth = 0;
 
     int getFallbackAutoPlayDialogDecision( const int buttons )
     {
@@ -202,6 +203,22 @@ namespace fheroes2
         }
     }
 
+    AutoPlayForceManualScope::AutoPlayForceManualScope( const bool enable )
+    {
+        if ( enable ) {
+            ++autoPlayForceManualOverrideDepth;
+            _active = true;
+        }
+    }
+
+    AutoPlayForceManualScope::~AutoPlayForceManualScope()
+    {
+        if ( _active ) {
+            assert( autoPlayForceManualOverrideDepth > 0 );
+            --autoPlayForceManualOverrideDepth;
+        }
+    }
+
     AutoPlayDialogDecisionScope::AutoPlayDialogDecisionScope( const int result, std::string decisionText )
     {
         if ( isAutoPlayPopupTimeoutEnabled() ) {
@@ -252,6 +269,10 @@ namespace fheroes2
 
     bool isAutoPlayPopupTimeoutEnabled()
     {
+        if ( autoPlayForceManualOverrideDepth > 0 ) {
+            return false;
+        }
+
         if ( autoPlayPopupTimeoutOverrideDepth > 0 ) {
             return true;
         }

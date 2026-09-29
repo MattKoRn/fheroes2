@@ -56,6 +56,8 @@ namespace
         case StrategicAdviceKind::ARTIFACT_RECOVERY:
         case StrategicAdviceKind::HERO_TRAINING:
         case StrategicAdviceKind::SPELL_PILGRIMAGE:
+        case StrategicAdviceKind::SHRINE_STUDY:
+        case StrategicAdviceKind::MANA_RESTORATION:
         case StrategicAdviceKind::MAGIC_DEVELOPMENT:
         case StrategicAdviceKind::DEVELOPMENT:
             return CouncilV18PlanFamily::DEVELOPMENT;
@@ -83,6 +85,7 @@ namespace
         case StrategicAdviceKind::HERO_SPLIT_SUPPORT:
         case StrategicAdviceKind::HERO_OPTIMIZE_PAIR:
         case StrategicAdviceKind::HERO_FAST_RESERVE:
+        case StrategicAdviceKind::RECRUIT_HERO:
             return CouncilV18PlanFamily::SUPPORT;
 
         case StrategicAdviceKind::REGROUP:

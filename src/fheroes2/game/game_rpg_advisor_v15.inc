@@ -78,6 +78,10 @@ namespace
             return isCouncilV15BuildingFeasible( kingdom, advice );
         case AdviceAction::TOWN_ARMY_MANAGEMENT:
             return isCouncilV15TownArmyFeasible( kingdom, advice );
+        case AdviceAction::RECRUIT_HERO: {
+            Castle * castle = getOwnedAdviceCastle( kingdom, advice.targetIndex );
+            return castle != nullptr && castle->AllowBuyHero();
+        }
         default:
             return true;
         }
@@ -111,6 +115,13 @@ namespace
                 return {};
             }
             return monster.GetCost() * count;
+        }
+
+        if ( advice.action == AdviceAction::RECRUIT_HERO ) {
+            if ( !castle->AllowBuyHero() ) {
+                return {};
+            }
+            return PaymentConditions::RecruitHero();
         }
 
         return {};

@@ -118,7 +118,10 @@ namespace
         HERO_SPLIT_MAIN,
         HERO_SPLIT_SUPPORT,
         HERO_OPTIMIZE_PAIR,
-        HERO_FAST_RESERVE
+        HERO_FAST_RESERVE,
+        RECRUIT_HERO,
+        MANA_RESTORATION,
+        SHRINE_STUDY
     };
 
     enum class AdviceAction : uint8_t
@@ -127,7 +130,8 @@ namespace
         RECRUIT_CREATURES,
         BUILD_STRUCTURE,
         TOWN_ARMY_MANAGEMENT,
-        HERO_EXCHANGE
+        HERO_EXCHANGE,
+        RECRUIT_HERO
     };
 
     struct StrategicAdvice
@@ -226,6 +230,9 @@ namespace
         case StrategicAdviceKind::HERO_SPLIT_SUPPORT: return "SPLIT SUPPORT";
         case StrategicAdviceKind::HERO_OPTIMIZE_PAIR: return "ORDER PAIR";
         case StrategicAdviceKind::HERO_FAST_RESERVE: return "FAST RESERVE";
+        case StrategicAdviceKind::RECRUIT_HERO: return "RECRUIT";
+        case StrategicAdviceKind::MANA_RESTORATION: return "MANA";
+        case StrategicAdviceKind::SHRINE_STUDY: return "SPELL";
         default: return "COUNCIL";
         }
     }
@@ -265,6 +272,7 @@ namespace
         case MP2::OBJ_FORT:
         case MP2::OBJ_MERCENARY_CAMP:
         case MP2::OBJ_WITCH_DOCTORS_HUT:
+        case MP2::OBJ_WITCHS_HUT:
         case MP2::OBJ_STANDING_STONES:
         case MP2::OBJ_SHRINE_FIRST_CIRCLE:
         case MP2::OBJ_SHRINE_SECOND_CIRCLE:
@@ -326,7 +334,8 @@ namespace
         case MP2::OBJ_GAZEBO:
         case MP2::OBJ_TREE_OF_KNOWLEDGE:
         case MP2::OBJ_ARENA:
-        case MP2::OBJ_XANADU: return StrategicAdviceKind::HERO_TRAINING;
+        case MP2::OBJ_XANADU:
+        case MP2::OBJ_WITCHS_HUT: return StrategicAdviceKind::HERO_TRAINING;
         case MP2::OBJ_SHRINE_FIRST_CIRCLE:
         case MP2::OBJ_SHRINE_SECOND_CIRCLE:
         case MP2::OBJ_SHRINE_THIRD_CIRCLE: return StrategicAdviceKind::SPELL_PILGRIMAGE;
@@ -361,6 +370,7 @@ namespace
         case MP2::OBJ_FORT:
         case MP2::OBJ_MERCENARY_CAMP:
         case MP2::OBJ_WITCH_DOCTORS_HUT:
+        case MP2::OBJ_WITCHS_HUT:
         case MP2::OBJ_STANDING_STONES:
         case MP2::OBJ_ARENA: return 7200.0;
         case MP2::OBJ_SHRINE_FIRST_CIRCLE:
@@ -420,6 +430,7 @@ namespace
         case MP2::OBJ_TREE_OF_KNOWLEDGE:
         case MP2::OBJ_ARENA:
         case MP2::OBJ_XANADU: return "Train at";
+        case MP2::OBJ_WITCHS_HUT: return "Learn at";
         case MP2::OBJ_SHRINE_FIRST_CIRCLE:
         case MP2::OBJ_SHRINE_SECOND_CIRCLE:
         case MP2::OBJ_SHRINE_THIRD_CIRCLE: return "Study at";
@@ -470,6 +481,14 @@ namespace
         }
         if ( ( objectType == MP2::OBJ_ARTIFACT || objectType == MP2::OBJ_SHIPWRECK_SURVIVOR ) && hero.IsFullBagArtifacts() ) return false;
         if ( isVisitFilteredObject( objectType ) && ( hero.isVisited( tile ) || kingdom.isVisited( tile ) ) ) return false;
+        if ( objectType == MP2::OBJ_MAGIC_WELL && hero.GetSpellPoints() >= hero.GetMaxSpellPoints() ) return false;
+        if ( objectType == MP2::OBJ_ARTESIAN_SPRING && hero.GetSpellPoints() >= 2 * hero.GetMaxSpellPoints() ) return false;
+        if ( ( objectType == MP2::OBJ_SHRINE_FIRST_CIRCLE || objectType == MP2::OBJ_SHRINE_SECOND_CIRCLE || objectType == MP2::OBJ_SHRINE_THIRD_CIRCLE ) && !hero.HaveSpellBook() ) return false;
+        if ( objectType == MP2::OBJ_SHRINE_THIRD_CIRCLE && hero.GetLevelSkill( Skill::Secondary::WISDOM ) == Skill::Level::NONE ) return false;
+        if ( objectType == MP2::OBJ_WITCHS_HUT ) {
+            const Skill::Secondary skill = Maps::getSecondarySkillFromWitchsHut( tile );
+            if ( hero.GetLevelSkill( skill.Skill() ) != Skill::Level::NONE || hero.HasMaxSecondarySkill() ) return false;
+        }
         return true;
     }
 
@@ -496,8 +515,18 @@ namespace
         const double matchup = defenderStrength > 0.0 ? heroStrength / defenderStrength : 0.0;
         if ( defenderStrength > 0.0 && matchup < 1.25 ) return advice;
 
-        const StrategicAdviceKind kind = classifyStrategicObject( objectType );
+        StrategicAdviceKind kind = classifyStrategicObject( objectType );
+        if ( ( objectType == MP2::OBJ_MAGIC_WELL || objectType == MP2::OBJ_ARTESIAN_SPRING ) && hero.GetSpellPoints() < hero.GetMaxSpellPoints() ) {
+            kind = StrategicAdviceKind::MANA_RESTORATION;
+        }
+        else if ( objectType == MP2::OBJ_SHRINE_FIRST_CIRCLE || objectType == MP2::OBJ_SHRINE_SECOND_CIRCLE || objectType == MP2::OBJ_SHRINE_THIRD_CIRCLE ) {
+            kind = StrategicAdviceKind::SHRINE_STUDY;
+        }
+
         double score = baseStrategicValue( objectType );
+        if ( kind == StrategicAdviceKind::MANA_RESTORATION && hero.GetSpellPoints() <= hero.GetMaxSpellPoints() / 3 ) {
+            score *= 1.32;
+        }
         if ( isPermanentStrategicObject( objectType ) ) score *= 1.28;
         if ( defenderStrength > 0.0 ) score *= std::clamp( 0.82 + matchup * 0.17, 1.0, 1.70 );
         const double movementFraction = static_cast<double>( distance ) / std::max<uint32_t>( 1, currentMove );
@@ -555,13 +584,14 @@ namespace
         case StrategicAdviceKind::TREASURE_HUNT: advice.rationale = "Immediate treasure without sacrificing the turn to travel"; break;
         case StrategicAdviceKind::HERO_TRAINING: advice.rationale = "Permanent hero development is reachable before turn end"; break;
         case StrategicAdviceKind::SPELL_PILGRIMAGE:
+        case StrategicAdviceKind::SHRINE_STUDY: advice.rationale = "Learn new tactical magic; wisdom verified"; break;
+        case StrategicAdviceKind::MANA_RESTORATION: advice.rationale = "Restore depleted spell points for battlefield casting"; break;
         case StrategicAdviceKind::MAGIC_DEVELOPMENT: advice.rationale = "Improve magical readiness while the detour fits this turn"; break;
         case StrategicAdviceKind::FOG_SWEEP: advice.rationale = "Turn movement into map intelligence and future route quality"; break;
         case StrategicAdviceKind::LOGISTICS: advice.rationale = "Gain movement or operational efficiency before committing elsewhere"; break;
         default: advice.rationale = "High-value objective that can be completed this turn"; break;
         }
         if ( defenderStrength > 0.0 ) advice.rationale += " | " + formatAdvisorRatio( matchup ) + " army edge";
-        advice.rationale += " | executable this turn";
         return advice;
     }
 
@@ -1465,6 +1495,42 @@ namespace
         return { true, "Executed [" + std::string( adviceKindName( advice.kind ) ) + "]: " + advice.title };
     }
 
+    AdviceExecutionResult executeRecruitHeroAdvice( Kingdom & kingdom, const StrategicAdvice & advice )
+    {
+        Castle * castle = getOwnedAdviceCastle( kingdom, advice.targetIndex );
+        if ( castle == nullptr || castle->GetColor() != kingdom.GetColor() ) {
+            return { false, "Order failed: the designated town is no longer available." };
+        }
+        if ( !castle->AllowBuyHero() ) {
+            return { false, "Order failed: cannot recruit a hero here right now." };
+        }
+        Heroes * recruit = nullptr;
+        if ( advice.secondaryHeroId >= 0 ) {
+            if ( kingdom.GetRecruits().GetHero1() && kingdom.GetRecruits().GetHero1()->GetID() == advice.secondaryHeroId ) {
+                recruit = kingdom.GetRecruits().GetHero1();
+            }
+            else if ( kingdom.GetRecruits().GetHero2() && kingdom.GetRecruits().GetHero2()->GetID() == advice.secondaryHeroId ) {
+                recruit = kingdom.GetRecruits().GetHero2();
+            }
+        }
+        if ( recruit == nullptr ) {
+            recruit = kingdom.GetRecruits().GetHero1() ? kingdom.GetRecruits().GetHero1() : kingdom.GetRecruits().GetHero2();
+        }
+        if ( recruit == nullptr ) {
+            return { false, "Order failed: no tavern recruit is available." };
+        }
+        Heroes * hired = castle->RecruitHero( recruit );
+        if ( hired == nullptr ) {
+            return { false, "Order failed: hero recruitment could not be completed." };
+        }
+        Interface::AdventureMap & adventureMap = Interface::AdventureMap::Get();
+        adventureMap.SetFocus( hired, true );
+        adventureMap.RedrawFocus();
+        adventureMap.getGameArea().SetCenter( hired->GetCenter() );
+        redrawAfterAdviceAction();
+        return { true, "Recruited " + hired->GetName() + " at " + castle->GetName() + "." };
+    }
+
     bool canInteractWithAdviceTarget( const Heroes & hero, const int32_t targetIndex )
     {
         if ( hero.GetIndex() == targetIndex ) return true;
@@ -1609,6 +1675,7 @@ namespace
         case AdviceAction::BUILD_STRUCTURE: return executeBuildingAdvice( kingdom, advice );
         case AdviceAction::TOWN_ARMY_MANAGEMENT: return executeTownArmyAdvice( kingdom, advice );
         case AdviceAction::HERO_EXCHANGE: return executeHeroExchangeAdvice( kingdom, advice );
+        case AdviceAction::RECRUIT_HERO: return executeRecruitHeroAdvice( kingdom, advice );
         case AdviceAction::MOVE_HERO:
         default: return executeMovementAdvice( kingdom, player, advice );
         }

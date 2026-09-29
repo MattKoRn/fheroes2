@@ -63,6 +63,19 @@ namespace fheroes2
         bool _active{ false };
     };
 
+    class AutoPlayForceManualScope final
+    {
+    public:
+        explicit AutoPlayForceManualScope( bool enable = true );
+        ~AutoPlayForceManualScope();
+
+        AutoPlayForceManualScope( const AutoPlayForceManualScope & ) = delete;
+        AutoPlayForceManualScope & operator=( const AutoPlayForceManualScope & ) = delete;
+
+    private:
+        bool _active{ false };
+    };
+
     class AutoPlayDialogDecisionScope final
     {
     public:

@@ -46,6 +46,7 @@
 #include "game_assets.h"
 #include "game_auto_playtest.h"
 #include "game_rpg.h"
+#include "game_rpg_events.h"
 #include "game_io.h"
 #include "game_static.h"
 #include "ground.h"
@@ -1858,6 +1859,10 @@ void Heroes::_levelUp( const bool skipSecondary, const bool autoselect, const bo
 
     if ( !skipSecondary ) {
         _levelUpSecondarySkill( seeds, primarySkill, autoselect, isMapLoading );
+    }
+
+    if ( !isMapLoading ) {
+        fheroes2::RPG::onHeroLevelUp( GetColor(), GetID() );
     }
 }
 

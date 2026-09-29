@@ -22,7 +22,8 @@ namespace
 
     bool isCouncilV10TownAction( const AdviceAction action )
     {
-        return action == AdviceAction::RECRUIT_CREATURES || action == AdviceAction::BUILD_STRUCTURE || action == AdviceAction::TOWN_ARMY_MANAGEMENT;
+        return action == AdviceAction::RECRUIT_CREATURES || action == AdviceAction::BUILD_STRUCTURE
+               || action == AdviceAction::TOWN_ARMY_MANAGEMENT || action == AdviceAction::RECRUIT_HERO;
     }
 
     std::string councilV10DuplicateKey( const StrategicAdvice & advice )

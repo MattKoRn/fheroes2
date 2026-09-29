@@ -185,6 +185,7 @@ namespace Game
         ARMY_DISMISS,
         ARMY_SWAP,
         WORLD_RPG_MENU,
+        WORLD_RPG_EVENT,
 
         // WARNING! Put all new event only above this line. No adding in between.
         NO_EVENT,
