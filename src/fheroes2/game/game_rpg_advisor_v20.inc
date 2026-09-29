@@ -1,11 +1,12 @@
-// War Council v20: clean visuals, new strategic advice types, bug fixes, compact writing, and zero UI bloat.
+// War Council v20: clean visuals, remaining-budget planning with partial recruitment, new strategic advice types, bug fixes, compact writing, and zero UI bloat.
 // v19 owns area coordination. This layer introduces:
 // 1. Visual icons: Aligned castle locator icons for town/castle orders matching hero portraits.
-// 2. New advice types: Tavern Hero Recruitment (RECRUIT_HERO), Mana Restoration (MANA_RESTORATION), and Spell Shrine Study (SHRINE_STUDY).
-// 3. AI Bug Fixes: Pruning zero-movement orders, full-bag artifact deadlocks, mana well waste, and shrine wisdom validation.
-// 4. Compact Writing: Eliminating redundant boilerplate across titles and rationales.
-// 5. Streamlined Feedback: In-dialog banner feedback replacing modal popup interruptions on successful orders.
-// 6. Right-Click Inspection: Classic HOMM2 detail popup for order inspection without screen bloat.
+// 2. Budget-aware planning: Live remaining-resource simulation allows partial recruitment and stronger spending to capture the best plan without all-or-nothing commitment.
+// 3. New advice types: Tavern Hero Recruitment (RECRUIT_HERO), Mana Restoration (MANA_RESTORATION), and Spell Shrine Study (SHRINE_STUDY).
+// 4. AI Bug Fixes: Pruning zero-movement orders, full-bag artifact deadlocks, mana well waste, and shrine wisdom validation.
+// 5. Compact Writing: Eliminating redundant boilerplate across titles and rationales.
+// 6. Streamlined Feedback: In-dialog banner feedback replacing modal popup interruptions on successful orders.
+// 7. Right-Click Inspection: Classic HOMM2 detail popup for order inspection without screen bloat.
 
 #include "game_rpg_advisor_v19.inc"
 #undef showRpgStrategicAdvisor
@@ -138,11 +139,136 @@ namespace
         return councilV14TypeLabel( advice, context, state );
     }
 
+    enum class CouncilV20SpendMode : uint8_t
+    {
+        NONE,
+        FULL,
+        PARTIAL,
+        DEFER
+    };
+
+    struct CouncilV20SpendPlan
+    {
+        CouncilV20SpendMode mode{ CouncilV20SpendMode::NONE };
+        Funds cost;
+        uint32_t requestedRecruitCount{ 0 };
+        uint32_t plannedRecruitCount{ 0 };
+    };
+
+    CouncilV20SpendPlan councilV20PlanSpend( Kingdom & kingdom, const StrategicAdvice & advice, const Funds & remaining )
+    {
+        CouncilV20SpendPlan plan;
+        Castle * castle = getOwnedAdviceCastle( kingdom, advice.targetIndex );
+        if ( castle == nullptr ) {
+            return plan;
+        }
+
+        if ( advice.action == AdviceAction::BUILD_STRUCTURE ) {
+            if ( advice.buildingType == BUILD_NOTHING || !castle->AllowBuyBuilding( advice.buildingType ) ) {
+                return plan;
+            }
+
+            plan.cost = PaymentConditions::BuyBuilding( castle->GetRace(), advice.buildingType );
+            plan.mode = remaining >= plan.cost ? CouncilV20SpendMode::FULL : CouncilV20SpendMode::DEFER;
+            return plan;
+        }
+
+        if ( advice.action != AdviceAction::RECRUIT_CREATURES ) {
+            return plan;
+        }
+
+        const uint32_t actualDwelling = castle->GetActualDwelling( advice.dwellingType );
+        if ( actualDwelling == BUILD_NOTHING || !castle->isBuild( actualDwelling ) ) {
+            return plan;
+        }
+
+        const Monster monster( castle->GetRace(), actualDwelling );
+        if ( !hasRecruitmentRoom( *castle, monster ) ) {
+            return plan;
+        }
+
+        const uint32_t available = castle->getMonstersInDwelling( actualDwelling );
+        plan.requestedRecruitCount = std::min( advice.recruitCount, available );
+        if ( plan.requestedRecruitCount == 0 ) {
+            return plan;
+        }
+
+        const uint32_t affordableFromRemaining = castle->getRecruitLimit( monster, remaining );
+        plan.plannedRecruitCount = std::min( plan.requestedRecruitCount, affordableFromRemaining );
+        if ( plan.plannedRecruitCount == 0 ) {
+            plan.mode = CouncilV20SpendMode::DEFER;
+            return plan;
+        }
+
+        plan.cost = monster.GetCost() * plan.plannedRecruitCount;
+        plan.mode = plan.plannedRecruitCount >= plan.requestedRecruitCount ? CouncilV20SpendMode::FULL : CouncilV20SpendMode::PARTIAL;
+        return plan;
+    }
+
+    void applyCouncilV20SpendCommitments( std::vector<StrategicAdvice> & candidates, Kingdom & kingdom, const CouncilContext & context )
+    {
+        std::vector<size_t> spendIndexes;
+        spendIndexes.reserve( candidates.size() );
+        for ( size_t index = 0; index < candidates.size(); ++index ) {
+            if ( isCouncilResourceSpend( candidates[index] ) && std::isfinite( candidates[index].score ) && candidates[index].score > 0.0 ) {
+                spendIndexes.emplace_back( index );
+            }
+        }
+        if ( spendIndexes.size() < 2 ) {
+            return;
+        }
+
+        std::sort( spendIndexes.begin(), spendIndexes.end(), [&]( const size_t left, const size_t right ) {
+            return councilV14DeterministicLess( candidates[left], candidates[right] );
+        } );
+
+        const double bestSpendScore = candidates[spendIndexes.front()].score;
+        Funds remaining = kingdom.GetFunds();
+        size_t committedCount = 0;
+
+        for ( const size_t index : spendIndexes ) {
+            StrategicAdvice & advice = candidates[index];
+
+            // Weak alternatives should not consume the simulated pool ahead of stronger work.
+            const bool worthPlanning = advice.score >= std::max( 3200.0, bestSpendScore * 0.70 );
+            if ( !worthPlanning ) {
+                advice.score *= 0.82;
+                continue;
+            }
+
+            const CouncilV20SpendPlan plan = councilV20PlanSpend( kingdom, advice, remaining );
+            if ( plan.mode == CouncilV20SpendMode::NONE ) {
+                advice.score = 0.0;
+                continue;
+            }
+
+            if ( plan.mode == CouncilV20SpendMode::DEFER ) {
+                advice.score *= ( context.lowGold || context.lowMaterials ) ? 0.46 : 0.64;
+                advice.rationale = "DEFER. Stronger spending uses this budget. | " + advice.rationale;
+                continue;
+            }
+
+            remaining -= plan.cost;
+            ++committedCount;
+
+            if ( plan.mode == CouncilV20SpendMode::PARTIAL ) {
+                const double fraction = static_cast<double>( plan.plannedRecruitCount ) / std::max<uint32_t>( 1, plan.requestedRecruitCount );
+                advice.score *= 0.78 + fraction * 0.18;
+                advice.rationale = "PARTIAL " + std::to_string( plan.plannedRecruitCount ) + "/" + std::to_string( plan.requestedRecruitCount )
+                                   + " fits after earlier spend. | " + advice.rationale;
+            }
+            else if ( committedCount > 1 ) {
+                advice.rationale = "FULL. Fits after earlier spend. | " + advice.rationale;
+            }
+        }
+    }
+
     std::vector<StrategicAdvice> generateStrategicAdviceV20( Kingdom & kingdom, const std::set<std::string> & excludedOrders )
     {
         const CouncilContext context = buildCouncilContext( kingdom );
         std::vector<StrategicAdvice> rawCandidates = gatherCouncilCandidates( kingdom, context );
         appendCouncilV20HeroRecruitmentAdvice( rawCandidates, kingdom, context );
+
         appendFrontierBenefitAdvice( rawCandidates, kingdom );
 
         std::vector<StrategicAdvice> candidates = scoreCouncilCandidates( std::move( rawCandidates ), kingdom, context );
@@ -157,6 +283,7 @@ namespace
         filterCouncilV15LiveFeasibility( candidates, kingdom );
         filterCouncilV20SanityAndPruning( candidates, kingdom );
 
+
         applyCouncilSequencePlanning( candidates );
         applyCouncilResourceReservation( candidates, context );
         applyCouncilV9Continuity( candidates );
@@ -164,7 +291,6 @@ namespace
         applyCouncilV9Intelligence( candidates, context );
         applyCouncilV11Intelligence( candidates, context );
         applyCouncilV17LiveCombat( candidates, kingdom );
-
         applyCouncilV19AreaCoordination( candidates, kingdom, context );
         applyCouncilV18FollowThrough( candidates, kingdom );
 
@@ -172,7 +298,11 @@ namespace
         suppressCouncilV10NearDuplicates( candidates );
         applyCouncilV9TypeDiversity( candidates );
         applyAlternativeComparison( candidates );
-        applyCouncilV15SpendCommitments( candidates, kingdom, context );
+        // Unlike v15, recruitment affordability is recalculated against the resources remaining
+        // after each stronger commitment. Do not mutate advice.recruitCount: the order is fully
+        // affordable if selected now; PARTIAL describes compatibility with the simulated prior plan.
+        applyCouncilV20SpendCommitments( candidates, kingdom, context );
+
         pruneCouncilV11WeakAlternatives( candidates );
         pruneCouncilV14OwnerEchoes( candidates );
 
@@ -375,6 +505,7 @@ namespace
             }
 
             const int selection = selectStrategicAdviceV20( advices, councilReport, kingdom );
+
             if ( selection < 0 || static_cast<size_t>( selection ) >= advices.size() ) {
                 return;
             }
@@ -387,6 +518,8 @@ namespace
             } );
             if ( refreshedIt == refreshed.end() ) {
                 councilReport = "Situation changed; advice refreshed.";
+                fheroes2::showStandardTextMessage( "War Council", councilReport, Dialog::OK );
+
                 recentCouncilV18Plan = {};
                 continue;
             }
@@ -395,11 +528,20 @@ namespace
             const AdviceExecutionResult execution = executeStrategicAdviceV20( kingdom, *player, current );
             const bool objectResolved = councilV13ObjectInteractionResolved( kingdom, current );
 
+            showCouncilV13ExecutionFeedback( current, execution );
+            councilReport = councilV13ReportAfterExecution( current, execution, objectResolved );
+
             if ( !execution.success ) {
                 fheroes2::showStandardTextMessage( "War Council", execution.message, Dialog::OK );
                 suppressedOrders.insert( selectedIdentity );
                 recentCouncilV18Plan = {};
                 councilReport = "Order failed; advice refreshed.";
+                continue;
+            }
+
+            // Clean, non-blocking in-dialog report feedback
+            councilReport = execution.message.empty() ? "Order complete; advice refreshed." : execution.message;
+
                 continue;
             }
 
