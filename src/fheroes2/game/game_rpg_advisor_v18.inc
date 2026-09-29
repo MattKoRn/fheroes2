@@ -7,12 +7,99 @@
 
 namespace
 {
+    enum class CouncilV18PlanFamily : uint8_t
+    {
+        NONE,
+        DEFENSE,
+        STRIKE,
+        POSITION,
+        SCOUT,
+        ECONOMY,
+        DEVELOPMENT,
+        SUPPORT,
+        RECOVERY
+    };
+
+    CouncilV18PlanFamily councilV18PlanFamilyForKind( const StrategicAdviceKind kind )
+    {
+        switch ( kind ) {
+        case StrategicAdviceKind::DEFENSE:
+        case StrategicAdviceKind::CASTLE_RELIEF:
+            return CouncilV18PlanFamily::DEFENSE;
+
+        case StrategicAdviceKind::OFFENSE:
+        case StrategicAdviceKind::SIEGE:
+        case StrategicAdviceKind::INTERCEPTION:
+        case StrategicAdviceKind::MONSTER_HUNT:
+            return CouncilV18PlanFamily::STRIKE;
+
+        case StrategicAdviceKind::ROAD_MARCH:
+        case StrategicAdviceKind::SAFE_ADVANCE:
+        case StrategicAdviceKind::TERRITORIAL_PRESSURE:
+        case StrategicAdviceKind::FRONTIER_BREAKTHROUGH:
+        case StrategicAdviceKind::FLANKING_MARCH:
+        case StrategicAdviceKind::LOGISTICS:
+        case StrategicAdviceKind::OPPORTUNITY:
+            return CouncilV18PlanFamily::POSITION;
+
+        case StrategicAdviceKind::FOG_SWEEP:
+        case StrategicAdviceKind::EXPLORATION:
+            return CouncilV18PlanFamily::SCOUT;
+
+        case StrategicAdviceKind::MINE_CAPTURE:
+        case StrategicAdviceKind::ECONOMIC_EXPANSION:
+        case StrategicAdviceKind::RESOURCE_RUN:
+        case StrategicAdviceKind::TREASURE_HUNT:
+        case StrategicAdviceKind::SUPPLY_SWEEP:
+            return CouncilV18PlanFamily::ECONOMY;
+
+        case StrategicAdviceKind::ARTIFACT_RECOVERY:
+        case StrategicAdviceKind::HERO_TRAINING:
+        case StrategicAdviceKind::SPELL_PILGRIMAGE:
+        case StrategicAdviceKind::MAGIC_DEVELOPMENT:
+        case StrategicAdviceKind::DEVELOPMENT:
+            return CouncilV18PlanFamily::DEVELOPMENT;
+
+        case StrategicAdviceKind::TRAVEL_TO_TOWN:
+        case StrategicAdviceKind::TOWN_RESUPPLY:
+        case StrategicAdviceKind::GARRISON_REINFORCEMENT:
+        case StrategicAdviceKind::TOWN_PULL_STRONGEST:
+        case StrategicAdviceKind::TOWN_SEND_SLOWEST:
+        case StrategicAdviceKind::TOWN_SWAP_ARMIES:
+        case StrategicAdviceKind::TOWN_FEED_GARRISON:
+        case StrategicAdviceKind::TOWN_MERGE_HERO:
+        case StrategicAdviceKind::TOWN_MERGE_GARRISON:
+        case StrategicAdviceKind::TOWN_SPLIT_HERO:
+        case StrategicAdviceKind::TOWN_SPLIT_GARRISON:
+        case StrategicAdviceKind::TOWN_OPTIMIZE_HERO:
+        case StrategicAdviceKind::TOWN_OPTIMIZE_GARRISON:
+        case StrategicAdviceKind::HERO_ARMY_TO_MAIN:
+        case StrategicAdviceKind::HERO_ARTIFACTS_TO_MAIN:
+        case StrategicAdviceKind::HERO_FULL_EXCHANGE:
+        case StrategicAdviceKind::HERO_SWAP_ARMIES:
+        case StrategicAdviceKind::HERO_MERGE_MAIN:
+        case StrategicAdviceKind::HERO_MERGE_SUPPORT:
+        case StrategicAdviceKind::HERO_SPLIT_MAIN:
+        case StrategicAdviceKind::HERO_SPLIT_SUPPORT:
+        case StrategicAdviceKind::HERO_OPTIMIZE_PAIR:
+        case StrategicAdviceKind::HERO_FAST_RESERVE:
+            return CouncilV18PlanFamily::SUPPORT;
+
+        case StrategicAdviceKind::REGROUP:
+            return CouncilV18PlanFamily::RECOVERY;
+
+        default:
+            return CouncilV18PlanFamily::NONE;
+        }
+    }
+
     struct CouncilV18PlanMemory
     {
         int32_t heroId{ -1 };
         int32_t anchorIndex{ -1 };
         StrategicAdviceKind kind{ StrategicAdviceKind::OFFENSE };
         CouncilV9Intent intent{ CouncilV9Intent::NONE };
+        CouncilV18PlanFamily family{ CouncilV18PlanFamily::NONE };
     };
 
     CouncilV18PlanMemory recentCouncilV18Plan;
@@ -75,21 +162,18 @@ namespace
         return Maps::GetApproximateDistance( recentCouncilV18Plan.anchorIndex, candidateIndex );
     }
 
-    bool councilV18IsContinuationCandidate( const StrategicAdvice & advice, Kingdom & kingdom, const bool urgentDefense,
+    bool councilV18IsContinuationCandidate( const StrategicAdvice & advice, Kingdom & kingdom,
                                             const std::vector<const Heroes *> & visibleEnemies, uint32_t & proximityDistance )
     {
-        if ( recentCouncilV18Plan.heroId < 0 || recentCouncilV18Plan.intent == CouncilV9Intent::NONE || advice.heroId != recentCouncilV18Plan.heroId
+        if ( recentCouncilV18Plan.heroId < 0 || recentCouncilV18Plan.intent == CouncilV9Intent::NONE
+             || recentCouncilV18Plan.family == CouncilV18PlanFamily::NONE || advice.heroId != recentCouncilV18Plan.heroId
              || !councilV18ContinuationAction( advice ) || !advice.reachableThisTurn || !std::isfinite( advice.score ) || advice.score <= 0.0 ) {
             return false;
         }
 
         const CouncilV9Intent nextIntent = councilV9IntentForAdvice( advice );
-        if ( nextIntent == CouncilV9Intent::NONE || nextIntent != recentCouncilV18Plan.intent ) {
-            return false;
-        }
-
-        // A newly urgent defensive order always interrupts non-defensive plan continuity.
-        if ( urgentDefense && !councilV17IsDefenseOrder( advice ) ) {
+        const CouncilV18PlanFamily nextFamily = councilV18PlanFamilyForKind( advice.kind );
+        if ( nextIntent == CouncilV9Intent::NONE || nextIntent != recentCouncilV18Plan.intent || nextFamily != recentCouncilV18Plan.family ) {
             return false;
         }
 
@@ -103,13 +187,19 @@ namespace
 
     void applyCouncilV18FollowThrough( std::vector<StrategicAdvice> & candidates, Kingdom & kingdom )
     {
-        if ( recentCouncilV18Plan.heroId < 0 || recentCouncilV18Plan.intent == CouncilV9Intent::NONE ) {
+        if ( recentCouncilV18Plan.heroId < 0 || recentCouncilV18Plan.intent == CouncilV9Intent::NONE
+             || recentCouncilV18Plan.family == CouncilV18PlanFamily::NONE ) {
             return;
         }
 
         const bool urgentDefense = councilV18HasUrgentDefense( candidates );
-        const std::vector<const Heroes *> visibleEnemies = councilV17VisibleEnemyHeroes( kingdom );
+        // A new emergency defense is a strategic interruption, not a continuation. Only an
+        // already-defensive plan may carry FOLLOW through an urgent-defense refresh.
+        if ( urgentDefense && recentCouncilV18Plan.family != CouncilV18PlanFamily::DEFENSE ) {
+            return;
+        }
 
+        const std::vector<const Heroes *> visibleEnemies = councilV17VisibleEnemyHeroes( kingdom );
         size_t bestIndex = candidates.size();
         double bestFit = 0.0;
         uint32_t bestDistance = std::numeric_limits<uint32_t>::max();
@@ -117,13 +207,13 @@ namespace
         for ( size_t index = 0; index < candidates.size(); ++index ) {
             StrategicAdvice & advice = candidates[index];
             uint32_t proximityDistance = std::numeric_limits<uint32_t>::max();
-            if ( !councilV18IsContinuationCandidate( advice, kingdom, urgentDefense, visibleEnemies, proximityDistance ) ) {
+            if ( !councilV18IsContinuationCandidate( advice, kingdom, visibleEnemies, proximityDistance ) ) {
                 continue;
             }
 
             const double proximity = 1.0 - std::min( 6.0, static_cast<double>( proximityDistance ) ) / 6.0;
             // v3 deliberately suppresses immediate same-kind repeats. Compensate only for a verified
-            // same-hero, same-intent, nearby continuation so anti-spam remains intact everywhere else.
+            // same-hero, same-intent, same-family nearby continuation so anti-spam remains intact elsewhere.
             const double repeatRecovery = advice.kind == recentCouncilV18Plan.kind ? 1.85 : 1.0;
             const double fit = advice.score * repeatRecovery * ( 1.10 + proximity * 0.10 );
 
@@ -164,7 +254,8 @@ namespace
         }
 
         const CouncilV9Intent intent = councilV9IntentForAdvice( advice );
-        if ( intent == CouncilV9Intent::NONE ) {
+        const CouncilV18PlanFamily family = councilV18PlanFamilyForKind( advice.kind );
+        if ( intent == CouncilV9Intent::NONE || family == CouncilV18PlanFamily::NONE ) {
             return;
         }
 
@@ -172,6 +263,7 @@ namespace
         recentCouncilV18Plan.anchorIndex = hero->GetIndex();
         recentCouncilV18Plan.kind = advice.kind;
         recentCouncilV18Plan.intent = intent;
+        recentCouncilV18Plan.family = family;
     }
 
     std::vector<StrategicAdvice> generateStrategicAdviceV18( Kingdom & kingdom, const std::set<std::string> & excludedOrders )
